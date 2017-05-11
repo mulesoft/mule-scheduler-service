@@ -2,19 +2,26 @@
     xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <groupId>org.mule.services</groupId>
-        <artifactId>mule-services</artifactId>
+        <artifactId>mule-core-services-parent</artifactId>
         <version>4.0.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
     
     <artifactId>mule-service-scheduler</artifactId>
     <packaging>mule-service</packaging>
+    <version>1.0.0-SNAPSHOT</version>
 
     <name>Mule Scheduler Service Implementation</name>
 
     <properties>
-        <formatterConfigPath>../../formatter.xml</formatterConfigPath>
+        <formatterConfigPath>formatter.xml</formatterConfigPath>
     </properties>
+
+    <scm>
+        <connection>scm:git:git://github.com/mulesoft/mule-scheduler-service.git</connection>
+        <developerConnection>scm:git:git@github.com:mulesoft/mule-scheduler-service.git</developerConnection>
+        <url>https://github.com/mulesoft/mule-scheduler-service</url>
+    </scm>
 
     <build>
         <plugins>
@@ -68,20 +75,56 @@
             <groupId>org.mule.runtime</groupId>
             <artifactId>mule-core</artifactId>
             <scope>provided</scope>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
         </dependency>
 
         <dependency>
             <groupId>org.mule.tests</groupId>
             <artifactId>mule-tests-unit</artifactId>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mule.tests</groupId>
             <artifactId>mule-tests-allure</artifactId>
-            <version>${project.version}</version>
+            <version>${project.parent.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <distributionManagement>
+        <downloadUrl>http://www.mulesoft.org/display/MULE/Download</downloadUrl>
+        <repository>
+            <id>mule-releases</id>
+            <name>Mule Release Repository</name>
+            <url>https://repository-master.mulesoft.org/nexus/content/repositories/releases</url>
+        </repository>
+        <snapshotRepository>
+            <id>mule-snapshots</id>
+            <name>Mule Snapshot Repository</name>
+            <url>https://repository-master.mulesoft.org/nexus/content/repositories/snapshots</url>
+            <uniqueVersion>false</uniqueVersion>
+        </snapshotRepository>
+    </distributionManagement>
+
+    <repositories>
+        <repository>
+            <id>mule</id>
+            <name>Mule Repository</name>
+            <url>https://repository.mulesoft.org/nexus/content/repositories/public/</url>
+        </repository>
+        <repository>
+            <id>spring-snapshot</id>
+            <name>Spring Snapshot Repository</name>
+            <url>http://repo.spring.io/snapshot/</url>
+        </repository>
+    </repositories>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>mule-plugin</id>
+            <name>Mule Repository</name>
+            <url>https://repository.mulesoft.org/nexus/content/repositories/public/</url>
+        </pluginRepository>
+    </pluginRepositories>
 </project>

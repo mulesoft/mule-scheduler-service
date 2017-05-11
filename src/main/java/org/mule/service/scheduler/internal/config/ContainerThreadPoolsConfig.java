@@ -41,7 +41,7 @@ import org.slf4j.Logger;
  * <p>
  * All of its getter methods for configuration values eturn non-null values.
  * 
- * @since 4.0
+ * @since 1.0
  */
 public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 

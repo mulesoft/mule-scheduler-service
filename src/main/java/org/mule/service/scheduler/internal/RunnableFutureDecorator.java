@@ -20,7 +20,7 @@ import org.slf4j.Logger;
  * Decorates a {@link RunnableFuture} in order to do hook behavior both before and after the execution of the decorated
  * {@link RunnableFuture} so a consistent state is maintained in the owner {@link DefaultScheduler}.
  *
- * @since 4.0
+ * @since 1.0
  */
 class RunnableFutureDecorator<V> extends AbstractRunnableFutureDecorator<V> {
 

@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * {@link ThreadFactory} implementation that sets a {@link ThreadGroup} and a name with a counter to the created {@link Thread}s
  *
- * @since 4.0
+ * @since 1.0
  */
 public class SchedulerThreadFactory implements java.util.concurrent.ThreadFactory {
 

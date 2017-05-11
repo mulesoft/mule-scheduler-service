@@ -50,7 +50,7 @@ import org.slf4j.Logger;
 /**
  * Default implementation of {@link SchedulerService}.
  *
- * @since 4.0
+ * @since 1.0
  */
 public class DefaultSchedulerService implements SchedulerService, Startable, Stoppable {
 

@@ -24,7 +24,7 @@ import java.util.concurrent.ThreadPoolExecutor.AbortPolicy;
  * @see AbortPolicy
  * @see WaitPolicy
  * 
- * @since 4.0
+ * @since 1.0
  */
 public final class ByCallerThreadGroupPolicy implements RejectedExecutionHandler {
 

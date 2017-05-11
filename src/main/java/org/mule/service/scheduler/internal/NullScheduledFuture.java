@@ -15,7 +15,7 @@ import java.util.concurrent.TimeoutException;
 /**
  * No-op implementation of a {@link ScheduledFuture}.
  *
- * @since 4.0
+ * @since 1.0
  */
 final class NullScheduledFuture<V> implements ScheduledFuture<V> {
 

@@ -18,7 +18,7 @@ import java.util.List;
 /**
  * Provides a definition for {@link SchedulerService}.
  *
- * @since 4.0
+ * @since 1.0
  */
 public class SchedulerServiceProvider implements ServiceProvider {
 

@@ -18,7 +18,7 @@ import java.util.concurrent.TimeoutException;
  * Decorates a {@link ScheduledFuture} in order to propagate the calls to {@link Future} methods not only to the decorated task
  * but also to the {@link RunnableFuture} that represents the scheduled task.
  *
- * @since 4.0
+ * @since 1.0
  */
 class ScheduledFutureDecorator<V> implements ScheduledFuture<V> {
 
