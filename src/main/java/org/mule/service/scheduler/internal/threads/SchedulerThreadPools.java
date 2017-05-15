@@ -56,7 +56,7 @@ import org.slf4j.Logger;
  * {@link ScheduledExecutorService} for scheduling work. When a scheduled tasks is fired, they are executed using the
  * {@link Scheduler}'s own executor.
  * 
- * @since 4.0
+ * @since 1.0
  */
 public class SchedulerThreadPools {
 

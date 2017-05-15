@@ -22,7 +22,7 @@ import org.slf4j.Logger;
  * Abstract base decorator for a a {@link RunnableFuture} in order to do hook behavior before the execution of the decorated
  * {@link RunnableFuture} so a consistent state is maintained in the owner {@link DefaultScheduler}.
  *
- * @since 4.0
+ * @since 1.0
  */
 abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
 

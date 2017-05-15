@@ -25,7 +25,7 @@ import java.util.function.Supplier;
  * <p>
  * Exceeding tasks will block the caller, until a running task is finished.
  * 
- * @since 4.0
+ * @since 1.0
  */
 public class ThrottledScheduler extends DefaultScheduler {
 

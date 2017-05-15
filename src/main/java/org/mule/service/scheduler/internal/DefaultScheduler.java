@@ -55,7 +55,7 @@ import org.slf4j.Logger;
 /**
  * Proxy for a {@link ScheduledExecutorService} that adds tracking of the source of the dispatched tasks.
  *
- * @since 4.0
+ * @since 1.0
  */
 public class DefaultScheduler extends AbstractExecutorService implements Scheduler {
 
