@@ -60,14 +60,27 @@ public final class ByCallerThreadGroupPolicy implements RejectedExecutionHandler
     ThreadGroup targetGroup = ((SchedulerThreadFactory) executor.getThreadFactory()).getGroup();
     ThreadGroup currentThreadGroup = currentThread().getThreadGroup();
 
-    if (waitGroups.contains(targetGroup) && waitGroups.contains(currentThreadGroup)) {
+    if (isWaitGroupThread(targetGroup) && targetGroup == currentThreadGroup) {
       callerRuns.rejectedExecution(r, executor);
-    } else if (!isSchedulerThread(currentThreadGroup) || waitGroups.contains(currentThreadGroup)) {
+    } else if (!isSchedulerThread(currentThreadGroup) || isWaitGroupThread(currentThreadGroup)) {
       // MULE-11460 Make CPU-intensive pool a ForkJoinPool - keep the parallelism when waiting.
       wait.rejectedExecution(r, executor);
     } else {
       abort.rejectedExecution(r, executor);
     }
+  }
+
+  private boolean isWaitGroupThread(ThreadGroup threadGroup) {
+    if (threadGroup != null) {
+      while (threadGroup.getParent() != null) {
+        if (waitGroups.contains(threadGroup)) {
+          return true;
+        } else {
+          threadGroup = threadGroup.getParent();
+        }
+      }
+    }
+    return false;
   }
 
   private boolean isSchedulerThread(ThreadGroup threadGroup) {
@@ -82,6 +95,5 @@ public final class ByCallerThreadGroupPolicy implements RejectedExecutionHandler
     }
     return false;
   }
-
 
 }

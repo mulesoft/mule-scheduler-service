@@ -108,11 +108,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
         service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
 
     custom.execute(() -> {
-      try {
-        latch.await();
-      } catch (InterruptedException e) {
-        currentThread().interrupt();
-      }
+      awaitLatch(latch);
     });
 
     expected.expect(ExecutionException.class);
@@ -278,13 +274,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
     // Fill up the IO pool, leaving room for just one more task
     for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt() - 1; ++i) {
-      ioScheduler.submit(() -> {
-        try {
-          outerLatch.await();
-        } catch (InterruptedException e) {
-          currentThread().interrupt();
-        }
-      });
+      consumeThread(ioScheduler, outerLatch);
     }
 
     AtomicReference<Thread> callerThread = new AtomicReference<>();
@@ -299,18 +289,44 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
         innerLatch.countDown();
       });
 
-      try {
-        return outerLatch.await(5, SECONDS);
-      } catch (InterruptedException e) {
-        currentThread().interrupt();
-        return false;
-      }
+      return awaitLatch(outerLatch);
     });
 
     assertThat(innerLatch.await(5, SECONDS), is(true));
     outerLatch.countDown();
     assertThat(submitted.get(), is(true));
     assertThat(executingThread.get(), is(callerThread.get()));
+  }
+
+  @Test
+  @Description("Tests that when the IO pool is full, any task dispatched from a CUSTOM pool with WAIT rejection action to IO is queued.")
+  public void customWaitToFullIoWaits() throws InterruptedException, ExecutionException, TimeoutException {
+    Scheduler customScheduler =
+        service.createCustomScheduler(config().withMaxConcurrentTasks(1).withRejectionAction(WAIT), CORES, () -> 1000L);
+    Scheduler ioScheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
+
+    Latch latch = new Latch();
+
+    // Fill up the IO pool
+    for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt(); ++i) {
+      consumeThread(ioScheduler, latch);
+    }
+
+    Future<Boolean> submitted = customScheduler.submit(() -> {
+      ioScheduler.submit(() -> {
+      });
+
+      fail("Didn't wait");
+      return null;
+    });
+
+    // Asssert that the task is waiting
+    expected.expect(TimeoutException.class);
+    try {
+      submitted.get(5, SECONDS);
+    } finally {
+      latch.countDown();
+    }
   }
 
   @Test
@@ -414,15 +430,24 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   private Callable<Object> threadsConsumer(Scheduler targetScheduler, Latch latch) {
     return () -> {
       while (latch.getCount() > 0) {
-        targetScheduler.submit(() -> {
-          try {
-            latch.await();
-          } catch (InterruptedException e) {
-            currentThread().interrupt();
-          }
-        });
+        consumeThread(targetScheduler, latch);
       }
       return null;
     };
+  }
+
+  private void consumeThread(Scheduler scheduler, Latch latch) {
+    scheduler.submit(() -> {
+      awaitLatch(latch);
+    });
+  }
+
+  private boolean awaitLatch(Latch latch) {
+    try {
+      return latch.await(30, SECONDS);
+    } catch (InterruptedException e) {
+      currentThread().interrupt();
+      return false;
+    }
   }
 }

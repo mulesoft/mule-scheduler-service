@@ -287,10 +287,12 @@ public class SchedulerThreadPools {
     if (config.getMaxConcurrentTasks() == null) {
       throw new IllegalArgumentException("Custom schedulers must define a thread pool size");
     }
+
+    final ThreadGroup customChildGroup = new ThreadGroup(resolveThreadGroupForCustomScheduler(config),
+                                                         threadPoolsConfig.getThreadNamePrefix() + "." + threadsName);
     final ThreadPoolExecutor executor =
-        new ThreadPoolExecutor(config.getMaxConcurrentTasks(), config.getMaxConcurrentTasks(), 0L,
-                               MILLISECONDS, workQueue, new SchedulerThreadFactory(resolveThreadGroupForCustomScheduler(config),
-                                                                                   "%s." + threadsName + ".%02d"),
+        new ThreadPoolExecutor(config.getMaxConcurrentTasks(), config.getMaxConcurrentTasks(), 0L, MILLISECONDS, workQueue,
+                               new SchedulerThreadFactory(customChildGroup, "%s." + threadsName + ".%02d"),
                                byCallerThreadGroupPolicy);
 
     final CustomScheduler customScheduler =
