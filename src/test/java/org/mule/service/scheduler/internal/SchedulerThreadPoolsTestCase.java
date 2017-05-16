@@ -29,6 +29,7 @@ import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.core.api.scheduler.SchedulerBusyException;
 import org.mule.runtime.core.util.concurrent.Latch;
+import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
@@ -61,11 +62,13 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Rule
   public ExpectedException expected = none();
 
+  private ContainerThreadPoolsConfig threadPoolsConfig;
   private SchedulerThreadPools service;
 
   @Before
   public void before() throws MuleException {
-    service = new SchedulerThreadPools(SchedulerThreadPoolsTestCase.class.getName(), loadThreadPoolsConfig());
+    threadPoolsConfig = loadThreadPoolsConfig();
+    service = new SchedulerThreadPools(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig);
     service.start();
   }
 
@@ -105,11 +108,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
         service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
 
     custom.execute(() -> {
-      try {
-        latch.await();
-      } catch (InterruptedException e) {
-        currentThread().interrupt();
-      }
+      awaitLatch(latch);
     });
 
     expected.expect(ExecutionException.class);
@@ -266,6 +265,71 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
+  @Description("Tests that when the IO pool is full, any task dispatched from IO to IO runs in the caller thread instead of being queued, which can cause a deadlock.")
+  public void ioToFullIoDoesntWait() throws InterruptedException, ExecutionException {
+    Scheduler ioScheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
+
+    Latch outerLatch = new Latch();
+    Latch innerLatch = new Latch();
+
+    // Fill up the IO pool, leaving room for just one more task
+    for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt() - 1; ++i) {
+      consumeThread(ioScheduler, outerLatch);
+    }
+
+    AtomicReference<Thread> callerThread = new AtomicReference<>();
+    AtomicReference<Thread> executingThread = new AtomicReference<>();
+
+    // The outer task will use the remaining slot in the scheduler, causing it to be full when the inner is sent.
+    Future<Boolean> submitted = ioScheduler.submit(() -> {
+      callerThread.set(currentThread());
+
+      ioScheduler.submit(() -> {
+        executingThread.set(currentThread());
+        innerLatch.countDown();
+      });
+
+      return awaitLatch(outerLatch);
+    });
+
+    assertThat(innerLatch.await(5, SECONDS), is(true));
+    outerLatch.countDown();
+    assertThat(submitted.get(), is(true));
+    assertThat(executingThread.get(), is(callerThread.get()));
+  }
+
+  @Test
+  @Description("Tests that when the IO pool is full, any task dispatched from a CUSTOM pool with WAIT rejection action to IO is queued.")
+  public void customWaitToFullIoWaits() throws InterruptedException, ExecutionException, TimeoutException {
+    Scheduler customScheduler =
+        service.createCustomScheduler(config().withMaxConcurrentTasks(1).withRejectionAction(WAIT), CORES, () -> 1000L);
+    Scheduler ioScheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
+
+    Latch latch = new Latch();
+
+    // Fill up the IO pool
+    for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt(); ++i) {
+      consumeThread(ioScheduler, latch);
+    }
+
+    Future<Boolean> submitted = customScheduler.submit(() -> {
+      ioScheduler.submit(() -> {
+      });
+
+      fail("Didn't wait");
+      return null;
+    });
+
+    // Asssert that the task is waiting
+    expected.expect(TimeoutException.class);
+    try {
+      submitted.get(5, SECONDS);
+    } finally {
+      latch.countDown();
+    }
+  }
+
+  @Test
   @Description("Tests that periodic tasks scheduled to a busy Scheduler are skipped but the job continues executing.")
   public void rejectionPolicyScheduledPeriodic()
       throws MuleException, InterruptedException, ExecutionException, TimeoutException {
@@ -366,15 +430,24 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   private Callable<Object> threadsConsumer(Scheduler targetScheduler, Latch latch) {
     return () -> {
       while (latch.getCount() > 0) {
-        targetScheduler.submit(() -> {
-          try {
-            latch.await();
-          } catch (InterruptedException e) {
-            currentThread().interrupt();
-          }
-        });
+        consumeThread(targetScheduler, latch);
       }
       return null;
     };
+  }
+
+  private void consumeThread(Scheduler scheduler, Latch latch) {
+    scheduler.submit(() -> {
+      awaitLatch(latch);
+    });
+  }
+
+  private boolean awaitLatch(Latch latch) {
+    try {
+      return latch.await(getTestTimeoutSecs(), SECONDS);
+    } catch (InterruptedException e) {
+      currentThread().interrupt();
+      return false;
+    }
   }
 }
