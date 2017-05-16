@@ -444,7 +444,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
   private boolean awaitLatch(Latch latch) {
     try {
-      return latch.await(30, SECONDS);
+      return latch.await(getTestTimeoutSecs(), SECONDS);
     } catch (InterruptedException e) {
       currentThread().interrupt();
       return false;
