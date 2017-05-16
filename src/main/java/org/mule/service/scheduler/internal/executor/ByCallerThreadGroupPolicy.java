@@ -10,11 +10,13 @@ import static java.lang.Thread.currentThread;
 import static java.util.Collections.unmodifiableSet;
 
 import org.mule.runtime.core.api.scheduler.SchedulerBusyException;
+import org.mule.service.scheduler.internal.threads.SchedulerThreadFactory;
 
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor.AbortPolicy;
+import java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy;
 
 /**
  * Dynamically determines the {@link RejectedExecutionHandler} implementation to use according to the {@link ThreadGroup} of the
@@ -36,6 +38,7 @@ public final class ByCallerThreadGroupPolicy implements RejectedExecutionHandler
     }
   };
   private final WaitPolicy wait = new WaitPolicy();
+  private final CallerRunsPolicy callerRuns = new CallerRunsPolicy();
 
   private final Set<ThreadGroup> waitGroups;
   private final ThreadGroup parentGroup;
@@ -54,8 +57,12 @@ public final class ByCallerThreadGroupPolicy implements RejectedExecutionHandler
 
   @Override
   public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
+    ThreadGroup targetGroup = ((SchedulerThreadFactory) executor.getThreadFactory()).getGroup();
     ThreadGroup currentThreadGroup = currentThread().getThreadGroup();
-    if (!isSchedulerThread(currentThreadGroup) || waitGroups.contains(currentThreadGroup)) {
+
+    if (waitGroups.contains(targetGroup) && waitGroups.contains(currentThreadGroup)) {
+      callerRuns.rejectedExecution(r, executor);
+    } else if (!isSchedulerThread(currentThreadGroup) || waitGroups.contains(currentThreadGroup)) {
       // MULE-11460 Make CPU-intensive pool a ForkJoinPool - keep the parallelism when waiting.
       wait.rejectedExecution(r, executor);
     } else {

@@ -29,6 +29,7 @@ import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.core.api.scheduler.SchedulerBusyException;
 import org.mule.runtime.core.util.concurrent.Latch;
+import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
@@ -61,11 +62,13 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Rule
   public ExpectedException expected = none();
 
+  private ContainerThreadPoolsConfig threadPoolsConfig;
   private SchedulerThreadPools service;
 
   @Before
   public void before() throws MuleException {
-    service = new SchedulerThreadPools(SchedulerThreadPoolsTestCase.class.getName(), loadThreadPoolsConfig());
+    threadPoolsConfig = loadThreadPoolsConfig();
+    service = new SchedulerThreadPools(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig);
     service.start();
   }
 
@@ -263,6 +266,51 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
     latch.countDown();
     submit.get(5, SECONDS);
+  }
+
+  @Test
+  @Description("Tests that when the IO pool is full, any task dispatched from IO to IO runs in the caller thread instead of being queued, which can cause a deadlock.")
+  public void ioToFullIoDoesntWait() throws InterruptedException, ExecutionException {
+    Scheduler ioScheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
+
+    Latch outerLatch = new Latch();
+    Latch innerLatch = new Latch();
+
+    // Fill up the IO pool, leaving room for just one more task
+    for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt() - 1; ++i) {
+      ioScheduler.submit(() -> {
+        try {
+          outerLatch.await();
+        } catch (InterruptedException e) {
+          currentThread().interrupt();
+        }
+      });
+    }
+
+    AtomicReference<Thread> callerThread = new AtomicReference<>();
+    AtomicReference<Thread> executingThread = new AtomicReference<>();
+
+    // The outer task will use the remaining slot in the scheduler, causing it to be full when the inner is sent.
+    Future<Boolean> submitted = ioScheduler.submit(() -> {
+      callerThread.set(currentThread());
+
+      ioScheduler.submit(() -> {
+        executingThread.set(currentThread());
+        innerLatch.countDown();
+      });
+
+      try {
+        return outerLatch.await(5, SECONDS);
+      } catch (InterruptedException e) {
+        currentThread().interrupt();
+        return false;
+      }
+    });
+
+    assertThat(innerLatch.await(5, SECONDS), is(true));
+    outerLatch.countDown();
+    assertThat(submitted.get(), is(true));
+    assertThat(executingThread.get(), is(callerThread.get()));
   }
 
   @Test

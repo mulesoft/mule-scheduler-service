@@ -37,6 +37,10 @@ public class SchedulerThreadFactory implements java.util.concurrent.ThreadFactor
     return new Thread(group, runnable, format(nameFormat, group.getName(), counter.getAndIncrement()));
   }
 
+  public ThreadGroup getGroup() {
+    return group;
+  }
+
   public AtomicLong getCounter() {
     return counter;
   }
