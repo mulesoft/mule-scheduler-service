@@ -6,14 +6,25 @@
  */
 package org.mule.service.scheduler.internal;
 
-import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
-import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SchedulerServiceStory.SHUTDOWN;
+import static java.lang.Thread.currentThread;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
 import static org.hamcrest.collection.IsEmptyCollection.empty;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
+import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SchedulerServiceStory.SHUTDOWN;
+
+import org.mule.runtime.core.util.concurrent.Latch;
+import org.mule.tck.probe.JUnitLambdaProbe;
+import org.mule.tck.probe.PollingProber;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -22,10 +33,12 @@ import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import org.junit.Test;
 import org.quartz.SchedulerException;
+
 import ru.yandex.qatools.allure.annotations.Description;
 import ru.yandex.qatools.allure.annotations.Features;
 import ru.yandex.qatools.allure.annotations.Stories;
@@ -174,10 +187,14 @@ public class DefaultSchedulerShutdownTestCase extends BaseDefaultSchedulerTestCa
 
     final Future<Boolean> result = executor.submit(() -> {
       triggeredLatch.countDown();
-      final boolean awaited = awaitLatch(latch);
-      assertThat(Thread.interrupted(), is(true));
-      interruptionLatch.countDown();
-      return awaited;
+      boolean awaited = false;
+      try {
+        awaited = awaitLatch(latch);
+      } finally {
+        assertThat(Thread.interrupted(), is(true));
+        interruptionLatch.countDown();
+        return awaited;
+      }
     });
 
     triggeredLatch.await(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
@@ -186,6 +203,121 @@ public class DefaultSchedulerShutdownTestCase extends BaseDefaultSchedulerTestCa
 
     assertThat(notStartedTasks, is(empty()));
     assertThat(result.isCancelled(), is(true));
+  }
+
+  @Test
+  @Description("Tests that a fixed-rate task stops running when shutdown() is called")
+  public void shutdownCancelsFixedRateTasks() throws InterruptedException, ExecutionException {
+    AtomicInteger runCount = new AtomicInteger();
+
+    executor.scheduleAtFixedRate(() -> {
+      synchronized (runCount) {
+        runCount.incrementAndGet();
+      }
+    }, 0, 1, MILLISECONDS);
+
+    final int runCountBeforeShutdown;
+    synchronized (runCount) {
+      runCountBeforeShutdown = runCount.get();
+      executor.shutdown();
+    }
+
+    Thread.sleep(50);
+
+    assertThat(runCount.get(), is(runCountBeforeShutdown));
+  }
+
+  @Test
+  @Description("Tests that a fixed-delay task stops running when shutdown() is called")
+  public void shutdownCancelsFixedDelayTasks() throws InterruptedException, ExecutionException {
+    AtomicInteger runCount = new AtomicInteger();
+
+    executor.scheduleWithFixedDelay(() -> {
+      synchronized (runCount) {
+        runCount.incrementAndGet();
+      }
+    }, 0, 1, MILLISECONDS);
+
+    final int runCountBeforeShutdown;
+    synchronized (runCount) {
+      runCountBeforeShutdown = runCount.get();
+      executor.shutdown();
+    }
+
+    Thread.sleep(50);
+
+    assertThat(runCount.get(), is(runCountBeforeShutdown));
+  }
+
+  @Test
+  @Description("Tests that a fixed-rate task stops running when shutdownNow() is called")
+  public void shutdownNowCancelsFixedRateTasks() throws InterruptedException, ExecutionException {
+    AtomicInteger runCount = new AtomicInteger();
+
+    executor.scheduleAtFixedRate(() -> {
+      synchronized (runCount) {
+        runCount.incrementAndGet();
+      }
+    }, 0, 1, MILLISECONDS);
+
+    final int runCountBeforeShutdown;
+    synchronized (runCount) {
+      runCountBeforeShutdown = runCount.get();
+      executor.shutdownNow();
+    }
+
+    Thread.sleep(50);
+
+    assertThat(runCount.get(), is(runCountBeforeShutdown));
+  }
+
+  @Test
+  @Description("Tests that a fixed-delay task stops running when shutdownNow() is called")
+  public void shutdownNowCancelsFixedDelayTasks() throws InterruptedException, ExecutionException {
+    AtomicInteger runCount = new AtomicInteger();
+
+    executor.scheduleWithFixedDelay(() -> {
+      synchronized (runCount) {
+        runCount.incrementAndGet();
+      }
+    }, 0, 1, MILLISECONDS);
+
+    final int runCountBeforeShutdown;
+    synchronized (runCount) {
+      runCountBeforeShutdown = runCount.get();
+      executor.shutdownNow();
+    }
+
+    Thread.sleep(50);
+
+    assertThat(runCount.get(), is(runCountBeforeShutdown));
+  }
+
+  @Test
+  @Description("Tests that when a Scheduler with a fixed-delay task is shutdown, is stops rescheduling the task to a terminated executor")
+  public void shutdownStopsReschedulingFixedDelayTasks() throws InterruptedException, ExecutionException {
+    Latch latch = new Latch();
+
+    executor.scheduleWithFixedDelay(() -> {
+      try {
+        latch.await();
+      } catch (InterruptedException e) {
+        currentThread().interrupt();
+      }
+    }, 0, 1, MILLISECONDS);
+
+    new PollingProber(100, 2).check(new JUnitLambdaProbe(() -> {
+      verify(sharedScheduledExecutor).schedule(any(Runnable.class), anyLong(), any());
+      return true;
+    }));
+
+    reset(sharedScheduledExecutor);
+    executor.shutdown();
+    latch.countDown();
+
+    Thread.sleep(50);
+
+    verify(sharedScheduledExecutor, never()).schedule(any(Runnable.class), anyLong(), any());
   }
 
   protected void assertRejected(final ScheduledExecutorService executor,
