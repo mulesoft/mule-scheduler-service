@@ -24,16 +24,19 @@ class ScheduledFutureDecorator<V> implements ScheduledFuture<V> {
 
   private ScheduledFuture<V> scheduled;
   private RunnableFuture<?> task;
+  private boolean periodic;
 
   /**
    * Decorates the given {@code scheduled}
    * 
    * @param scheduled the {@link ScheduledFuture} to be decorated
    * @param task the actual task that was scheduled.
+   * @param periodic {@code true} if this task will run on a regular basis, {@code false} otherwise
    */
-  ScheduledFutureDecorator(ScheduledFuture<V> scheduled, RunnableFuture<?> task) {
+  ScheduledFutureDecorator(ScheduledFuture<V> scheduled, RunnableFuture<?> task, boolean periodic) {
     this.scheduled = scheduled;
     this.task = task;
+    this.periodic = periodic;
   }
 
   @Override
@@ -61,6 +64,13 @@ class ScheduledFutureDecorator<V> implements ScheduledFuture<V> {
   @Override
   public boolean isDone() {
     return scheduled.isDone() || task.isDone();
+  }
+
+  /**
+   * @return {@code true} if this task will run on a regular basis, {@code false} otherwise
+   */
+  public boolean isPeriodic() {
+    return periodic;
   }
 
   @Override

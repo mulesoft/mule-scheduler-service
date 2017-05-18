@@ -127,7 +127,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     final RunnableFuture<?> task = newTaskFor(command, null);
 
     final ScheduledFutureDecorator<?> scheduled =
-        new ScheduledFutureDecorator<>(scheduledExecutor.schedule(schedulableTask(task), delay, unit), task);
+        new ScheduledFutureDecorator<>(scheduledExecutor.schedule(schedulableTask(task), delay, unit), task, false);
 
     putTask(task, scheduled);
     return scheduled;
@@ -141,7 +141,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     final RunnableFuture<V> task = newTaskFor(callable);
 
     final ScheduledFuture<V> scheduled =
-        new ScheduledFutureDecorator(scheduledExecutor.schedule(schedulableTask(task), delay, unit), task);
+        new ScheduledFutureDecorator(scheduledExecutor.schedule(schedulableTask(task), delay, unit), task, false);
 
     putTask(task, scheduled);
     return scheduled;
@@ -160,7 +160,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
     final ScheduledFuture<?> scheduled =
         new ScheduledFutureDecorator<>(scheduledExecutor.scheduleAtFixedRate(schedulableTask(task), initialDelay, period, unit),
-                                       task);
+                                       task, true);
 
     putTask(task, scheduled);
     return scheduled;
@@ -177,7 +177,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
     final ScheduledFutureDecorator<?> scheduled =
         new ScheduledFutureDecorator<>(scheduledExecutor.schedule(reschedulableTask(task, delay, unit), initialDelay, unit),
-                                       task);
+                                       task, true);
 
     putTask(task, scheduled);
     return scheduled;
@@ -188,11 +188,13 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
       try {
         executor.execute(task);
       } catch (RejectedExecutionException e) {
-        // Just log. Do not rethrow so the periodic job is not cancelled
-        logger.warn(e.getClass().getName() + " scheduling next execution of task " + task.toString() + ". Message was: "
-            + e.getMessage());
+        if (!executor.isShutdown()) {
+          // Just log. Do not rethrow so the periodic job is not cancelled
+          logger.warn(e.getClass().getName() + " scheduling next execution of task " + task.toString() + ". Message was: "
+              + e.getMessage());
 
-        fixedDelayWrapUp(task, delay, unit);
+          fixedDelayWrapUp(task, delay, unit);
+        }
       }
     };
   }
@@ -251,6 +253,13 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   public void shutdown() {
     logger.debug("Shutting down " + this.toString());
     this.shutdown = true;
+    for (Entry<RunnableFuture<?>, ScheduledFuture<?>> taskEntry : scheduledTasks.entrySet()) {
+      final ScheduledFuture<?> scheduledFuture = taskEntry.getValue();
+
+      if (!(scheduledFuture instanceof ScheduledFutureDecorator) || ((ScheduledFutureDecorator) scheduledFuture).isPeriodic()) {
+        scheduledFuture.cancel(false);
+      }
+    }
     shutdownCallback.accept(this);
     tryTerminate();
   }
@@ -258,7 +267,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   @Override
   public List<Runnable> shutdownNow() {
     logger.debug("Shutting down NOW " + this.toString());
-    shutdown();
+    this.shutdown = true;
 
     List<Runnable> tasks;
     try {
@@ -278,6 +287,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
       return tasks;
     } finally {
+      shutdownCallback.accept(this);
       tryTerminate();
     }
   }
