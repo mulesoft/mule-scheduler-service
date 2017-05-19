@@ -110,7 +110,7 @@ public class SchedulerThreadPools {
         new ThreadPoolExecutor(threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
                                threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
                                0, SECONDS,
-                               new LinkedBlockingQueue<>(threadPoolsConfig.getCpuLightQueueSize().getAsInt()),
+                               createQueue(threadPoolsConfig.getCpuLightQueueSize().getAsInt()),
                                new SchedulerThreadFactory(cpuLightGroup), byCallerThreadGroupPolicy);
     ioExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getIoCorePoolSize().getAsInt(), threadPoolsConfig.getIoMaxPoolSize().getAsInt(),
@@ -122,7 +122,7 @@ public class SchedulerThreadPools {
     computationExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
                                threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
-                               0, SECONDS, new LinkedBlockingQueue<>(threadPoolsConfig.getCpuIntensiveQueueSize().getAsInt()),
+                               0, SECONDS, createQueue(threadPoolsConfig.getCpuIntensiveQueueSize().getAsInt()),
                                new SchedulerThreadFactory(computationGroup), byCallerThreadGroupPolicy);
 
     scheduledExecutor = new ScheduledThreadPoolExecutor(1, new SchedulerThreadFactory(timerGroup, "%s"));
@@ -142,6 +142,16 @@ public class SchedulerThreadPools {
     ioExecutor.prestartAllCoreThreads();
     computationExecutor.prestartAllCoreThreads();
     scheduledExecutor.prestartAllCoreThreads();
+  }
+
+  /**
+   * Create queue using a {@link SynchronousQueue} if size is 0 or a {@link LinkedBlockingQueue} if size > 0.
+   *
+   * @param size queue size
+   * @return new queue instance
+   */
+  private BlockingQueue<Runnable> createQueue(int size) {
+    return size == 0 ? new SynchronousQueue<>() : new LinkedBlockingQueue<>(size);
   }
 
   /**
@@ -286,7 +296,7 @@ public class SchedulerThreadPools {
   public Scheduler createCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, int queueSize) {
     String threadsName = resolveCustomThreadsName(config);
     return doCreateCustomScheduler(config, workers, stopTimeout, resolveCustomSchedulerName(config),
-                                   new LinkedBlockingQueue<>(queueSize), threadsName);
+                                   createQueue(queueSize), threadsName);
   }
 
   private Scheduler doCreateCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, String schedulerName,
