@@ -96,7 +96,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   /**
    * @param name the name of this scheduler
    * @param executor the actual executor that will run the dispatched tasks.
-   * @param workers an estimate of how many threads will be, at maximum, in the underlying executor
+   * @param parallelTasksEstimate an estimate of how many threads will be, at maximum, in the underlying executor
    * @param scheduledExecutor the executor that will handle the delayed/periodic tasks. This will not execute the actual tasks,
    *        but will dispatch it to the {@code executor} at the appropriate time.
    * @param quartzScheduler the quartz object that will handle tasks scheduled with cron expressions. This will not execute the
@@ -105,11 +105,11 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
    * @param shutdownTimeoutMillis the time in millis to wait for the gracefule stop of this scheduler
    * @param shutdownCallback a callback to be invoked when this scheduler is stopped/shutdown.
    */
-  public DefaultScheduler(String name, ExecutorService executor, int workers, ScheduledExecutorService scheduledExecutor,
+  public DefaultScheduler(String name, ExecutorService executor, int parallelTasksEstimate, ScheduledExecutorService scheduledExecutor,
                           org.quartz.Scheduler quartzScheduler, ThreadType threadsType, Supplier<Long> shutdownTimeoutMillis,
                           Consumer<Scheduler> shutdownCallback) {
     this.name = name + "@" + toHexString(hashCode());
-    scheduledTasks = new ConcurrentHashMap<>(workers, 1.00f, getRuntime().availableProcessors());
+    scheduledTasks = new ConcurrentHashMap<>(parallelTasksEstimate, 1.00f, getRuntime().availableProcessors());
     cancelledBeforeFireTasks = newKeySet();
     this.executor = executor;
     this.scheduledExecutor = scheduledExecutor;

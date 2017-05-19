@@ -6,6 +6,7 @@
  */
 package org.mule.service.scheduler.internal.threads;
 
+import static java.lang.Integer.MAX_VALUE;
 import static java.lang.System.currentTimeMillis;
 import static java.util.Arrays.asList;
 import static java.util.Collections.synchronizedList;
@@ -107,7 +108,8 @@ public class SchedulerThreadPools {
     cpuLightExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
                                threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
-                               0, SECONDS, new LinkedBlockingQueue<>(threadPoolsConfig.getCpuLightQueueSize().getAsInt()),
+                               0, SECONDS,
+                               new LinkedBlockingQueue<>(threadPoolsConfig.getCpuLightQueueSize().getAsInt()),
                                new SchedulerThreadFactory(cpuLightGroup), byCallerThreadGroupPolicy);
     ioExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getIoCorePoolSize().getAsInt(), threadPoolsConfig.getIoMaxPoolSize().getAsInt(),
@@ -142,7 +144,6 @@ public class SchedulerThreadPools {
   }
 
   /**
-   * @param name the name of the owner of the quartz scheduler
    * @return the properties to provide the quartz scheduler
    */
   private Properties defaultQuartzProperties() {
@@ -209,19 +210,21 @@ public class SchedulerThreadPools {
     }
   }
 
-  public Scheduler createCpuLightScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
+  public Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate, Supplier<Long> stopTimeout) {
     if (config.getRejectionAction() != DEFAULT) {
       throw new IllegalArgumentException("Only custom schedulers may define waitDispatchingToBusyScheduler");
     }
     final String schedulerName = resolveCpuLightSchedulerName(config);
     Scheduler scheduler;
-    if (config.getMaxConcurrentTasks() != null) {
+    // Only throttle if max concurrent tasks is less than total backing pools size
+    if (config.getMaxConcurrentTasks() != null
+        && config.getMaxConcurrentTasks() < threadPoolsConfig.getCpuLightPoolSize().orElse(MAX_VALUE)) {
       scheduler =
-          new ThrottledScheduler(schedulerName, cpuLightExecutor, workers, scheduledExecutor,
+          new ThrottledScheduler(schedulerName, cpuLightExecutor, parallelTasksEstimate, scheduledExecutor,
                                  quartzScheduler, CPU_LIGHT, config.getMaxConcurrentTasks(),
                                  stopTimeout, schr -> activeSchedulers.remove(schr));
     } else {
-      scheduler = new DefaultScheduler(schedulerName, cpuLightExecutor, workers,
+      scheduler = new DefaultScheduler(schedulerName, cpuLightExecutor, parallelTasksEstimate,
                                        scheduledExecutor, quartzScheduler, CPU_LIGHT,
                                        stopTimeout, schr -> activeSchedulers.remove(schr));
     }
@@ -235,7 +238,9 @@ public class SchedulerThreadPools {
     }
     final String schedulerName = resolveIoSchedulerName(config);
     Scheduler scheduler;
-    if (config.getMaxConcurrentTasks() != null) {
+    // Only throttle if max concurrent tasks is less than total backing pools size
+    if (config.getMaxConcurrentTasks() != null
+        && config.getMaxConcurrentTasks() < threadPoolsConfig.getIoMaxPoolSize().orElse(MAX_VALUE)) {
       scheduler = new ThrottledScheduler(schedulerName, ioExecutor, workers,
                                          scheduledExecutor, quartzScheduler, IO,
                                          config.getMaxConcurrentTasks(), stopTimeout,
@@ -255,7 +260,9 @@ public class SchedulerThreadPools {
     }
     final String schedulerName = resolveComputationSchedulerName(config);
     Scheduler scheduler;
-    if (config.getMaxConcurrentTasks() != null) {
+    // Only throttle if max concurrent tasks is less than total backing pools size
+    if (config.getMaxConcurrentTasks() != null
+        && config.getMaxConcurrentTasks() < threadPoolsConfig.getCpuIntensivePoolSize().orElse(MAX_VALUE)) {
       scheduler = new ThrottledScheduler(schedulerName, computationExecutor, workers,
                                          scheduledExecutor, quartzScheduler,
                                          CPU_INTENSIVE, config.getMaxConcurrentTasks(), stopTimeout,
@@ -273,13 +280,13 @@ public class SchedulerThreadPools {
   public Scheduler createCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
     String threadsName = resolveCustomThreadsName(config);
     return doCreateCustomScheduler(config, workers, stopTimeout, resolveCustomSchedulerName(config),
-                                   new SynchronousQueue<Runnable>(), threadsName);
+                                   new SynchronousQueue<>(), threadsName);
   }
 
   public Scheduler createCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, int queueSize) {
     String threadsName = resolveCustomThreadsName(config);
     return doCreateCustomScheduler(config, workers, stopTimeout, resolveCustomSchedulerName(config),
-                                   new LinkedBlockingQueue<Runnable>(queueSize), threadsName);
+                                   new LinkedBlockingQueue<>(queueSize), threadsName);
   }
 
   private Scheduler doCreateCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, String schedulerName,
