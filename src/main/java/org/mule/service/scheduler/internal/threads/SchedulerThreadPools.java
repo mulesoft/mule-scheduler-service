@@ -145,8 +145,6 @@ public class SchedulerThreadPools {
   }
 
   /**
-<<<<<<< HEAD
-=======
    * Create queue using a {@link SynchronousQueue} if size is 0 or a {@link LinkedBlockingQueue} if size > 0.
    *
    * @param size queue size
@@ -157,7 +155,6 @@ public class SchedulerThreadPools {
   }
 
   /**
->>>>>>> MULE-12518 SchedulerService does not support queue size of 0
    * @return the properties to provide the quartz scheduler
    */
   private Properties defaultQuartzProperties() {
