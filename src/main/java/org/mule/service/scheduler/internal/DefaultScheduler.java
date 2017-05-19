@@ -105,7 +105,8 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
    * @param shutdownTimeoutMillis the time in millis to wait for the gracefule stop of this scheduler
    * @param shutdownCallback a callback to be invoked when this scheduler is stopped/shutdown.
    */
-  public DefaultScheduler(String name, ExecutorService executor, int parallelTasksEstimate, ScheduledExecutorService scheduledExecutor,
+  public DefaultScheduler(String name, ExecutorService executor, int parallelTasksEstimate,
+                          ScheduledExecutorService scheduledExecutor,
                           org.quartz.Scheduler quartzScheduler, ThreadType threadsType, Supplier<Long> shutdownTimeoutMillis,
                           Consumer<Scheduler> shutdownCallback) {
     this.name = name + "@" + toHexString(hashCode());

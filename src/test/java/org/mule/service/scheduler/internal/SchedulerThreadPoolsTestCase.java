@@ -428,8 +428,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
-  @Description("Tests that ThrottledScheduler is not used for CPU light schedulers unless maxConcurrency is less than backing " +
-      "pool max size.")
+  @Description("Tests that ThrottledScheduler is not used for CPU light schedulers unless maxConcurrency is less than backing pool max size.")
   public void maxCpuLightConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
     assertThat(service
         .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()), 1,
@@ -443,9 +442,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
-  @Description("Tests that ThrottledScheduler is not used for CPU intensive schedulers " +
-      "unless maxConcurrency is less than backing " +
-      "pool max size.")
+  @Description("Tests that ThrottledScheduler is not used for CPU intensive schedulers unless maxConcurrency is less than backing pool max size.")
   public void maxCpuIntensiveConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
     assertThat(service
         .createCpuIntensiveScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
@@ -460,9 +457,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
-  @Description("Tests that ThrottledScheduler is not used for IO schedulers unless " +
-      "maxConcurrency is less than backing " +
-      "pool max size.")
+  @Description("Tests that ThrottledScheduler is not used for IO schedulers unless maxConcurrency is less than backing pool max size.")
   public void maxIOConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
     assertThat(service
         .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig

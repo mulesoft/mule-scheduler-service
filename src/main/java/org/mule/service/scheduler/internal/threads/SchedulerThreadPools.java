@@ -35,6 +35,7 @@ import org.mule.service.scheduler.internal.executor.ByCallerThreadGroupPolicy;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
@@ -216,7 +217,7 @@ public class SchedulerThreadPools {
     }
     final String schedulerName = resolveCpuLightSchedulerName(config);
     Scheduler scheduler;
-    if (shouldThrottle(config, threadPoolsConfig.getCpuLightPoolSize().orElse(MAX_VALUE))) {
+    if (shouldThrottle(config, threadPoolsConfig.getCpuLightPoolSize())) {
       scheduler =
           new ThrottledScheduler(schedulerName, cpuLightExecutor, parallelTasksEstimate, scheduledExecutor,
                                  quartzScheduler, CPU_LIGHT, config.getMaxConcurrentTasks(),
@@ -236,7 +237,7 @@ public class SchedulerThreadPools {
     }
     final String schedulerName = resolveIoSchedulerName(config);
     Scheduler scheduler;
-    if (shouldThrottle(config, threadPoolsConfig.getIoMaxPoolSize().orElse(MAX_VALUE))) {
+    if (shouldThrottle(config, threadPoolsConfig.getIoMaxPoolSize())) {
       scheduler = new ThrottledScheduler(schedulerName, ioExecutor, workers,
                                          scheduledExecutor, quartzScheduler, IO,
                                          config.getMaxConcurrentTasks(), stopTimeout,
@@ -256,7 +257,7 @@ public class SchedulerThreadPools {
     }
     final String schedulerName = resolveComputationSchedulerName(config);
     Scheduler scheduler;
-    if (shouldThrottle(config, threadPoolsConfig.getCpuIntensivePoolSize().orElse(MAX_VALUE))) {
+    if (shouldThrottle(config, threadPoolsConfig.getCpuIntensivePoolSize())) {
       scheduler = new ThrottledScheduler(schedulerName, computationExecutor, workers,
                                          scheduledExecutor, quartzScheduler,
                                          CPU_INTENSIVE, config.getMaxConcurrentTasks(), stopTimeout,
@@ -271,9 +272,9 @@ public class SchedulerThreadPools {
     return scheduler;
   }
 
-  private boolean shouldThrottle(SchedulerConfig config, int backingPoolMaxSize) {
+  private boolean shouldThrottle(SchedulerConfig config, OptionalInt backingPoolMaxSize) {
     // Only throttle if max concurrent tasks is less than total backing pool size
-    return config.getMaxConcurrentTasks() != null && config.getMaxConcurrentTasks() < backingPoolMaxSize;
+    return config.getMaxConcurrentTasks() != null && config.getMaxConcurrentTasks() < backingPoolMaxSize.orElse(MAX_VALUE);
   }
 
   public Scheduler createCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
