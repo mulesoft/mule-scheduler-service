@@ -427,6 +427,50 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     submit.get(5, SECONDS);
   }
 
+  @Test
+  @Description("Tests that ThrottledScheduler is not used for CPU light schedulers unless maxConcurrency is less than backing pool max size.")
+  public void maxCpuLightConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
+    assertThat(service
+        .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()), 1,
+                                 () -> 1l),
+               not(instanceOf(ThrottledScheduler.class)));
+    assertThat(service
+        .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()
+            - 1), 1,
+                                 () -> 1l),
+               instanceOf(ThrottledScheduler.class));
+  }
+
+  @Test
+  @Description("Tests that ThrottledScheduler is not used for CPU intensive schedulers unless maxConcurrency is less than backing pool max size.")
+  public void maxCpuIntensiveConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
+    assertThat(service
+        .createCpuIntensiveScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
+            .getCpuIntensivePoolSize().getAsInt()), 1,
+                                     () -> 1l),
+               not(instanceOf(ThrottledScheduler.class)));
+    assertThat(service
+        .createCpuIntensiveScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt()
+            - 1), 1,
+                                     () -> 1l),
+               instanceOf(ThrottledScheduler.class));
+  }
+
+  @Test
+  @Description("Tests that ThrottledScheduler is not used for IO schedulers unless maxConcurrency is less than backing pool max size.")
+  public void maxIOConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
+    assertThat(service
+        .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
+            .getIoMaxPoolSize().getAsInt()), 1,
+                           () -> 1l),
+               not(instanceOf(ThrottledScheduler.class)));
+    assertThat(service
+        .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getIoMaxPoolSize().getAsInt()
+            - 1), 1,
+                           () -> 1l),
+               instanceOf(ThrottledScheduler.class));
+  }
+
   private Callable<Object> threadsConsumer(Scheduler targetScheduler, Latch latch) {
     return () -> {
       while (latch.getCount() > 0) {
