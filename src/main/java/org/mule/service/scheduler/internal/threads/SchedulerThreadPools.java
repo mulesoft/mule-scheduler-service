@@ -216,7 +216,7 @@ public class SchedulerThreadPools {
     }
     final String schedulerName = resolveCpuLightSchedulerName(config);
     Scheduler scheduler;
-    // Only throttle if max concurrent tasks is less than total backing pools size
+    // Only throttle if max concurrent tasks is less than total backing pool size
     if (config.getMaxConcurrentTasks() != null
         && config.getMaxConcurrentTasks() < threadPoolsConfig.getCpuLightPoolSize().orElse(MAX_VALUE)) {
       scheduler =
@@ -238,7 +238,7 @@ public class SchedulerThreadPools {
     }
     final String schedulerName = resolveIoSchedulerName(config);
     Scheduler scheduler;
-    // Only throttle if max concurrent tasks is less than total backing pools size
+    // Only throttle if max concurrent tasks is less than total backing pool size
     if (config.getMaxConcurrentTasks() != null
         && config.getMaxConcurrentTasks() < threadPoolsConfig.getIoMaxPoolSize().orElse(MAX_VALUE)) {
       scheduler = new ThrottledScheduler(schedulerName, ioExecutor, workers,
@@ -260,7 +260,7 @@ public class SchedulerThreadPools {
     }
     final String schedulerName = resolveComputationSchedulerName(config);
     Scheduler scheduler;
-    // Only throttle if max concurrent tasks is less than total backing pools size
+    // Only throttle if max concurrent tasks is less than total backing pool size
     if (config.getMaxConcurrentTasks() != null
         && config.getMaxConcurrentTasks() < threadPoolsConfig.getCpuIntensivePoolSize().orElse(MAX_VALUE)) {
       scheduler = new ThrottledScheduler(schedulerName, computationExecutor, workers,
