@@ -104,7 +104,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     engine.put("cores", cores);
     engine.put("mem", mem);
 
-    config.setGracefulShutdownTimeout(resolveNumber(properties, PROP_PREFIX + "gracefulShutdownTimeout", false));
+    config.setGracefulShutdownTimeout(resolveNumber(properties, PROP_PREFIX + "gracefulShutdownTimeout", true));
 
     config.setCpuLightPoolSize(resolveExpression(properties, CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, config, engine, false));
     config.setCpuLightQueueSize(resolveExpression(properties, CPU_LIGHT_PREFIX + "." + WORK_QUEUE_SIZE, config, engine, true));
