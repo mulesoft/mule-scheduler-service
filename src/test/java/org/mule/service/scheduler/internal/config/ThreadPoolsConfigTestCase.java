@@ -237,6 +237,17 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
   }
 
   @Test
+  public void zeroWorkQueueSize() throws IOException, MuleException {
+    final Properties props = buildDefaultConfigProps();
+    props.setProperty(CPU_LIGHT_PREFIX + "." + WORK_QUEUE_SIZE, "0");
+    props.store(new FileOutputStream(schedulerConfigFile), "expressionConfigNegative");
+
+    final SchedulerPoolsConfig config = loadThreadPoolsConfig();
+
+    assertThat(config.getCpuLightQueueSize().getAsInt(), is(0));
+  }
+
+  @Test
   public void invalidExpressionConfig() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
     props.setProperty(CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, "invalid");
