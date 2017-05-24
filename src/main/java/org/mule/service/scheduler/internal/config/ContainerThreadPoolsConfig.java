@@ -104,29 +104,29 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     engine.put("cores", cores);
     engine.put("mem", mem);
 
-    config.setGracefulShutdownTimeout(resolveNumber(properties, PROP_PREFIX + "gracefulShutdownTimeout"));
+    config.setGracefulShutdownTimeout(resolveNumber(properties, PROP_PREFIX + "gracefulShutdownTimeout", false));
 
-    config.setCpuLightPoolSize(resolveExpression(properties, CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, config, engine));
-    config.setCpuLightQueueSize(resolveExpression(properties, CPU_LIGHT_PREFIX + "." + WORK_QUEUE_SIZE, config, engine));
+    config.setCpuLightPoolSize(resolveExpression(properties, CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, config, engine, false));
+    config.setCpuLightQueueSize(resolveExpression(properties, CPU_LIGHT_PREFIX + "." + WORK_QUEUE_SIZE, config, engine, true));
 
-    config.setIoCorePoolSize(resolveExpression(properties, IO_PREFIX + "." + THREAD_POOL_SIZE_CORE, config, engine));
-    config.setIoMaxPoolSize(resolveExpression(properties, IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, config, engine));
-    config.setIoQueueSize(resolveExpression(properties, IO_PREFIX + "." + WORK_QUEUE_SIZE, config, engine));
-    config.setIoKeepAlive(resolveNumber(properties, IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE));
+    config.setIoCorePoolSize(resolveExpression(properties, IO_PREFIX + "." + THREAD_POOL_SIZE_CORE, config, engine, false));
+    config.setIoMaxPoolSize(resolveExpression(properties, IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, config, engine, false));
+    config.setIoQueueSize(resolveExpression(properties, IO_PREFIX + "." + WORK_QUEUE_SIZE, config, engine, true));
+    config.setIoKeepAlive(resolveNumber(properties, IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE, true));
 
-    config.setCpuIntensivePoolSize(resolveExpression(properties, CPU_INTENSIVE_PREFIX + "." + THREAD_POOL_SIZE, config, engine));
-    config.setCpuIntensiveQueueSize(resolveExpression(properties, CPU_INTENSIVE_PREFIX + "." + WORK_QUEUE_SIZE, config, engine));
+    config.setCpuIntensivePoolSize(resolveExpression(properties, CPU_INTENSIVE_PREFIX + "." + THREAD_POOL_SIZE, config, engine,
+                                                     false));
+    config.setCpuIntensiveQueueSize(resolveExpression(properties, CPU_INTENSIVE_PREFIX + "." + WORK_QUEUE_SIZE, config, engine,
+                                                      true));
 
     return config;
   }
 
-  private static long resolveNumber(Properties properties, String propName) throws DefaultMuleException {
+  private static long resolveNumber(Properties properties, String propName, boolean allowZero) throws DefaultMuleException {
     final String property = properties.getProperty(propName);
     try {
       final long result = parseLong(property);
-      if (result <= 0) {
-        throw new DefaultMuleException(propName + ": Value has to be greater than 0");
-      }
+      validateNumber(propName, result, allowZero);
 
       return result;
     } catch (NumberFormatException e) {
@@ -135,7 +135,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
   }
 
   private static int resolveExpression(Properties properties, String propName, ContainerThreadPoolsConfig threadPoolsConfig,
-                                       ScriptEngine engine)
+                                       ScriptEngine engine, boolean allowZero)
       throws DefaultMuleException {
     final String property = properties.getProperty(propName).trim().toLowerCase();
     if (!POOLSIZE_PATTERN.matcher(property).matches()) {
@@ -143,13 +143,24 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     }
     try {
       final int result = ((Number) engine.eval(property)).intValue();
-      if (result <= 0) {
-        throw new DefaultMuleException(propName + ": Value has to be greater than 0");
-      }
+      validateNumber(propName, result, allowZero);
 
       return result;
     } catch (ScriptException e) {
       throw new DefaultMuleException(propName + ": " + e.getMessage(), e);
+    }
+  }
+
+  private static void validateNumber(String propName, long result, boolean allowZero) throws DefaultMuleException {
+    if (allowZero) {
+      if (result < 0) {
+        throw new DefaultMuleException(propName + ": Value has to be greater than or equal to 0");
+      }
+
+    } else {
+      if (result <= 0) {
+        throw new DefaultMuleException(propName + ": Value has to be greater than 0");
+      }
     }
   }
 
