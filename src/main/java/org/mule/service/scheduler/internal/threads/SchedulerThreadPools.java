@@ -85,7 +85,7 @@ public class SchedulerThreadPools {
   private ThreadPoolExecutor cpuLightExecutor;
   private ThreadPoolExecutor ioExecutor;
   private ThreadPoolExecutor computationExecutor;
-  private Set<ExecutorService> customSchedulersExecutors = new HashSet<>();
+  private Set<ThreadPoolExecutor> customSchedulersExecutors = new HashSet<>();
   private ScheduledThreadPoolExecutor scheduledExecutor;
   private org.quartz.Scheduler quartzScheduler;
 
@@ -171,7 +171,7 @@ public class SchedulerThreadPools {
     cpuLightExecutor.shutdown();
     ioExecutor.shutdown();
     computationExecutor.shutdown();
-    for (ExecutorService customSchedulerExecutor : customSchedulersExecutors) {
+    for (ThreadPoolExecutor customSchedulerExecutor : customSchedulersExecutors) {
       customSchedulerExecutor.shutdown();
     }
     scheduledExecutor.shutdown();
@@ -192,9 +192,9 @@ public class SchedulerThreadPools {
 
     // When graceful shutdown timeouts, forceful shutdown will remove the custom scheduler from the list.
     // In that case, not creating a new collection here will cause a ConcurrentModificationException.
-    for (ExecutorService customSchedulerExecutor : new ArrayList<>(customSchedulersExecutors)) {
+    for (ThreadPoolExecutor customSchedulerExecutor : new ArrayList<>(customSchedulersExecutors)) {
       waitForExecutorTermination(startMillis, customSchedulerExecutor,
-                                 threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
+                                 ((SchedulerThreadFactory) customSchedulerExecutor.getThreadFactory()).getGroup().getName());
     }
 
     cpuLightExecutor = null;
@@ -330,8 +330,7 @@ public class SchedulerThreadPools {
 
   private String resolveCpuLightSchedulerName(SchedulerConfig config) {
     if (!config.hasName()) {
-      config =
-          config.withName(resolveSchedulerCreationLocation(CPU_LIGHT_THREADS_NAME));
+      config = config.withName(resolveSchedulerCreationLocation(CPU_LIGHT_THREADS_NAME));
     }
     return config.getSchedulerName();
   }
@@ -345,8 +344,7 @@ public class SchedulerThreadPools {
 
   private String resolveComputationSchedulerName(SchedulerConfig config) {
     if (!config.hasName()) {
-      config =
-          config.withName(resolveSchedulerCreationLocation(COMPUTATION_THREADS_NAME));
+      config = config.withName(resolveSchedulerCreationLocation(COMPUTATION_THREADS_NAME));
     }
     return config.getSchedulerName();
   }
