@@ -300,7 +300,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     props.store(new FileOutputStream(schedulerConfigFile), "negativeShutdownTimeConfig");
 
     expected.expect(DefaultMuleException.class);
-    expected.expectMessage(is(PROP_PREFIX + "gracefulShutdownTimeout: Value has to be greater than 0"));
+    expected.expectMessage(is(PROP_PREFIX + "gracefulShutdownTimeout: Value has to be greater than or equal to 0"));
     loadThreadPoolsConfig();
   }
 
@@ -311,7 +311,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     props.store(new FileOutputStream(schedulerConfigFile), "negativeIoKeepAliveConfig");
 
     expected.expect(DefaultMuleException.class);
-    expected.expectMessage(is(IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE + ": Value has to be greater than 0"));
+    expected.expectMessage(is(IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE + ": Value has to be greater than or equal to 0"));
     loadThreadPoolsConfig();
   }
 
