@@ -16,7 +16,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThat;
 
 import org.mule.runtime.core.api.scheduler.SchedulerBusyException;
-import org.mule.runtime.core.util.StringUtils;
+import org.mule.runtime.core.api.util.StringUtils;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 
 import java.util.ArrayList;
