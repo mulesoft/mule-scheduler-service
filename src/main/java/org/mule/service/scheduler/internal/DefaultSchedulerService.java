@@ -24,7 +24,7 @@ import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.core.api.scheduler.SchedulerConfig;
 import org.mule.runtime.core.api.scheduler.SchedulerPoolsConfigFactory;
 import org.mule.runtime.core.api.scheduler.SchedulerService;
-import org.mule.runtime.core.scheduler.SchedulerContainerPoolsConfig;
+import org.mule.runtime.core.api.scheduler.SchedulerContainerPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 
 import com.google.common.cache.CacheLoader;
