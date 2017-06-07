@@ -16,7 +16,7 @@ import static org.mockito.Mockito.spy;
 import static org.mule.service.scheduler.ThreadType.CUSTOM;
 
 import org.mule.runtime.api.scheduler.Scheduler;
-import org.mule.runtime.core.util.concurrent.NamedThreadFactory;
+import org.mule.runtime.core.api.util.concurrent.NamedThreadFactory;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 
 import java.util.Properties;
