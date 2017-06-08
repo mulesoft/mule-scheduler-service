@@ -13,8 +13,6 @@ import static java.util.Collections.synchronizedList;
 import static java.util.Collections.unmodifiableList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.mule.runtime.core.api.scheduler.SchedulerConfig.RejectionAction.DEFAULT;
-import static org.mule.runtime.core.api.scheduler.SchedulerConfig.RejectionAction.WAIT;
 import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
 import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
 import static org.mule.service.scheduler.ThreadType.CUSTOM;
@@ -222,64 +220,68 @@ public class SchedulerThreadPools {
   }
 
   public Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate, Supplier<Long> stopTimeout) {
-    if (config.getRejectionAction() != DEFAULT) {
-      throw new IllegalArgumentException("Only custom schedulers may define waitDispatchingToBusyScheduler");
-    }
+    validateWaitAllowedNotChanged(config);
     final String schedulerName = resolveCpuLightSchedulerName(config);
     Scheduler scheduler;
     if (shouldThrottle(config, threadPoolsConfig.getCpuLightPoolSize())) {
       scheduler =
           new ThrottledScheduler(schedulerName, cpuLightExecutor, parallelTasksEstimate, scheduledExecutor,
                                  quartzScheduler, CPU_LIGHT, config.getMaxConcurrentTasks(),
-                                 stopTimeout, schr -> activeSchedulers.remove(schr));
+                                 stopTimeout, shutdownCallback());
     } else {
       scheduler = new DefaultScheduler(schedulerName, cpuLightExecutor, parallelTasksEstimate,
                                        scheduledExecutor, quartzScheduler, CPU_LIGHT,
-                                       stopTimeout, schr -> activeSchedulers.remove(schr));
+                                       stopTimeout, shutdownCallback());
     }
     activeSchedulers.add(scheduler);
     return scheduler;
   }
 
   public Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
-    if (config.getRejectionAction() != DEFAULT) {
-      throw new IllegalArgumentException("Only custom schedulers may define waitDispatchingToBusyScheduler");
-    }
+    validateWaitAllowedNotChanged(config);
     final String schedulerName = resolveIoSchedulerName(config);
     Scheduler scheduler;
     if (shouldThrottle(config, threadPoolsConfig.getIoMaxPoolSize())) {
       scheduler = new ThrottledScheduler(schedulerName, ioExecutor, workers,
                                          scheduledExecutor, quartzScheduler, IO,
                                          config.getMaxConcurrentTasks(), stopTimeout,
-                                         schr -> activeSchedulers.remove(schr));
+                                         shutdownCallback());
     } else {
       scheduler = new DefaultScheduler(schedulerName, ioExecutor, workers,
                                        scheduledExecutor, quartzScheduler, IO,
-                                       stopTimeout, schr -> activeSchedulers.remove(schr));
+                                       stopTimeout, shutdownCallback());
     }
     activeSchedulers.add(scheduler);
     return scheduler;
   }
 
+  private Consumer<Scheduler> shutdownCallback() {
+    return schr -> activeSchedulers.remove(schr);
+  }
+
   public Scheduler createCpuIntensiveScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
-    if (config.getRejectionAction() != DEFAULT) {
-      throw new IllegalArgumentException("Only custom schedulers may define waitDispatchingToBusyScheduler");
-    }
+    validateWaitAllowedNotChanged(config);
     final String schedulerName = resolveComputationSchedulerName(config);
     Scheduler scheduler;
     if (shouldThrottle(config, threadPoolsConfig.getCpuIntensivePoolSize())) {
       scheduler = new ThrottledScheduler(schedulerName, computationExecutor, workers,
                                          scheduledExecutor, quartzScheduler,
                                          CPU_INTENSIVE, config.getMaxConcurrentTasks(), stopTimeout,
-                                         schr -> activeSchedulers.remove(schr));
+                                         shutdownCallback());
     } else {
       scheduler =
           new DefaultScheduler(schedulerName, computationExecutor, workers, scheduledExecutor,
                                quartzScheduler, CPU_INTENSIVE, stopTimeout,
-                               schr -> activeSchedulers.remove(schr));
+                               shutdownCallback());
     }
     activeSchedulers.add(scheduler);
     return scheduler;
+  }
+
+  private void validateWaitAllowedNotChanged(SchedulerConfig config) {
+    if (config.getWaitAllowed().isPresent()) {
+      throw new IllegalArgumentException("Only custom schedulers may define 'waitAllowed' behaviour");
+    }
   }
 
   private boolean shouldThrottle(SchedulerConfig config, OptionalInt backingPoolMaxSize) {
@@ -314,14 +316,14 @@ public class SchedulerThreadPools {
 
     final CustomScheduler customScheduler =
         new CustomScheduler(schedulerName, executor, workers, scheduledExecutor, quartzScheduler, CUSTOM, stopTimeout,
-                            schr -> activeSchedulers.remove(schr));
+                            shutdownCallback());
     customSchedulersExecutors.add(executor);
     activeSchedulers.add(customScheduler);
     return customScheduler;
   }
 
   private ThreadGroup resolveThreadGroupForCustomScheduler(SchedulerConfig config) {
-    if (config.getRejectionAction() == WAIT) {
+    if (config.getWaitAllowed().orElse(false)) {
       return customWaitGroup;
     } else {
       return customGroup;
