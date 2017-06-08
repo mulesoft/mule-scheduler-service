@@ -21,7 +21,6 @@ import static org.junit.Assert.fail;
 import static org.junit.rules.ExpectedException.none;
 import static org.mockito.Mockito.mock;
 import static org.mule.runtime.core.api.scheduler.SchedulerConfig.config;
-import static org.mule.runtime.core.api.scheduler.SchedulerConfig.RejectionAction.WAIT;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
@@ -194,21 +193,21 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   public void onlyCustomMayConfigureWaitCpuLight() {
     expected.expect(IllegalArgumentException.class);
     expected.expectMessage("Only custom schedulers may define waitDispatchingToBusyScheduler");
-    service.createCpuLightScheduler(config().withRejectionAction(WAIT), CORES, () -> 1000L);
+    service.createCpuLightScheduler(config().withWaitAllowed(true), CORES, () -> 1000L);
   }
 
   @Test
   public void onlyCustomMayConfigureWaitCpuIntensive() {
     expected.expect(IllegalArgumentException.class);
     expected.expectMessage("Only custom schedulers may define waitDispatchingToBusyScheduler");
-    service.createCpuIntensiveScheduler(config().withRejectionAction(WAIT), CORES, () -> 1000L);
+    service.createCpuIntensiveScheduler(config().withWaitAllowed(true), CORES, () -> 1000L);
   }
 
   @Test
   public void onlyCustomMayConfigureWaitIO() {
     expected.expect(IllegalArgumentException.class);
     expected.expectMessage("Only custom schedulers may define waitDispatchingToBusyScheduler");
-    service.createIoScheduler(config().withRejectionAction(WAIT), CORES, () -> 1000L);
+    service.createIoScheduler(config().withWaitAllowed(true), CORES, () -> 1000L);
   }
 
   @Test
@@ -302,7 +301,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Description("Tests that when the IO pool is full, any task dispatched from a CUSTOM pool with WAIT rejection action to IO is queued.")
   public void customWaitToFullIoWaits() throws InterruptedException, ExecutionException, TimeoutException {
     Scheduler customScheduler =
-        service.createCustomScheduler(config().withMaxConcurrentTasks(1).withRejectionAction(WAIT), CORES, () -> 1000L);
+        service.createCustomScheduler(config().withMaxConcurrentTasks(1).withWaitAllowed(true), CORES, () -> 1000L);
     Scheduler ioScheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
 
     Latch latch = new Latch();
@@ -387,7 +386,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that tasks dispatched from a Custom scheduler with 'Wait' allowed thread to a busy Scheduler waits for execution.")
   public void rejectionPolicyCustomWithConfig() throws MuleException, InterruptedException, ExecutionException, TimeoutException {
-    Scheduler sourceScheduler = service.createCustomScheduler(config().withRejectionAction(WAIT).withMaxConcurrentTasks(1),
+    Scheduler sourceScheduler = service.createCustomScheduler(config().withWaitAllowed(true).withMaxConcurrentTasks(1),
                                                               CORES, () -> 1000L, 1);
     Scheduler targetScheduler =
         service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
