@@ -279,7 +279,7 @@ public class SchedulerThreadPools {
   }
 
   private void validateWaitAllowedNotChanged(SchedulerConfig config) {
-    if (config.getWaitAllowed() != null) {
+    if (config.getWaitAllowed().isPresent()) {
       throw new IllegalArgumentException("Only custom schedulers may define 'waitAllowed' behaviour");
     }
   }
@@ -323,7 +323,7 @@ public class SchedulerThreadPools {
   }
 
   private ThreadGroup resolveThreadGroupForCustomScheduler(SchedulerConfig config) {
-    if (config.getWaitAllowed() != null && config.getWaitAllowed()) {
+    if (config.getWaitAllowed().orElse(false)) {
       return customWaitGroup;
     } else {
       return customGroup;
