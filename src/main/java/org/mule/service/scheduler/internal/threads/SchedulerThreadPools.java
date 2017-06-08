@@ -227,11 +227,11 @@ public class SchedulerThreadPools {
       scheduler =
           new ThrottledScheduler(schedulerName, cpuLightExecutor, parallelTasksEstimate, scheduledExecutor,
                                  quartzScheduler, CPU_LIGHT, config.getMaxConcurrentTasks(),
-                                 stopTimeout, schr -> activeSchedulers.remove(schr));
+                                 stopTimeout, shutdownCallback());
     } else {
       scheduler = new DefaultScheduler(schedulerName, cpuLightExecutor, parallelTasksEstimate,
                                        scheduledExecutor, quartzScheduler, CPU_LIGHT,
-                                       stopTimeout, schr -> activeSchedulers.remove(schr));
+                                       stopTimeout, shutdownCallback());
     }
     activeSchedulers.add(scheduler);
     return scheduler;
@@ -245,14 +245,18 @@ public class SchedulerThreadPools {
       scheduler = new ThrottledScheduler(schedulerName, ioExecutor, workers,
                                          scheduledExecutor, quartzScheduler, IO,
                                          config.getMaxConcurrentTasks(), stopTimeout,
-                                         schr -> activeSchedulers.remove(schr));
+                                         shutdownCallback());
     } else {
       scheduler = new DefaultScheduler(schedulerName, ioExecutor, workers,
                                        scheduledExecutor, quartzScheduler, IO,
-                                       stopTimeout, schr -> activeSchedulers.remove(schr));
+                                       stopTimeout, shutdownCallback());
     }
     activeSchedulers.add(scheduler);
     return scheduler;
+  }
+
+  private Consumer<Scheduler> shutdownCallback() {
+    return schr -> activeSchedulers.remove(schr);
   }
 
   public Scheduler createCpuIntensiveScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
@@ -263,12 +267,12 @@ public class SchedulerThreadPools {
       scheduler = new ThrottledScheduler(schedulerName, computationExecutor, workers,
                                          scheduledExecutor, quartzScheduler,
                                          CPU_INTENSIVE, config.getMaxConcurrentTasks(), stopTimeout,
-                                         schr -> activeSchedulers.remove(schr));
+                                         shutdownCallback());
     } else {
       scheduler =
           new DefaultScheduler(schedulerName, computationExecutor, workers, scheduledExecutor,
                                quartzScheduler, CPU_INTENSIVE, stopTimeout,
-                               schr -> activeSchedulers.remove(schr));
+                               shutdownCallback());
     }
     activeSchedulers.add(scheduler);
     return scheduler;
@@ -312,7 +316,7 @@ public class SchedulerThreadPools {
 
     final CustomScheduler customScheduler =
         new CustomScheduler(schedulerName, executor, workers, scheduledExecutor, quartzScheduler, CUSTOM, stopTimeout,
-                            schr -> activeSchedulers.remove(schr));
+                            shutdownCallback());
     customSchedulersExecutors.add(executor);
     activeSchedulers.add(customScheduler);
     return customScheduler;

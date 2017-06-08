@@ -192,21 +192,21 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   public void onlyCustomMayConfigureWaitCpuLight() {
     expected.expect(IllegalArgumentException.class);
-    expected.expectMessage("Only custom schedulers may define waitDispatchingToBusyScheduler");
+    expected.expectMessage("Only custom schedulers may define 'waitAllowed' behaviour");
     service.createCpuLightScheduler(config().withWaitAllowed(true), CORES, () -> 1000L);
   }
 
   @Test
   public void onlyCustomMayConfigureWaitCpuIntensive() {
     expected.expect(IllegalArgumentException.class);
-    expected.expectMessage("Only custom schedulers may define waitDispatchingToBusyScheduler");
+    expected.expectMessage("Only custom schedulers may define 'waitAllowed' behaviour");
     service.createCpuIntensiveScheduler(config().withWaitAllowed(true), CORES, () -> 1000L);
   }
 
   @Test
   public void onlyCustomMayConfigureWaitIO() {
     expected.expect(IllegalArgumentException.class);
-    expected.expectMessage("Only custom schedulers may define waitDispatchingToBusyScheduler");
+    expected.expectMessage("Only custom schedulers may define 'waitAllowed' behaviour");
     service.createIoScheduler(config().withWaitAllowed(true), CORES, () -> 1000L);
   }
 
