@@ -44,12 +44,12 @@ import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.quartz.SchedulerException;
 
-import ru.yandex.qatools.allure.annotations.Description;
-import ru.yandex.qatools.allure.annotations.Features;
-import ru.yandex.qatools.allure.annotations.Stories;
+import io.qameta.allure.Description;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 
-@Features(SCHEDULER_SERVICE)
-@Stories(QUARTZ_TASK_SCHEDULING)
+@Feature(SCHEDULER_SERVICE)
+@Story(QUARTZ_TASK_SCHEDULING)
 public class DefaultSchedulerQuartzTestCase extends BaseDefaultSchedulerTestCase {
 
   private static final int DELTA_MILLIS = 30;

@@ -50,10 +50,10 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
-import ru.yandex.qatools.allure.annotations.Description;
-import ru.yandex.qatools.allure.annotations.Features;
+import io.qameta.allure.Description;
+import io.qameta.allure.Feature;
 
-@Features(SCHEDULER_SERVICE)
+@Feature(SCHEDULER_SERVICE)
 public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
   private static final int CORES = getRuntime().availableProcessors();

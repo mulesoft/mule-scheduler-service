@@ -16,12 +16,12 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Consumer;
 
 import org.junit.Test;
-import ru.yandex.qatools.allure.annotations.Description;
-import ru.yandex.qatools.allure.annotations.Features;
-import ru.yandex.qatools.allure.annotations.Stories;
+import io.qameta.allure.Description;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 
-@Features(SCHEDULER_SERVICE)
-@Stories(EXHAUSTION)
+@Feature(SCHEDULER_SERVICE)
+@Story(EXHAUSTION)
 public class DefaultSchedulerExhaustionTestCase extends BaseDefaultSchedulerTestCase {
 
   @Test
