@@ -26,10 +26,10 @@ import org.junit.Before;
 import org.junit.Test;
 import org.quartz.SchedulerException;
 
-import ru.yandex.qatools.allure.annotations.Description;
-import ru.yandex.qatools.allure.annotations.Features;
+import io.qameta.allure.Description;
+import io.qameta.allure.Feature;
 
-@Features("Scheduler Throttling")
+@Feature("Scheduler Throttling")
 public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTestCase {
 
   private static final int THROTTLE_SIZE = 2;

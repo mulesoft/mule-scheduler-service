@@ -31,9 +31,9 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import ru.yandex.qatools.allure.annotations.Features;
+import io.qameta.allure.Feature;
 
-@Features(SCHEDULER_SERVICE)
+@Feature(SCHEDULER_SERVICE)
 public class SchedulerServiceTestCase extends AbstractMuleTestCase {
 
   private DefaultSchedulerService service;

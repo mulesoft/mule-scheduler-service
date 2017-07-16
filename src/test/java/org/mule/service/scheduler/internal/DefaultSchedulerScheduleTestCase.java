@@ -46,13 +46,13 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 import org.mockito.InOrder;
 import org.quartz.SchedulerException;
-import ru.yandex.qatools.allure.annotations.Description;
-import ru.yandex.qatools.allure.annotations.Features;
-import ru.yandex.qatools.allure.annotations.Stories;
+import io.qameta.allure.Description;
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 
 @RunWith(Parameterized.class)
-@Features(SCHEDULER_SERVICE)
-@Stories(TASK_SCHEDULING)
+@Feature(SCHEDULER_SERVICE)
+@Story(TASK_SCHEDULING)
 public class DefaultSchedulerScheduleTestCase extends BaseDefaultSchedulerTestCase {
 
   private static final long TASK_DURATION_MILLIS = 200;
