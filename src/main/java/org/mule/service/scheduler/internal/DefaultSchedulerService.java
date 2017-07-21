@@ -56,7 +56,11 @@ import org.slf4j.Logger;
  */
 public class DefaultSchedulerService implements SchedulerService, Startable, Stoppable {
 
+  private static final String USAGE_TRACE_INTERVAL_SECS_PROPERTY = "mule.scheduler.usageTraceIntervalSecs";
+  public static final Long USAGE_TRACE_INTERVAL_SECS = getLong(USAGE_TRACE_INTERVAL_SECS_PROPERTY);
+
   private static final Logger logger = getLogger(DefaultSchedulerService.class);
+  public static final Logger traceLogger = getLogger("org.mule.service.scheduler.trace");
 
   private static final long DEFAULT_SHUTDOWN_TIMEOUT_MILLIS = 5000;
   private static final int CORES = getRuntime().availableProcessors();
@@ -67,7 +71,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   private LoadingCache<SchedulerPoolsConfigFactory, SchedulerThreadPools> poolsByConfig;
   private Scheduler poolsMaintenanceScheduler;
-  private Scheduler usageReportingScheduler;
   private ScheduledFuture<?> poolsMaintenanceTask;
   private ScheduledFuture<?> usageReportingTask;
   private volatile boolean started = false;
@@ -265,8 +268,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   public void start() throws MuleException {
     logger.info("Starting " + this.toString() + "...");
 
-    final Long usageTraceIntervalSecs = getLong("mule.scheduler.usageTraceIntervalSecs");
-
     pollsWriteLock.lock();
     try {
       poolsByConfig = newBuilder()
@@ -291,8 +292,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
             @Override
             public SchedulerThreadPools load(SchedulerPoolsConfigFactory key) throws Exception {
               SchedulerThreadPools containerThreadPools =
-                  new SchedulerThreadPools(getName(), key.getConfig().orElse(loadThreadPoolsConfig()),
-                                           usageTraceIntervalSecs != null);
+                  new SchedulerThreadPools(getName(), key.getConfig().orElse(loadThreadPoolsConfig()));
               containerThreadPools.start();
 
               return containerThreadPools;
@@ -302,22 +302,20 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
       logger.info("Started " + this.toString());
       started = true;
 
-      poolsMaintenanceScheduler = ioScheduler();
+      poolsMaintenanceScheduler = customScheduler(config().withName("Scheduler Maintenace").withMaxConcurrentTasks(1));
       poolsMaintenanceTask = poolsMaintenanceScheduler.scheduleAtFixedRate(() -> poolsByConfig.cleanUp(), 1, 1, MINUTES);
 
-      if (usageTraceIntervalSecs != null) {
-        usageReportingScheduler = cpuLightScheduler();
-
-        logger.info("Usage Trace enabled");
-        usageReportingTask = usageReportingScheduler.scheduleAtFixedRate(() -> {
-          logger.warn("************************************************************************");
-          logger.warn("* Schedulers Usage Report                                              *");
-          logger.warn("************************************************************************");
+      if (USAGE_TRACE_INTERVAL_SECS != null) {
+        traceLogger.info("Usage Trace enabled");
+        usageReportingTask = poolsMaintenanceScheduler.scheduleAtFixedRate(() -> {
+          traceLogger.warn("************************************************************************");
+          traceLogger.warn("* Schedulers Usage Report                                              *");
+          traceLogger.warn("************************************************************************");
           for (SchedulerThreadPools pool : getPools()) {
-            logger.warn(pool.buildReportString());
-            logger.warn("************************************************************************");
+            traceLogger.warn(pool.buildReportString());
+            traceLogger.warn("************************************************************************");
           }
-        }, usageTraceIntervalSecs, usageTraceIntervalSecs, SECONDS);
+        }, USAGE_TRACE_INTERVAL_SECS, USAGE_TRACE_INTERVAL_SECS, SECONDS);
       }
 
     } finally {
@@ -334,7 +332,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
       if (usageReportingTask != null) {
         usageReportingTask.cancel(true);
-        usageReportingScheduler.stop();
       }
 
       poolsMaintenanceTask.cancel(true);

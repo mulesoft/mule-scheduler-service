@@ -102,7 +102,7 @@ public class SchedulerThreadPools {
   private List<Scheduler> activeCpuIntensiveSchedulers = new ArrayList<>();
   private List<Scheduler> activeCustomSchedulers = new ArrayList<>();
 
-  public SchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig, boolean logRejectionDetails) {
+  public SchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig) {
     this.name = name;
     this.threadPoolsConfig = threadPoolsConfig;
 
@@ -114,8 +114,7 @@ public class SchedulerThreadPools {
     customGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
     customWaitGroup = new ThreadGroup(customGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
 
-    byCallerThreadGroupPolicy =
-        new ByCallerThreadGroupPolicy(new HashSet<>(asList(ioGroup, customWaitGroup)), schedulerGroup, logRejectionDetails);
+    byCallerThreadGroupPolicy = new ByCallerThreadGroupPolicy(new HashSet<>(asList(ioGroup, customWaitGroup)), schedulerGroup);
   }
 
   public void start() throws MuleException {
