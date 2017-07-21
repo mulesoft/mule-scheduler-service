@@ -67,7 +67,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Before
   public void before() throws MuleException {
     threadPoolsConfig = loadThreadPoolsConfig();
-    service = new SchedulerThreadPools(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig);
+    service = new SchedulerThreadPools(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig, true);
     service.start();
   }
 

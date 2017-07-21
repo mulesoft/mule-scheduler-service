@@ -7,10 +7,12 @@
 package org.mule.service.scheduler.internal;
 
 import static com.google.common.cache.CacheBuilder.newBuilder;
+import static java.lang.Long.getLong;
 import static java.lang.Runtime.getRuntime;
 import static java.lang.Thread.currentThread;
 import static java.util.Collections.unmodifiableList;
 import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mule.runtime.core.api.config.MuleProperties.OBJECT_SCHEDULER_BASE_CONFIG;
 import static org.mule.runtime.core.api.scheduler.SchedulerConfig.config;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
@@ -22,9 +24,9 @@ import org.mule.runtime.api.lifecycle.Startable;
 import org.mule.runtime.api.lifecycle.Stoppable;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.core.api.scheduler.SchedulerConfig;
+import org.mule.runtime.core.api.scheduler.SchedulerContainerPoolsConfig;
 import org.mule.runtime.core.api.scheduler.SchedulerPoolsConfigFactory;
 import org.mule.runtime.core.api.scheduler.SchedulerService;
-import org.mule.runtime.core.api.scheduler.SchedulerContainerPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 
 import com.google.common.cache.CacheLoader;
@@ -65,7 +67,9 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   private LoadingCache<SchedulerPoolsConfigFactory, SchedulerThreadPools> poolsByConfig;
   private Scheduler poolsMaintenanceScheduler;
+  private Scheduler usageReportingScheduler;
   private ScheduledFuture<?> poolsMaintenanceTask;
+  private ScheduledFuture<?> usageReportingTask;
   private volatile boolean started = false;
 
   @Override
@@ -261,6 +265,8 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   public void start() throws MuleException {
     logger.info("Starting " + this.toString() + "...");
 
+    final Long usageTraceIntervalSecs = getLong("mule.scheduler.usageTraceIntervalSecs");
+
     pollsWriteLock.lock();
     try {
       poolsByConfig = newBuilder()
@@ -285,7 +291,8 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
             @Override
             public SchedulerThreadPools load(SchedulerPoolsConfigFactory key) throws Exception {
               SchedulerThreadPools containerThreadPools =
-                  new SchedulerThreadPools(getName(), key.getConfig().orElse(loadThreadPoolsConfig()));
+                  new SchedulerThreadPools(getName(), key.getConfig().orElse(loadThreadPoolsConfig()),
+                                           usageTraceIntervalSecs != null);
               containerThreadPools.start();
 
               return containerThreadPools;
@@ -297,6 +304,22 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
       poolsMaintenanceScheduler = ioScheduler();
       poolsMaintenanceTask = poolsMaintenanceScheduler.scheduleAtFixedRate(() -> poolsByConfig.cleanUp(), 1, 1, MINUTES);
+
+      if (usageTraceIntervalSecs != null) {
+        usageReportingScheduler = cpuLightScheduler();
+
+        logger.info("Usage Trace enabled");
+        usageReportingTask = usageReportingScheduler.scheduleAtFixedRate(() -> {
+          logger.warn("************************************************************************");
+          logger.warn("* Schedulers Usage Report                                              *");
+          logger.warn("************************************************************************");
+          for (SchedulerThreadPools pool : getPools()) {
+            logger.warn(pool.buildReportString());
+            logger.warn("************************************************************************");
+          }
+        }, usageTraceIntervalSecs, usageTraceIntervalSecs, SECONDS);
+      }
+
     } finally {
       pollsWriteLock.unlock();
     }
@@ -308,6 +331,11 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     pollsWriteLock.lock();
     try {
       started = false;
+
+      if (usageReportingTask != null) {
+        usageReportingTask.cancel(true);
+        usageReportingScheduler.stop();
+      }
 
       poolsMaintenanceTask.cancel(true);
       poolsMaintenanceScheduler.stop();
