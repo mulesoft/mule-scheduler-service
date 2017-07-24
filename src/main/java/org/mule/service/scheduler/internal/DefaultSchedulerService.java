@@ -7,10 +7,12 @@
 package org.mule.service.scheduler.internal;
 
 import static com.google.common.cache.CacheBuilder.newBuilder;
+import static java.lang.Long.getLong;
 import static java.lang.Runtime.getRuntime;
 import static java.lang.Thread.currentThread;
 import static java.util.Collections.unmodifiableList;
 import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mule.runtime.core.api.config.MuleProperties.OBJECT_SCHEDULER_BASE_CONFIG;
 import static org.mule.runtime.core.api.scheduler.SchedulerConfig.config;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
@@ -22,9 +24,9 @@ import org.mule.runtime.api.lifecycle.Startable;
 import org.mule.runtime.api.lifecycle.Stoppable;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.core.api.scheduler.SchedulerConfig;
+import org.mule.runtime.core.api.scheduler.SchedulerContainerPoolsConfig;
 import org.mule.runtime.core.api.scheduler.SchedulerPoolsConfigFactory;
 import org.mule.runtime.core.api.scheduler.SchedulerService;
-import org.mule.runtime.core.api.scheduler.SchedulerContainerPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 
 import com.google.common.cache.CacheLoader;
@@ -54,7 +56,11 @@ import org.slf4j.Logger;
  */
 public class DefaultSchedulerService implements SchedulerService, Startable, Stoppable {
 
+  private static final String USAGE_TRACE_INTERVAL_SECS_PROPERTY = "mule.scheduler.usageTraceIntervalSecs";
+  public static final Long USAGE_TRACE_INTERVAL_SECS = getLong(USAGE_TRACE_INTERVAL_SECS_PROPERTY);
+
   private static final Logger logger = getLogger(DefaultSchedulerService.class);
+  public static final Logger traceLogger = getLogger("org.mule.service.scheduler.trace");
 
   private static final long DEFAULT_SHUTDOWN_TIMEOUT_MILLIS = 5000;
   private static final int CORES = getRuntime().availableProcessors();
@@ -66,6 +72,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   private LoadingCache<SchedulerPoolsConfigFactory, SchedulerThreadPools> poolsByConfig;
   private Scheduler poolsMaintenanceScheduler;
   private ScheduledFuture<?> poolsMaintenanceTask;
+  private ScheduledFuture<?> usageReportingTask;
   private volatile boolean started = false;
 
   @Override
@@ -295,8 +302,22 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
       logger.info("Started " + this.toString());
       started = true;
 
-      poolsMaintenanceScheduler = ioScheduler();
+      poolsMaintenanceScheduler = customScheduler(config().withName("Scheduler Maintenace").withMaxConcurrentTasks(1));
       poolsMaintenanceTask = poolsMaintenanceScheduler.scheduleAtFixedRate(() -> poolsByConfig.cleanUp(), 1, 1, MINUTES);
+
+      if (USAGE_TRACE_INTERVAL_SECS != null) {
+        traceLogger.info("Usage Trace enabled");
+        usageReportingTask = poolsMaintenanceScheduler.scheduleAtFixedRate(() -> {
+          traceLogger.warn("************************************************************************");
+          traceLogger.warn("* Schedulers Usage Report                                              *");
+          traceLogger.warn("************************************************************************");
+          for (SchedulerThreadPools pool : getPools()) {
+            traceLogger.warn(pool.buildReportString());
+            traceLogger.warn("************************************************************************");
+          }
+        }, USAGE_TRACE_INTERVAL_SECS, USAGE_TRACE_INTERVAL_SECS, SECONDS);
+      }
+
     } finally {
       pollsWriteLock.unlock();
     }
@@ -308,6 +329,10 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     pollsWriteLock.lock();
     try {
       started = false;
+
+      if (usageReportingTask != null) {
+        usageReportingTask.cancel(true);
+      }
 
       poolsMaintenanceTask.cancel(true);
       poolsMaintenanceScheduler.stop();

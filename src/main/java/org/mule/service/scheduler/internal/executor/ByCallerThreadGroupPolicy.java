@@ -8,6 +8,9 @@ package org.mule.service.scheduler.internal.executor;
 
 import static java.lang.Thread.currentThread;
 import static java.util.Collections.unmodifiableSet;
+import static org.apache.commons.lang3.StringUtils.rightPad;
+import static org.mule.service.scheduler.internal.DefaultSchedulerService.USAGE_TRACE_INTERVAL_SECS;
+import static org.mule.service.scheduler.internal.DefaultSchedulerService.traceLogger;
 
 import org.mule.runtime.core.api.scheduler.SchedulerBusyException;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadFactory;
@@ -30,18 +33,22 @@ import java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy;
  */
 public final class ByCallerThreadGroupPolicy implements RejectedExecutionHandler {
 
-  private final AbortPolicy abort = new AbortPolicy() {
+  private static final class AbortBusyPolicy extends AbortPolicy {
 
     @Override
     public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
       throw new SchedulerBusyException("Task " + r.toString() + " rejected from " + executor.toString());
     }
-  };
+  }
+
+  private final AbortPolicy abort = new AbortBusyPolicy();
   private final WaitPolicy wait = new WaitPolicy();
   private final CallerRunsPolicy callerRuns = new CallerRunsPolicy();
 
   private final Set<ThreadGroup> waitGroups;
   private final ThreadGroup parentGroup;
+
+  private volatile long rejectedCount;
 
   /**
    * Builds a new {@link ByCallerThreadGroupPolicy} with the given {@code waitGroups}.
@@ -60,13 +67,26 @@ public final class ByCallerThreadGroupPolicy implements RejectedExecutionHandler
     ThreadGroup targetGroup = ((SchedulerThreadFactory) executor.getThreadFactory()).getGroup();
     ThreadGroup currentThreadGroup = currentThread().getThreadGroup();
 
+    ++rejectedCount;
+
     if (isWaitGroupThread(targetGroup) && targetGroup == currentThreadGroup) {
+      logRejection(r.toString(), callerRuns.getClass().getSimpleName(), targetGroup.getName());
       callerRuns.rejectedExecution(r, executor);
     } else if (!isSchedulerThread(currentThreadGroup) || isWaitGroupThread(currentThreadGroup)) {
+      logRejection(r.toString(), wait.getClass().getSimpleName(), targetGroup.getName());
       // MULE-11460 Make CPU-intensive pool a ForkJoinPool - keep the parallelism when waiting.
       wait.rejectedExecution(r, executor);
     } else {
+      logRejection(r.toString(), abort.getClass().getSimpleName(), targetGroup.getName());
       abort.rejectedExecution(r, executor);
+    }
+  }
+
+  private void logRejection(String taskAsString, String strategy, String targetAsString) {
+    if (USAGE_TRACE_INTERVAL_SECS != null) {
+      traceLogger.warn("Task rejected ({}) from '{}' scheduler: {}", rightPad(strategy, 16), targetAsString, taskAsString);
+    } else if (traceLogger.isDebugEnabled()) {
+      traceLogger.debug("Task rejected ({}) from '{}' scheduler: {}", rightPad(strategy, 16), targetAsString, taskAsString);
     }
   }
 
@@ -94,6 +114,10 @@ public final class ByCallerThreadGroupPolicy implements RejectedExecutionHandler
       }
     }
     return false;
+  }
+
+  public long getRejectedCount() {
+    return rejectedCount;
   }
 
 }
