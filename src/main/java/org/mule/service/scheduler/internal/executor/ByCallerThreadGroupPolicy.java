@@ -33,18 +33,22 @@ import java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy;
  */
 public final class ByCallerThreadGroupPolicy implements RejectedExecutionHandler {
 
-  private final AbortPolicy abort = new AbortPolicy() {
+  private static final class AbortBusyPolicy extends AbortPolicy {
 
     @Override
     public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
       throw new SchedulerBusyException("Task " + r.toString() + " rejected from " + executor.toString());
     }
-  };
+  }
+
+  private final AbortPolicy abort = new AbortBusyPolicy();
   private final WaitPolicy wait = new WaitPolicy();
   private final CallerRunsPolicy callerRuns = new CallerRunsPolicy();
 
   private final Set<ThreadGroup> waitGroups;
   private final ThreadGroup parentGroup;
+
+  private volatile long rejectedCount;
 
   /**
    * Builds a new {@link ByCallerThreadGroupPolicy} with the given {@code waitGroups}.
@@ -62,6 +66,8 @@ public final class ByCallerThreadGroupPolicy implements RejectedExecutionHandler
   public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
     ThreadGroup targetGroup = ((SchedulerThreadFactory) executor.getThreadFactory()).getGroup();
     ThreadGroup currentThreadGroup = currentThread().getThreadGroup();
+
+    ++rejectedCount;
 
     if (isWaitGroupThread(targetGroup) && targetGroup == currentThreadGroup) {
       logRejection(r.toString(), callerRuns.getClass().getSimpleName(), targetGroup.getName());
@@ -108,6 +114,10 @@ public final class ByCallerThreadGroupPolicy implements RejectedExecutionHandler
       }
     }
     return false;
+  }
+
+  public long getRejectedCount() {
+    return rejectedCount;
   }
 
 }

@@ -7,12 +7,12 @@
 package org.mule.service.scheduler.internal.threads;
 
 import static java.lang.Integer.MAX_VALUE;
+import static java.lang.String.format;
 import static java.lang.System.currentTimeMillis;
 import static java.lang.System.lineSeparator;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.apache.commons.lang3.StringUtils.leftPad;
 import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
 import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
 import static org.mule.service.scheduler.ThreadType.CUSTOM;
@@ -84,7 +84,7 @@ public class SchedulerThreadPools {
   private final ThreadGroup customGroup;
   private final ThreadGroup customWaitGroup;
 
-  private final RejectedExecutionHandler byCallerThreadGroupPolicy;
+  private final Supplier<RejectedExecutionHandler> byCallerThreadGroupPolicy;
 
   private ThreadPoolExecutor cpuLightExecutor;
   private ThreadPoolExecutor ioExecutor;
@@ -114,7 +114,8 @@ public class SchedulerThreadPools {
     customGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
     customWaitGroup = new ThreadGroup(customGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
 
-    byCallerThreadGroupPolicy = new ByCallerThreadGroupPolicy(new HashSet<>(asList(ioGroup, customWaitGroup)), schedulerGroup);
+    final Set<ThreadGroup> waitGroups = new HashSet<>(asList(ioGroup, customWaitGroup));
+    byCallerThreadGroupPolicy = () -> new ByCallerThreadGroupPolicy(waitGroups, schedulerGroup);
   }
 
   public void start() throws MuleException {
@@ -123,19 +124,19 @@ public class SchedulerThreadPools {
                                threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
                                0, SECONDS,
                                createQueue(threadPoolsConfig.getCpuLightQueueSize().getAsInt()),
-                               new SchedulerThreadFactory(cpuLightGroup), byCallerThreadGroupPolicy);
+                               new SchedulerThreadFactory(cpuLightGroup), byCallerThreadGroupPolicy.get());
     ioExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getIoCorePoolSize().getAsInt(), threadPoolsConfig.getIoMaxPoolSize().getAsInt(),
                                threadPoolsConfig.getIoKeepAlive().getAsLong(), MILLISECONDS,
                                // TODO MULE-11505 - Implement cached IO scheduler that grows and uses async hand-off
                                // with queue.
                                new SynchronousQueue<>(),
-                               new SchedulerThreadFactory(ioGroup), byCallerThreadGroupPolicy);
+                               new SchedulerThreadFactory(ioGroup), byCallerThreadGroupPolicy.get());
     computationExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
                                threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
                                0, SECONDS, createQueue(threadPoolsConfig.getCpuIntensiveQueueSize().getAsInt()),
-                               new SchedulerThreadFactory(computationGroup), byCallerThreadGroupPolicy);
+                               new SchedulerThreadFactory(computationGroup), byCallerThreadGroupPolicy.get());
 
     scheduledExecutor = new ScheduledThreadPoolExecutor(1, new SchedulerThreadFactory(timerGroup, "%s"));
     scheduledExecutor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
@@ -342,7 +343,7 @@ public class SchedulerThreadPools {
     final ThreadPoolExecutor executor =
         new ThreadPoolExecutor(config.getMaxConcurrentTasks(), config.getMaxConcurrentTasks(), 0L, MILLISECONDS, workQueue,
                                new SchedulerThreadFactory(customChildGroup, "%s.%02d"),
-                               byCallerThreadGroupPolicy);
+                               byCallerThreadGroupPolicy.get());
 
     final CustomScheduler customScheduler =
         new CustomScheduler(schedulerName, executor, workers, scheduledExecutor, quartzScheduler, CUSTOM, stopTimeout,
@@ -479,36 +480,73 @@ public class SchedulerThreadPools {
     }
 
     final int cpuLightActiveCount = cpuLightExecutor.getActiveCount();
+    final long cpuLightTaskCount = cpuLightExecutor.getTaskCount();
+    final long cpuLightRejected = ((ByCallerThreadGroupPolicy) cpuLightExecutor.getRejectedExecutionHandler()).getRejectedCount();
     final int ioActiveCount = ioExecutor.getActiveCount();
+    final long ioTaskCount = ioExecutor.getTaskCount();
+    final long ioRejected = ((ByCallerThreadGroupPolicy) ioExecutor.getRejectedExecutionHandler()).getRejectedCount();
     final int cpuIntensiveActiveCount = computationExecutor.getActiveCount();
+    final long cpuIntensiveTaskCount = computationExecutor.getTaskCount();
+    final long cpuIntensiveRejected =
+        ((ByCallerThreadGroupPolicy) computationExecutor.getRejectedExecutionHandler()).getRejectedCount();
+
+    int customActiveCount = 0;
+    int customUsedCount = 0;
+    int customQueued = 0;
+    long customTaskCount = 0;
+    long customRejected = 0;
+    for (ThreadPoolExecutor customExecutor : customSchedulersExecutors) {
+      final int currentCustomActive = customExecutor.getActiveCount();
+      customActiveCount += currentCustomActive;
+      customUsedCount += customExecutor.getPoolSize() - currentCustomActive;
+      customQueued += customExecutor.getQueue().size();
+      customTaskCount += customExecutor.getTaskCount();
+      customRejected += ((ByCallerThreadGroupPolicy) customExecutor.getRejectedExecutionHandler()).getRejectedCount();
+    }
 
     threadPoolsReportBuilder.append(lineSeparator() + name + lineSeparator());
-    threadPoolsReportBuilder.append("------------------------------------------------------------------------" + lineSeparator());
-    threadPoolsReportBuilder.append("Pool          | Schedulers | Idle threads | Used threads | Queued tasks " + lineSeparator());
-    threadPoolsReportBuilder.append("------------------------------------------------------------------------" + lineSeparator());
     threadPoolsReportBuilder
-        .append("CPU Light     |"
-            + leftPad("" + schedulersCpuLight, 11) + " |"
-            + leftPad("" + (cpuLightExecutor.getPoolSize() - cpuLightActiveCount), 13) + " |"
-            + leftPad("" + cpuLightActiveCount, 13) + " |"
-            + leftPad("" + cpuLightExecutor.getQueue().size(), 13) + lineSeparator());
+        .append("--------------------------------------------------------------------------------------" + lineSeparator());
     threadPoolsReportBuilder
-        .append("IO            |"
-            + leftPad("" + schedulersIo, 11) + " |"
-            + leftPad("" + (ioExecutor.getPoolSize() - ioActiveCount), 13) + " |"
-            + leftPad("" + ioActiveCount, 13) + " |"
-            + leftPad("" + ioExecutor.getQueue().size(), 13) + lineSeparator());
+        .append("Pool          | Schedulers | Idle threads | Used threads | Queued tasks | Rejection % " + lineSeparator());
     threadPoolsReportBuilder
-        .append("CPU Intensive |"
-            + leftPad("" + schedulersCpuIntensive, 11) + " |"
-            + leftPad("" + (computationExecutor.getPoolSize() - cpuIntensiveActiveCount), 13) + " |"
-            + leftPad("" + cpuIntensiveActiveCount, 13) + " |"
-            + leftPad("" + computationExecutor.getQueue().size(), 13) + lineSeparator());
+        .append("--------------------------------------------------------------------------------------" + lineSeparator());
     threadPoolsReportBuilder
-        .append("Custom        |"
-            + leftPad("" + schedulersCustom, 11) + " |            - |            - |            -" + lineSeparator());
+        .append(format("CPU Light     | %10d | %12d | %12d | %12d | ~ %9.2f",
+                       schedulersCpuLight,
+                       cpuLightExecutor.getPoolSize() - cpuLightActiveCount,
+                       cpuLightActiveCount,
+                       cpuLightExecutor.getQueue().size(),
+                       cpuLightRejected > 0 ? 100.0 * (cpuLightRejected / (cpuLightTaskCount + cpuLightRejected)) : 0)
+            + lineSeparator());
     threadPoolsReportBuilder
-        .append("------------------------------------------------------------------------" + lineSeparator() + lineSeparator());
+        .append(format("IO            | %10d | %12d | %12d | %12d | ~ %9.2f",
+                       schedulersIo,
+                       ioExecutor.getPoolSize() - ioActiveCount,
+                       ioActiveCount,
+                       ioExecutor.getQueue().size(),
+                       ioRejected > 0 ? 100.0 * (ioRejected / (ioTaskCount + ioRejected)) : 0)
+            + lineSeparator());
+    threadPoolsReportBuilder
+        .append(format("CPU Intensive | %10d | %12d | %12d | %12d | ~ %9.2f",
+                       schedulersCpuIntensive,
+                       computationExecutor.getPoolSize() - cpuIntensiveActiveCount,
+                       cpuIntensiveActiveCount,
+                       computationExecutor.getQueue().size(),
+                       cpuIntensiveRejected > 0 ? 100.0 * (cpuIntensiveRejected / (cpuIntensiveTaskCount + cpuIntensiveRejected))
+                           : 0)
+            + lineSeparator());
+    threadPoolsReportBuilder
+        .append(format("Custom        | %10d | %12d | %12d | %12d | ~ %9.2f",
+                       schedulersCustom,
+                       customUsedCount,
+                       customActiveCount,
+                       customQueued,
+                       customRejected > 0 ? 100.0 * (customRejected / (customTaskCount + customRejected)) : 0)
+            + lineSeparator());
+    threadPoolsReportBuilder
+        .append("--------------------------------------------------------------------------------------" + lineSeparator()
+            + lineSeparator());
 
     return threadPoolsReportBuilder.toString();
   }
