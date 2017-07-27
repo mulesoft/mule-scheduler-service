@@ -12,7 +12,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.sameInstance;
-import static org.hamcrest.Matchers.is;
+import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsCollectionContaining.hasItem;
 import static org.hamcrest.core.IsInstanceOf.instanceOf;
 import static org.hamcrest.core.StringStartsWith.startsWith;
@@ -21,7 +21,9 @@ import static org.junit.Assert.fail;
 import static org.junit.rules.ExpectedException.none;
 import static org.mockito.Mockito.mock;
 import static org.mule.runtime.core.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
+import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 import org.mule.runtime.api.exception.MuleException;
@@ -34,6 +36,8 @@ import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
 
+import java.lang.ref.PhantomReference;
+import java.lang.ref.ReferenceQueue;
 import java.util.ArrayList;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -57,6 +61,8 @@ import ru.yandex.qatools.allure.annotations.Features;
 public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
   private static final int CORES = getRuntime().availableProcessors();
+
+  private static final int GC_POLLING_TIMEOUT = 10000;
 
   @Rule
   public ExpectedException expected = none();
@@ -187,6 +193,42 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
         submit.cancel(false);
       }
     }
+  }
+
+  @Test
+  @Description("Tests that a custom scheduler doesn't hold a reference to the context classloader that was in the context when it was created.")
+  public void customPoolThreadsDontReferenceCreatorClassLoader() throws Exception {
+    ClassLoader testClassLoader = new ClassLoader(this.getClass().getClassLoader()) {};
+    PhantomReference<ClassLoader> clRef = new PhantomReference<>(testClassLoader, new ReferenceQueue<>());
+
+    scheduleToCustomWithClassLoader(testClassLoader);
+
+    testClassLoader = null;
+
+    new PollingProber(GC_POLLING_TIMEOUT, DEFAULT_POLLING_INTERVAL).check(new JUnitLambdaProbe(() -> {
+      System.gc();
+      assertThat(clRef.isEnqueued(), is(true));
+      return true;
+    }, "A hard reference is being mantained to the child ClassLoader."));
+  }
+
+  public void scheduleToCustomWithClassLoader(final ClassLoader testClassLoader) throws InterruptedException, ExecutionException {
+    final AtomicReference<Scheduler> scheduler = new AtomicReference<>();
+    withContextClassLoader(testClassLoader, () -> {
+      scheduler.set(service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L));
+
+      try {
+        scheduler.get().submit(() -> {
+          assertThat(currentThread().getContextClassLoader(), is(testClassLoader));
+        }).get();
+      } catch (InterruptedException | ExecutionException e) {
+        throw new RuntimeException(e);
+      }
+    });
+
+    scheduler.get().submit(() -> {
+      assertThat(currentThread().getContextClassLoader(), is(testClassLoader.getParent()));
+    }).get();
   }
 
   @Test

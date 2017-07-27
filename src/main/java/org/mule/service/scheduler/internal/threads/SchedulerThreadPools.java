@@ -313,6 +313,7 @@ public class SchedulerThreadPools {
         new ThreadPoolExecutor(config.getMaxConcurrentTasks(), config.getMaxConcurrentTasks(), 0L, MILLISECONDS, workQueue,
                                new SchedulerThreadFactory(customChildGroup, "%s." + threadsName + ".%02d"),
                                byCallerThreadGroupPolicy);
+    executor.prestartAllCoreThreads();
 
     final CustomScheduler customScheduler =
         new CustomScheduler(schedulerName, executor, workers, scheduledExecutor, quartzScheduler, CUSTOM, stopTimeout,
