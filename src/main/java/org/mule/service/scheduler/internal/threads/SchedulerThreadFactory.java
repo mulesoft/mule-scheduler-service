@@ -34,7 +34,9 @@ public class SchedulerThreadFactory implements java.util.concurrent.ThreadFactor
 
   @Override
   public Thread newThread(Runnable runnable) {
-    return new Thread(group, runnable, format(nameFormat, group.getName(), counter.getAndIncrement()));
+    final Thread thread = new Thread(group, runnable, format(nameFormat, group.getName(), counter.getAndIncrement()));
+    thread.setContextClassLoader(this.getClass().getClassLoader());
+    return thread;
   }
 
   public ThreadGroup getGroup() {
