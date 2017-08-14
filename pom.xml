@@ -45,9 +45,6 @@
                 <groupId>org.mule.runtime.plugins</groupId>
                 <artifactId>mule-app-plugins-maven-plugin</artifactId>
                 <extensions>true</extensions>
-                <!--<configuration>-->
-                    <!--<serviceProviderClassName>org.mule.service.scheduler.provider.SchedulerServiceProvider</serviceProviderClassName>-->
-                <!--</configuration>-->
             </plugin>
         </plugins>
     </build>
