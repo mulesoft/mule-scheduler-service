@@ -9,7 +9,7 @@
     
     <artifactId>mule-service-scheduler</artifactId>
     <packaging>mule-service</packaging>
-    <version>1.0.0-rc.cyborg-SNAPSHOT</version>
+    <version>1.0.0-rc.cyborg</version>
 
     <name>Mule Scheduler Service Implementation</name>
 
