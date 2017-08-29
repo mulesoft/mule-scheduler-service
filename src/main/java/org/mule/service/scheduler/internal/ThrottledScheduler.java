@@ -59,7 +59,7 @@ public class ThrottledScheduler extends DefaultScheduler {
     try {
       synchronized (runningTasks) {
         runningTasks.incrementAndGet();
-        while (runningTasks.get() >= maxConcurrentTasks) {
+        while (runningTasks.get() > maxConcurrentTasks) {
           runningTasks.wait();
         }
       }
