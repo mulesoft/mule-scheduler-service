@@ -30,6 +30,10 @@ import org.mule.service.scheduler.internal.DefaultScheduler;
 import org.mule.service.scheduler.internal.ThrottledScheduler;
 import org.mule.service.scheduler.internal.executor.ByCallerThreadGroupPolicy;
 
+import org.quartz.SchedulerException;
+import org.quartz.impl.StdSchedulerFactory;
+import org.slf4j.Logger;
+
 import com.google.common.collect.ImmutableList;
 
 import java.util.ArrayList;
@@ -52,15 +56,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import org.quartz.SchedulerException;
-import org.quartz.impl.StdSchedulerFactory;
-import org.slf4j.Logger;
-
 /**
  * {@link Scheduler}s provided by this implementation of {@link SchedulerService} use a shared single-threaded
  * {@link ScheduledExecutorService} for scheduling work. When a scheduled tasks is fired, they are executed using the
  * {@link Scheduler}'s own executor.
- * 
+ *
  * @since 1.0
  */
 public class SchedulerThreadPools {
@@ -177,6 +177,7 @@ public class SchedulerThreadPools {
     factoryProperties.setProperty("org.quartz.threadPool.class", "org.quartz.simpl.SimpleThreadPool");
     factoryProperties.setProperty("org.quartz.threadPool.threadNamePrefix", threadPoolsConfig.getThreadNamePrefix() + "_qz");
     factoryProperties.setProperty("org.quartz.threadPool.threadCount", "1");
+    factoryProperties.setProperty("org.quartz.jobStore.misfireThreshold", "" + SECONDS.toMillis(5));
     return factoryProperties;
   }
 
