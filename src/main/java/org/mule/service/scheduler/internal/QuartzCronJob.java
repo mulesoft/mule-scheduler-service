@@ -18,12 +18,7 @@ public class QuartzCronJob implements Job {
 
   @Override
   public void execute(JobExecutionContext context) throws JobExecutionException {
-    Runnable task = (Runnable) context.getJobDetail().getJobDataMap().get(JOB_TASK_KEY);
-
-
-    // ((CronTrigger)( context.getTrigger())).getTimeZone();
-
-    task.run();
+    ((Runnable) context.getJobDetail().getJobDataMap().get(JOB_TASK_KEY)).run();
   }
 
 }

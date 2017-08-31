@@ -26,6 +26,12 @@ import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.service.scheduler.ThreadType;
 
+import org.quartz.CronTrigger;
+import org.quartz.JobDataMap;
+import org.quartz.JobDetail;
+import org.quartz.SchedulerException;
+import org.slf4j.Logger;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -45,12 +51,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-
-import org.quartz.CronTrigger;
-import org.quartz.JobDataMap;
-import org.quartz.JobDetail;
-import org.quartz.SchedulerException;
-import org.slf4j.Logger;
 
 /**
  * Proxy for a {@link ScheduledExecutorService} that adds tracking of the source of the dispatched tasks.
@@ -228,7 +228,8 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     jobDataMap.put(JOB_TASK_KEY, schedulableTask(task));
     JobDetail job = newJob(jobClass).usingJobData(jobDataMap).build();
 
-    CronTrigger trigger = newTrigger().withSchedule(cronSchedule(cronExpression).inTimeZone(timeZone)).build();
+    CronTrigger trigger = newTrigger()
+        .withSchedule(cronSchedule(cronExpression).withMisfireHandlingInstructionIgnoreMisfires().inTimeZone(timeZone)).build();
 
     try {
       quartzScheduler.scheduleJob(job, trigger);
