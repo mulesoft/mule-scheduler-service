@@ -39,7 +39,7 @@ public class DefaultSchedulerView implements SchedulerView {
 
   @Override
   public boolean isTerminated() {
-    return scheduler.isShutdown();
+    return scheduler.isTerminated();
   }
 
   @Override
