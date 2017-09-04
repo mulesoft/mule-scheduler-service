@@ -102,7 +102,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
    * @param quartzScheduler the quartz object that will handle tasks scheduled with cron expressions. This will not execute the
    *        actual tasks, but will dispatch it to the {@code executor} at the appropriate time.
    * @param threadsType The {@link ThreadType} that matches with the {@link Thread}s managed by this {@link Scheduler}.
-   * @param shutdownTimeoutMillis the time in millis to wait for the gracefule stop of this scheduler
+   * @param shutdownTimeoutMillis the time in millis to wait for the graceful stop of this scheduler
    * @param shutdownCallback a callback to be invoked when this scheduler is stopped/shutdown.
    */
   public DefaultScheduler(String name, ExecutorService executor, int parallelTasksEstimate,

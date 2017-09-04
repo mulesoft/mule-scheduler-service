@@ -13,6 +13,7 @@ import static java.lang.Thread.currentThread;
 import static java.util.Collections.unmodifiableList;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static java.util.stream.Collectors.toList;
 import static org.mule.runtime.core.api.config.MuleProperties.OBJECT_SCHEDULER_BASE_CONFIG;
 import static org.mule.runtime.core.api.scheduler.SchedulerConfig.config;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
@@ -23,11 +24,15 @@ import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lifecycle.Startable;
 import org.mule.runtime.api.lifecycle.Stoppable;
 import org.mule.runtime.api.scheduler.Scheduler;
+import org.mule.runtime.api.scheduler.SchedulerView;
 import org.mule.runtime.core.api.scheduler.SchedulerConfig;
 import org.mule.runtime.core.api.scheduler.SchedulerContainerPoolsConfig;
 import org.mule.runtime.core.api.scheduler.SchedulerPoolsConfigFactory;
 import org.mule.runtime.core.api.scheduler.SchedulerService;
+import org.mule.service.scheduler.internal.reporting.DefaultSchedulerView;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
+
+import org.slf4j.Logger;
 
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -46,8 +51,6 @@ import java.util.function.Supplier;
 
 import javax.inject.Inject;
 import javax.inject.Named;
-
-import org.slf4j.Logger;
 
 /**
  * Default implementation of {@link SchedulerService}.
@@ -344,11 +347,11 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   }
 
   @Override
-  public List<Scheduler> getSchedulers() {
-    List<Scheduler> schedulers = new ArrayList<>();
+  public List<SchedulerView> getSchedulers() {
+    List<SchedulerView> schedulers = new ArrayList<>();
 
     for (SchedulerThreadPools schedulerThreadPools : getPools()) {
-      schedulers.addAll(schedulerThreadPools.getSchedulers());
+      schedulers.addAll(schedulerThreadPools.getSchedulers().stream().map(s -> new DefaultSchedulerView(s)).collect(toList()));
     }
 
     return unmodifiableList(schedulers);
