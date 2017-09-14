@@ -109,7 +109,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
                           ScheduledExecutorService scheduledExecutor,
                           org.quartz.Scheduler quartzScheduler, ThreadType threadsType, Supplier<Long> shutdownTimeoutMillis,
                           Consumer<Scheduler> shutdownCallback) {
-    this.name = name + "@" + toHexString(hashCode());
+    this.name = name + " @" + toHexString(hashCode());
     scheduledTasks = new ConcurrentHashMap<>(parallelTasksEstimate, 1.00f, getRuntime().availableProcessors());
     cancelledBeforeFireTasks = newKeySet();
     this.executor = executor;

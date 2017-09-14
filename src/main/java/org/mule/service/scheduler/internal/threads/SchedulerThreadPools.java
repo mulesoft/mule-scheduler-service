@@ -337,7 +337,7 @@ public class SchedulerThreadPools {
   private Scheduler doCreateCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, String schedulerName,
                                             BlockingQueue<Runnable> workQueue, String threadsName) {
     if (config.getMaxConcurrentTasks() == null) {
-      throw new IllegalArgumentException("Custom schedulers must define a thread pool size");
+      throw new IllegalArgumentException("Custom schedulers must define a thread pool size bi calling `config.withMaxConcurrentTasks()`");
     }
 
     final ThreadGroup customChildGroup = new ThreadGroup(resolveThreadGroupForCustomScheduler(config), threadsName);
