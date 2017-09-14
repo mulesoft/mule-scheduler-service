@@ -16,14 +16,12 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
-import static org.mule.runtime.core.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.Scheduler;
-import org.mule.runtime.core.api.scheduler.SchedulerConfig;
-import org.mule.runtime.core.api.scheduler.SchedulerService;
 import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 import org.mule.tck.junit4.AbstractMuleTestCase;

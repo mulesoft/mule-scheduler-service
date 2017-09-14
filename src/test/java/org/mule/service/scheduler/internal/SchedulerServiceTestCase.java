@@ -12,12 +12,12 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.mule.runtime.core.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 import org.mule.runtime.api.exception.MuleException;
-import org.mule.runtime.core.api.scheduler.SchedulerPoolsConfig;
-import org.mule.runtime.core.api.scheduler.SchedulerPoolsConfigFactory;
+import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
+import org.mule.runtime.api.scheduler.SchedulerPoolsConfigFactory;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;

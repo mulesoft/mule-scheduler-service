@@ -18,8 +18,8 @@ import static org.mule.service.scheduler.ThreadType.IO;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.MuleException;
-import org.mule.runtime.core.api.DefaultMuleException;
-import org.mule.runtime.core.api.scheduler.SchedulerPoolsConfig;
+import org.mule.runtime.api.exception.DefaultMuleException;
+import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -122,7 +122,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     return config;
   }
 
-  private static long resolveNumber(Properties properties, String propName, boolean allowZero) throws DefaultMuleException {
+  private static long resolveNumber(Properties properties, String propName, boolean allowZero) throws MuleException {
     final String property = properties.getProperty(propName);
     try {
       final long result = parseLong(property);
@@ -136,7 +136,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
   private static int resolveExpression(Properties properties, String propName, ContainerThreadPoolsConfig threadPoolsConfig,
                                        ScriptEngine engine, boolean allowZero)
-      throws DefaultMuleException {
+      throws MuleException {
     final String property = properties.getProperty(propName).trim().toLowerCase();
     if (!POOLSIZE_PATTERN.matcher(property).matches()) {
       throw new DefaultMuleException(propName + ": Expression not valid");
@@ -151,7 +151,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     }
   }
 
-  private static void validateNumber(String propName, long result, boolean allowZero) throws DefaultMuleException {
+  private static void validateNumber(String propName, long result, boolean allowZero) throws MuleException {
     if (allowZero) {
       if (result < 0) {
         throw new DefaultMuleException(propName + ": Value has to be greater than or equal to 0");

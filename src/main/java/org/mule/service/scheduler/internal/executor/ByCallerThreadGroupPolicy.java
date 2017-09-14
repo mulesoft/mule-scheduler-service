@@ -12,7 +12,8 @@ import static org.apache.commons.lang3.StringUtils.rightPad;
 import static org.mule.service.scheduler.internal.DefaultSchedulerService.USAGE_TRACE_INTERVAL_SECS;
 import static org.mule.service.scheduler.internal.DefaultSchedulerService.traceLogger;
 
-import org.mule.runtime.core.api.scheduler.SchedulerBusyException;
+import org.mule.runtime.api.scheduler.SchedulerService;
+import org.mule.runtime.api.scheduler.SchedulerBusyException;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadFactory;
 
 import java.util.Set;
@@ -23,7 +24,7 @@ import java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy;
 
 /**
  * Dynamically determines the {@link RejectedExecutionHandler} implementation to use according to the {@link ThreadGroup} of the
- * current thread. If the current thread is not a {@link org.mule.runtime.core.api.scheduler.SchedulerService} managed thread then
+ * current thread. If the current thread is not a {@link SchedulerService} managed thread then
  * {@link WaitPolicy} is used.
  * 
  * @see AbortPolicy
@@ -55,7 +56,7 @@ public final class ByCallerThreadGroupPolicy implements RejectedExecutionHandler
    * 
    * @param waitGroups the group of threads for which a {@link WaitPolicy} will be applied. For the rest, an {@link AbortPolicy}
    *        will be applied.
-   * @param parentGroup the {@link org.mule.runtime.core.api.scheduler.SchedulerService} parent {@link ThreadGroup}
+   * @param parentGroup the {@link SchedulerService} parent {@link ThreadGroup}
    */
   public ByCallerThreadGroupPolicy(Set<ThreadGroup> waitGroups, ThreadGroup parentGroup) {
     this.waitGroups = unmodifiableSet(waitGroups);
