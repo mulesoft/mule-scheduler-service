@@ -36,6 +36,12 @@ import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
 
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
+
 import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
 import java.util.ArrayList;
@@ -47,12 +53,6 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
@@ -390,7 +390,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     }
 
     CountDownLatch scheduledTaskLatch = new CountDownLatch(2);
-    AtomicReference<ScheduledFuture> scheduledTask = new AtomicReference<ScheduledFuture>(null);
+    AtomicReference<ScheduledFuture> scheduledTask = new AtomicReference<>(null);
 
     sourceScheduler.submit(() -> {
       scheduledTask.set(targetScheduler.scheduleWithFixedDelay(() -> {

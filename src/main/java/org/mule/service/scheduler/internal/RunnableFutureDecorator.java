@@ -8,13 +8,13 @@ package org.mule.service.scheduler.internal;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
+import org.slf4j.Logger;
+
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-
-import org.slf4j.Logger;
 
 /**
  * Decorates a {@link RunnableFuture} in order to do hook behavior both before and after the execution of the decorated
@@ -35,7 +35,7 @@ class RunnableFutureDecorator<V> extends AbstractRunnableFutureDecorator<V> {
 
   /**
    * Decorates the given {@code task}
-   * 
+   *
    * @param task the task to be decorated
    * @param classLoader the context {@link ClassLoader} on which the {@code task} should be executed
    * @param scheduler the owner {@link Executor} of this task
@@ -94,6 +94,10 @@ class RunnableFutureDecorator<V> extends AbstractRunnableFutureDecorator<V> {
 
   @Override
   public String toString() {
-    return taskAsString;
+    return getSchedulerName() + " - " + taskAsString;
+  }
+
+  public String getSchedulerName() {
+    return scheduler.getName();
   }
 }
