@@ -15,7 +15,7 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 import static org.mule.runtime.core.api.config.MuleProperties.OBJECT_SCHEDULER_BASE_CONFIG;
-import static org.mule.runtime.core.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -25,10 +25,10 @@ import org.mule.runtime.api.lifecycle.Startable;
 import org.mule.runtime.api.lifecycle.Stoppable;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerView;
-import org.mule.runtime.core.api.scheduler.SchedulerConfig;
-import org.mule.runtime.core.api.scheduler.SchedulerContainerPoolsConfig;
-import org.mule.runtime.core.api.scheduler.SchedulerPoolsConfigFactory;
-import org.mule.runtime.core.api.scheduler.SchedulerService;
+import org.mule.runtime.api.scheduler.SchedulerConfig;
+import org.mule.runtime.api.scheduler.SchedulerContainerPoolsConfig;
+import org.mule.runtime.api.scheduler.SchedulerPoolsConfigFactory;
+import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.service.scheduler.internal.reporting.DefaultSchedulerView;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 

@@ -10,7 +10,7 @@ import static java.lang.Long.MAX_VALUE;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-import org.mule.runtime.core.api.scheduler.SchedulerBusyException;
+import org.mule.runtime.api.scheduler.SchedulerBusyException;
 
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RejectedExecutionHandler;

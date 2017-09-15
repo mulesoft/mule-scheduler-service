@@ -20,7 +20,7 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.junit.rules.ExpectedException.none;
 import static org.mockito.Mockito.mock;
-import static org.mule.runtime.core.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
@@ -28,7 +28,7 @@ import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHED
 
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.Scheduler;
-import org.mule.runtime.core.api.scheduler.SchedulerBusyException;
+import org.mule.runtime.api.scheduler.SchedulerBusyException;
 import org.mule.runtime.core.api.util.concurrent.Latch;
 import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;

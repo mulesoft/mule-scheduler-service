@@ -7,7 +7,7 @@
 package org.mule.service.scheduler;
 
 import org.mule.runtime.api.scheduler.Scheduler;
-import org.mule.runtime.core.api.scheduler.SchedulerService;
+import org.mule.runtime.api.scheduler.SchedulerService;
 
 /**
  * Represents the type of work that a {@link Thread} owned by a {@link Scheduler} is configured to perform.

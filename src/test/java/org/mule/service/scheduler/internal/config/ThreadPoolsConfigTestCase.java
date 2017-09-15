@@ -26,8 +26,8 @@ import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsCon
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 
 import org.mule.runtime.api.exception.MuleException;
-import org.mule.runtime.core.api.DefaultMuleException;
-import org.mule.runtime.core.api.scheduler.SchedulerPoolsConfig;
+import org.mule.runtime.api.exception.DefaultMuleException;
+import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 
 import java.io.File;
