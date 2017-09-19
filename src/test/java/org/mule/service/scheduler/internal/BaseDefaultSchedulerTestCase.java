@@ -8,15 +8,14 @@ package org.mule.service.scheduler.internal;
 
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
+import static java.util.concurrent.Executors.defaultThreadFactory;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.number.IsCloseTo.closeTo;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.spy;
 import static org.mule.service.scheduler.ThreadType.CUSTOM;
-
 import org.mule.runtime.api.scheduler.Scheduler;
-import org.mule.runtime.core.api.util.concurrent.NamedThreadFactory;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 
 import java.util.Properties;
@@ -60,10 +59,8 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
   @Before
   public void before() throws SchedulerException {
     sharedExecutor =
-        new ThreadPoolExecutor(1, 1, 0, SECONDS, new ArrayBlockingQueue<>(1), new NamedThreadFactory(this.getClass().getName()));
-
-    sharedScheduledExecutor =
-        spy(new ScheduledThreadPoolExecutor(1, new NamedThreadFactory(this.getClass().getName() + "_sched")));
+        new ThreadPoolExecutor(1, 1, 0, SECONDS, new ArrayBlockingQueue<>(1), defaultThreadFactory());
+    sharedScheduledExecutor = spy(new ScheduledThreadPoolExecutor(1, defaultThreadFactory()));
     sharedScheduledExecutor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
     sharedScheduledExecutor.setRemoveOnCancelPolicy(true);
 
