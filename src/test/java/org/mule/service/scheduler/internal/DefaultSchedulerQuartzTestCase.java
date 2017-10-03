@@ -27,14 +27,6 @@ import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.Sched
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.TimeZone;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-
 import org.hamcrest.TypeSafeMatcher;
 import org.junit.Test;
 import org.quartz.CronTrigger;
@@ -43,6 +35,14 @@ import org.quartz.JobDetail;
 import org.quartz.JobExecutionContext;
 import org.quartz.JobExecutionException;
 import org.quartz.SchedulerException;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.TimeZone;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
@@ -57,7 +57,7 @@ public class DefaultSchedulerQuartzTestCase extends BaseDefaultSchedulerTestCase
   private DefaultScheduler executor;
 
   @Override
-  public void before() throws SchedulerException {
+  public void before() throws Exception {
     super.before();
     executor = new DefaultScheduler(DefaultSchedulerQuartzTestCase.class.getSimpleName(), sharedExecutor, 1,
                                     sharedScheduledExecutor, sharedQuartzScheduler, CUSTOM, () -> 5000L,
@@ -65,7 +65,7 @@ public class DefaultSchedulerQuartzTestCase extends BaseDefaultSchedulerTestCase
   }
 
   @Override
-  public void after() throws SchedulerException, InterruptedException {
+  public void after() throws Exception {
     executor.shutdownNow();
     executor.awaitTermination(5, SECONDS);
     super.after();

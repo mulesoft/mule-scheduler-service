@@ -12,13 +12,12 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.atomic.AtomicInteger;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.quartz.SchedulerException;
+
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class RunnableRepeatableFutureDecoratorTestCase extends BaseDefaultSchedulerTestCase {
 
@@ -28,14 +27,14 @@ public class RunnableRepeatableFutureDecoratorTestCase extends BaseDefaultSchedu
 
   @Override
   @Before
-  public void before() throws SchedulerException {
+  public void before() throws Exception {
     super.before();
     scheduler = (DefaultScheduler) createExecutor();
   }
 
   @Override
   @After
-  public void after() throws SchedulerException, InterruptedException {
+  public void after() throws Exception {
     scheduler.stop();
     scheduler = null;
     super.after();

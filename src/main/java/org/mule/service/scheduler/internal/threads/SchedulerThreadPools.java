@@ -29,6 +29,7 @@ import org.mule.service.scheduler.ThreadType;
 import org.mule.service.scheduler.internal.DefaultScheduler;
 import org.mule.service.scheduler.internal.ThrottledScheduler;
 import org.mule.service.scheduler.internal.executor.ByCallerThreadGroupPolicy;
+import org.mule.service.scheduler.internal.executor.ByCallerThrottlingPolicy;
 
 import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
@@ -114,8 +115,8 @@ public class SchedulerThreadPools {
     customGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
     customWaitGroup = new ThreadGroup(customGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
 
-    final Set<ThreadGroup> waitGroups = new HashSet<>(asList(ioGroup, customWaitGroup));
-    byCallerThreadGroupPolicy = () -> new ByCallerThreadGroupPolicy(waitGroups, schedulerGroup);
+    byCallerThreadGroupPolicy =
+        () -> new ByCallerThreadGroupPolicy(new HashSet<>(asList(ioGroup, customWaitGroup)), schedulerGroup);
   }
 
   public void start() throws MuleException {
@@ -241,8 +242,10 @@ public class SchedulerThreadPools {
     Scheduler scheduler;
     if (shouldThrottle(config, threadPoolsConfig.getCpuLightPoolSize())) {
       scheduler =
-          new ThrottledScheduler(schedulerName, cpuLightExecutor, parallelTasksEstimate, scheduledExecutor,
-                                 quartzScheduler, CPU_LIGHT, config.getMaxConcurrentTasks(),
+          new ThrottledScheduler(schedulerName, cpuLightExecutor, parallelTasksEstimate, scheduledExecutor, quartzScheduler,
+                                 CPU_LIGHT,
+                                 new ByCallerThrottlingPolicy(config.getMaxConcurrentTasks(),
+                                                              new HashSet<>(asList(ioGroup, customWaitGroup)), schedulerGroup),
                                  stopTimeout, shutdownCallback(activeCpuLightSchedulers));
     } else {
       scheduler = new DefaultScheduler(schedulerName, cpuLightExecutor, parallelTasksEstimate,
@@ -259,10 +262,11 @@ public class SchedulerThreadPools {
     final String schedulerName = resolveIoSchedulerName(config);
     Scheduler scheduler;
     if (shouldThrottle(config, threadPoolsConfig.getIoMaxPoolSize())) {
-      scheduler = new ThrottledScheduler(schedulerName, ioExecutor, workers,
-                                         scheduledExecutor, quartzScheduler, IO,
-                                         config.getMaxConcurrentTasks(), stopTimeout,
-                                         shutdownCallback(activeIoSchedulers));
+      scheduler =
+          new ThrottledScheduler(schedulerName, ioExecutor, workers, scheduledExecutor, quartzScheduler, IO,
+                                 new ByCallerThrottlingPolicy(config.getMaxConcurrentTasks(),
+                                                              new HashSet<>(asList(ioGroup, customWaitGroup)), schedulerGroup),
+                                 stopTimeout, shutdownCallback(activeIoSchedulers));
     } else {
       scheduler = new DefaultScheduler(schedulerName, ioExecutor, workers,
                                        scheduledExecutor, quartzScheduler, IO,
@@ -297,15 +301,15 @@ public class SchedulerThreadPools {
     final String schedulerName = resolveComputationSchedulerName(config);
     Scheduler scheduler;
     if (shouldThrottle(config, threadPoolsConfig.getCpuIntensivePoolSize())) {
-      scheduler = new ThrottledScheduler(schedulerName, computationExecutor, workers,
-                                         scheduledExecutor, quartzScheduler,
-                                         CPU_INTENSIVE, config.getMaxConcurrentTasks(), stopTimeout,
-                                         shutdownCallback(activeCpuIntensiveSchedulers));
-    } else {
       scheduler =
-          new DefaultScheduler(schedulerName, computationExecutor, workers, scheduledExecutor,
-                               quartzScheduler, CPU_INTENSIVE, stopTimeout,
-                               shutdownCallback(activeCpuIntensiveSchedulers));
+          new ThrottledScheduler(schedulerName, computationExecutor, workers, scheduledExecutor, quartzScheduler, CPU_INTENSIVE,
+                                 new ByCallerThrottlingPolicy(config.getMaxConcurrentTasks(),
+                                                              new HashSet<>(asList(ioGroup, customWaitGroup)), schedulerGroup),
+                                 stopTimeout, shutdownCallback(activeCpuIntensiveSchedulers));
+    } else {
+      scheduler = new DefaultScheduler(schedulerName, computationExecutor, workers, scheduledExecutor,
+                                       quartzScheduler, CPU_INTENSIVE, stopTimeout,
+                                       shutdownCallback(activeCpuIntensiveSchedulers));
     }
     addScheduler(activeCpuIntensiveSchedulers, scheduler);
     return scheduler;

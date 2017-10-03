@@ -6,8 +6,6 @@
  */
 package org.mule.service.scheduler.internal;
 
-import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
-import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SchedulerServiceStory.TASK_SCHEDULING;
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
 import static java.util.Arrays.asList;
@@ -27,8 +25,16 @@ import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
+import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
+import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SchedulerServiceStory.TASK_SCHEDULING;
 
 import org.mule.runtime.api.scheduler.Scheduler;
+
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
+import org.mockito.InOrder;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -40,12 +46,6 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
-import org.mockito.InOrder;
-import org.quartz.SchedulerException;
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Story;
@@ -76,13 +76,13 @@ public class DefaultSchedulerScheduleTestCase extends BaseDefaultSchedulerTestCa
   }
 
   @Override
-  public void before() throws SchedulerException {
+  public void before() throws Exception {
     super.before();
     executor = createExecutor();
   }
 
   @Override
-  public void after() throws SchedulerException, InterruptedException {
+  public void after() throws Exception {
     executor.shutdownNow();
     executor.awaitTermination(5, SECONDS);
     super.after();
