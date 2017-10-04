@@ -6,17 +6,14 @@
  */
 package org.mule.service.scheduler.internal;
 
-import static java.lang.Thread.currentThread;
-
-import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.service.scheduler.ThreadType;
+import org.mule.service.scheduler.internal.executor.ByCallerThrottlingPolicy;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -24,13 +21,12 @@ import java.util.function.Supplier;
  * Extension of {@link DefaultScheduler} that has a limit on the tasks that can be run at the same time.
  * <p>
  * Exceeding tasks will block the caller, until a running task is finished.
- * 
+ *
  * @since 1.0
  */
 public class ThrottledScheduler extends DefaultScheduler {
 
-  private final int maxConcurrentTasks;
-  private final AtomicInteger runningTasks = new AtomicInteger();
+  private final ByCallerThrottlingPolicy thottlingPolicy;
 
   /**
    * @param name the name of this scheduler
@@ -41,48 +37,32 @@ public class ThrottledScheduler extends DefaultScheduler {
    * @param quartzScheduler the quartz object that will handle tasks scheduled with cron expressions. This will not execute the
    *        actual tasks, but will dispatch it to the {@code executor} at the appropriate time.
    * @param threadsType The {@link ThreadType} that matches with the {@link Thread}s managed by this {@link Scheduler}.
-   * @param maxConcurrentTasks how many tasks can be running at the same time for this {@link Scheduler}.
-   * @param shutdownTimeoutMillis the time in millis to wait for the gracefule stop of this scheduler
+   * @param throttingPolicy the action to perform when too many tasks are running at the same time for this {@link Scheduler}.
+   * @param shutdownTimeoutMillis the time in millis to wait for the graceful stop of this scheduler
    * @param shutdownCallback a callback to be invoked when this scheduler is stopped/shutdown.
    */
   public ThrottledScheduler(String name, ExecutorService executor, int parallelTasksEstimate,
-                            ScheduledExecutorService scheduledExecutor,
-                            org.quartz.Scheduler quartzScheduler, ThreadType threadsType, int maxConcurrentTasks,
+                            ScheduledExecutorService scheduledExecutor, org.quartz.Scheduler quartzScheduler,
+                            ThreadType threadsType, ByCallerThrottlingPolicy throttingPolicy,
                             Supplier<Long> shutdownTimeoutMillis, Consumer<Scheduler> shutdownCallback) {
     super(name, executor, parallelTasksEstimate, scheduledExecutor, quartzScheduler, threadsType, shutdownTimeoutMillis,
           shutdownCallback);
-    this.maxConcurrentTasks = maxConcurrentTasks;
+    thottlingPolicy = throttingPolicy;
   }
 
   @Override
   protected void putTask(RunnableFuture<?> task, ScheduledFuture<?> scheduledFuture) {
-    try {
-      synchronized (runningTasks) {
-        runningTasks.incrementAndGet();
-        while (runningTasks.get() > maxConcurrentTasks) {
-          runningTasks.wait();
-        }
-      }
-
-      super.putTask(task, scheduledFuture);
-    } catch (InterruptedException e) {
-      currentThread().interrupt();
-      throw new MuleRuntimeException(e);
-    }
+    thottlingPolicy.throttle(() -> super.putTask(task, scheduledFuture), task, this.toString());
   }
 
   @Override
   protected void removeTask(RunnableFuture<?> task) {
     super.removeTask(task);
-
-    synchronized (runningTasks) {
-      runningTasks.decrementAndGet();
-      runningTasks.notify();
-    }
+    thottlingPolicy.throttleWrapUp();
   }
 
   @Override
   public String toString() {
-    return super.toString() + " (throttled: " + runningTasks.get() + "/" + maxConcurrentTasks + ")";
+    return super.toString() + " " + thottlingPolicy.toString();
   }
 }

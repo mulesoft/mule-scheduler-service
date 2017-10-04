@@ -15,8 +15,15 @@ import static org.hamcrest.number.IsCloseTo.closeTo;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.spy;
 import static org.mule.service.scheduler.ThreadType.CUSTOM;
+
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.tck.junit4.AbstractMuleTestCase;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.rules.ExpectedException;
+import org.quartz.impl.StdSchedulerFactory;
 
 import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -26,13 +33,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Consumer;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.rules.ExpectedException;
-import org.quartz.SchedulerException;
-import org.quartz.impl.StdSchedulerFactory;
 
 public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
 
@@ -57,7 +57,7 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
   protected org.quartz.Scheduler sharedQuartzScheduler;
 
   @Before
-  public void before() throws SchedulerException {
+  public void before() throws Exception {
     sharedExecutor =
         new ThreadPoolExecutor(1, 1, 0, SECONDS, new ArrayBlockingQueue<>(1), defaultThreadFactory());
     sharedScheduledExecutor = spy(new ScheduledThreadPoolExecutor(1, defaultThreadFactory()));
@@ -81,7 +81,7 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
   }
 
   @After
-  public void after() throws SchedulerException, InterruptedException {
+  public void after() throws Exception {
     sharedScheduledExecutor.shutdownNow();
     sharedQuartzScheduler.shutdown(true);
     sharedExecutor.shutdownNow();
