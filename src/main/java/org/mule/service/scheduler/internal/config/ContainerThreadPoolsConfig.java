@@ -11,15 +11,19 @@ import static java.lang.Long.parseLong;
 import static java.lang.Runtime.getRuntime;
 import static java.lang.System.getProperty;
 import static java.util.regex.Pattern.compile;
+import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.core.api.config.MuleProperties.MULE_HOME_DIRECTORY_PROPERTY;
 import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
 import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
 import static org.mule.service.scheduler.ThreadType.IO;
 import static org.slf4j.LoggerFactory.getLogger;
 
-import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.DefaultMuleException;
+import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
+import org.mule.runtime.core.api.config.ConfigurationException;
+
+import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -33,14 +37,11 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
-import org.apache.logging.log4j.core.config.ConfigurationException;
-import org.slf4j.Logger;
-
 /**
  * Bean that contains the thread pools configuration for the runtime.
  * <p>
  * All of its getter methods for configuration values eturn non-null values.
- * 
+ *
  * @since 1.0
  */
 public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
@@ -66,7 +67,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
   /**
    * Loads the configuration from the {@code &#123;mule.home&#125;/conf/scheduler-pools.conf} file.
-   * 
+   *
    * @return The loaded configuration, or the default if the file is unavailable.
    * @throws MuleException for any trouble that happens while parsing the file.
    */
@@ -99,7 +100,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     ScriptEngineManager manager = new ScriptEngineManager();
     ScriptEngine engine = manager.getEngineByName("js");
     if (engine == null) {
-      throw new ConfigurationException("No 'js' script engine found. It is required to parse the config in 'conf/scheduler-pools.conf'");
+      throw new ConfigurationException(createStaticMessage("No 'js' script engine found. It is required to parse the config in 'conf/scheduler-pools.conf'"));
     }
     engine.put("cores", cores);
     engine.put("mem", mem);
