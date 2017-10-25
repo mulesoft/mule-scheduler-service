@@ -396,7 +396,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   protected void taskFinished(RunnableFuture<?> task) {
     removeTask(task);
-    if (task instanceof AbstractRunnableFutureDecorator && !((AbstractRunnableFutureDecorator) task).isStarted()) {
+    if (task instanceof AbstractRunnableFutureDecorator && !((AbstractRunnableFutureDecorator) task).isRanAtLeastOnce()) {
       cancelledBeforeFireTasks.add(task);
     }
     tryTerminate();
