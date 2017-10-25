@@ -13,7 +13,6 @@ import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
 import static java.util.Objects.requireNonNull;
 import static java.util.TimeZone.getDefault;
-import static java.util.concurrent.ConcurrentHashMap.newKeySet;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mule.service.scheduler.internal.QuartzCronJob.JOB_TASK_KEY;
@@ -36,7 +35,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.Callable;
@@ -85,7 +83,6 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   private static final ScheduledFuture<?> NULL_SCHEDULED_FUTURE = NullScheduledFuture.INSTANCE;
   private Map<RunnableFuture<?>, ScheduledFuture<?>> scheduledTasks;
-  private Set<RunnableFuture<?>> cancelledBeforeFireTasks;
 
   private volatile boolean shutdown = false;
 
@@ -111,7 +108,6 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
                           Consumer<Scheduler> shutdownCallback) {
     this.name = name + " @" + toHexString(hashCode());
     scheduledTasks = new ConcurrentHashMap<>(parallelTasksEstimate, 1.00f, getRuntime().availableProcessors());
-    cancelledBeforeFireTasks = newKeySet();
     this.executor = executor;
     this.scheduledExecutor = scheduledExecutor;
     this.quartzScheduler = quartzScheduler;
@@ -273,8 +269,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
     List<Runnable> tasks;
     try {
-      tasks = new ArrayList<>(scheduledTasks.size() + cancelledBeforeFireTasks.size());
-      tasks.addAll(cancelledBeforeFireTasks);
+      tasks = new ArrayList<>(scheduledTasks.size());
 
       for (Entry<RunnableFuture<?>, ScheduledFuture<?>> taskEntry : scheduledTasks.entrySet()) {
         taskEntry.getValue().cancel(true);
@@ -285,7 +280,6 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
         }
       }
       scheduledTasks.clear();
-      cancelledBeforeFireTasks.clear();
 
       return tasks;
     } finally {
@@ -396,9 +390,6 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   protected void taskFinished(RunnableFuture<?> task) {
     removeTask(task);
-    if (task instanceof AbstractRunnableFutureDecorator && !((AbstractRunnableFutureDecorator) task).isRanAtLeastOnce()) {
-      cancelledBeforeFireTasks.add(task);
-    }
     tryTerminate();
   }
 

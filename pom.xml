@@ -89,6 +89,11 @@
             <scope>test</scope>
         </dependency>
         <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>org.mule.tests</groupId>
             <artifactId>mule-tests-allure</artifactId>
             <version>${mule.version}</version>
