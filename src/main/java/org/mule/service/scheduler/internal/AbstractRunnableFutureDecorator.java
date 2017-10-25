@@ -49,6 +49,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
 
   private final Integer id;
 
+  private volatile boolean ranAtLeastOnce = false;
   private volatile boolean started = false;
 
   /**
@@ -64,6 +65,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
       startTime = System.nanoTime();
       logger.trace("Starting task " + toString() + "...");
     }
+    ranAtLeastOnce = true;
     started = true;
     return startTime;
   }
@@ -118,6 +120,13 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   protected void wrapUp() throws Exception {
     started = false;
     clearAllThreadLocals();
+  }
+
+  /**
+   * @return {@code true} if the execution of this task was started at least once, false otherwise.
+   */
+  boolean isRanAtLeastOnce() {
+    return ranAtLeastOnce;
   }
 
   /**

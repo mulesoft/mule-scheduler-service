@@ -403,6 +403,20 @@ public class DefaultSchedulerScheduleTestCase extends BaseDefaultSchedulerTestCa
   }
 
   @Test
+  @Description("Tests that shutdownNow after cancelling a running ScheduledFuture after being fired at least once doesn't return the cancelled task")
+  public void shutdownNowAfterCancelCallableAfterFire() throws Exception {
+    final ScheduledFuture<?> scheduled = executor.schedule(() -> {
+      return true;
+    }, 0, SECONDS);
+
+    scheduled.get(EXECUTOR_TIMEOUT_SECS, SECONDS);
+    scheduled.cancel(true);
+
+    List<Runnable> notStartedTasks = executor.shutdownNow();
+    assertThat(notStartedTasks, hasSize(0));
+  }
+
+  @Test
   @Description("Tests that shutdownNow after cancelling a running ScheduledFuture returns the cancelled task")
   public void shutdownNowAfterCancelCallableWhileRunning() throws InterruptedException {
     final CountDownLatch latch1 = new CountDownLatch(1);
