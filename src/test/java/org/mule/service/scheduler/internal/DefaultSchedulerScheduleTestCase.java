@@ -8,7 +8,6 @@ package org.mule.service.scheduler.internal;
 
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
-import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -31,13 +30,9 @@ import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.Sched
 import org.mule.runtime.api.scheduler.Scheduler;
 
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 import org.mockito.InOrder;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -50,42 +45,15 @@ import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Story;
 
-@RunWith(Parameterized.class)
 @Feature(SCHEDULER_SERVICE)
 @Story(TASK_SCHEDULING)
-public class DefaultSchedulerScheduleTestCase extends BaseDefaultSchedulerTestCase {
+public class DefaultSchedulerScheduleTestCase extends AbstractMuleVsJavaExecutorTestCase {
 
   private static final long TASK_DURATION_MILLIS = 200;
   private static final long TEST_DELAY_MILLIS = 1000;
 
-  private Function<DefaultSchedulerScheduleTestCase, ScheduledExecutorService> executorFactory;
-
-  private ScheduledExecutorService executor;
-
-  public DefaultSchedulerScheduleTestCase(Function<DefaultSchedulerScheduleTestCase, ScheduledExecutorService> executorFactory) {
-    this.executorFactory = executorFactory;
-  }
-
-  @Parameters
-  public static Collection<Object[]> data() {
-    return asList(new Object[][] {
-        // Use a default ScheduledExecutorService to compare behavior
-        {(Function<DefaultSchedulerScheduleTestCase, ScheduledExecutorService>) test -> test.useSharedScheduledExecutor()},
-        {(Function<DefaultSchedulerScheduleTestCase, ScheduledExecutorService>) test -> test.createScheduledSameThreadExecutor()}
-    });
-  }
-
-  @Override
-  public void before() throws Exception {
-    super.before();
-    executor = createExecutor();
-  }
-
-  @Override
-  public void after() throws Exception {
-    executor.shutdownNow();
-    executor.awaitTermination(5, SECONDS);
-    super.after();
+  public DefaultSchedulerScheduleTestCase(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService> executorFactory) {
+    super(executorFactory);
   }
 
   @Test
@@ -399,7 +367,7 @@ public class DefaultSchedulerScheduleTestCase extends BaseDefaultSchedulerTestCa
     scheduled.cancel(true);
 
     List<Runnable> notStartedTasks = executor.shutdownNow();
-    assertThat(notStartedTasks, hasSize(1));
+    assertThat(notStartedTasks, hasSize(0));
   }
 
   @Test
@@ -519,19 +487,4 @@ public class DefaultSchedulerScheduleTestCase extends BaseDefaultSchedulerTestCa
                greaterThanOrEqualTo(TEST_DELAY_MILLIS - DELTA_MILLIS));
   }
 
-  @Override
-  protected ScheduledExecutorService createExecutor() {
-    return executorFactory.apply(this);
-  }
-
-  protected ScheduledExecutorService useSharedScheduledExecutor() {
-    sharedScheduledExecutor.setExecuteExistingDelayedTasksAfterShutdownPolicy(true);
-    sharedScheduledExecutor.setRemoveOnCancelPolicy(false);
-
-    return sharedScheduledExecutor;
-  }
-
-  protected ScheduledExecutorService createScheduledSameThreadExecutor() {
-    return super.createExecutor();
-  }
 }
