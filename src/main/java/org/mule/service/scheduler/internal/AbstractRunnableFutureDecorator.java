@@ -62,7 +62,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   protected long beforeRun() {
     long startTime = 0;
     if (logger.isTraceEnabled()) {
-      startTime = System.nanoTime();
+      startTime = nanoTime();
       logger.trace("Starting task " + toString() + "...");
     }
     ranAtLeastOnce = true;
@@ -92,8 +92,10 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     try {
       task.run();
       if (task.isCancelled()) {
-        // Log instead of rethrow to avoid flooding the logger with stack traces of cancellation, which may be very common.
-        logger.trace("Task " + toString() + " cancelled");
+        if (logger.isTraceEnabled()) {
+          // Log instead of rethrow to avoid flooding the logger with stack traces of cancellation, which may be very common.
+          logger.trace("Task " + toString() + " cancelled");
+        }
       } else {
         task.get();
       }
