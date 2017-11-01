@@ -30,6 +30,7 @@ import org.mule.service.scheduler.internal.DefaultScheduler;
 import org.mule.service.scheduler.internal.ThrottledScheduler;
 import org.mule.service.scheduler.internal.executor.ByCallerThreadGroupPolicy;
 import org.mule.service.scheduler.internal.executor.ByCallerThrottlingPolicy;
+import org.mule.service.scheduler.internal.queue.AsyncHandOffQueue;
 
 import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
@@ -126,13 +127,13 @@ public class SchedulerThreadPools {
                                0, SECONDS,
                                createQueue(threadPoolsConfig.getCpuLightQueueSize().getAsInt()),
                                new SchedulerThreadFactory(cpuLightGroup), byCallerThreadGroupPolicy.get());
+
+    AsyncHandOffQueue ioWorkQueue = new AsyncHandOffQueue();
     ioExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getIoCorePoolSize().getAsInt(), threadPoolsConfig.getIoMaxPoolSize().getAsInt(),
                                threadPoolsConfig.getIoKeepAlive().getAsLong(), MILLISECONDS,
-                               // TODO MULE-11505 - Implement cached IO scheduler that grows and uses async hand-off
-                               // with queue.
-                               new SynchronousQueue<>(),
-                               new SchedulerThreadFactory(ioGroup), byCallerThreadGroupPolicy.get());
+                               ioWorkQueue, new SchedulerThreadFactory(ioGroup),
+                               ioWorkQueue.buildHandler(byCallerThreadGroupPolicy.get()));
     computationExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
                                threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
