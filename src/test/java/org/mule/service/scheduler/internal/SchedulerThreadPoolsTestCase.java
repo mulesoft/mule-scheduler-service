@@ -340,37 +340,6 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
-  @Description("Tests that when the IO pool is full, any task dispatched from a CUSTOM pool with WAIT rejection action to IO is queued.")
-  public void customWaitToFullIoWaits() throws InterruptedException, ExecutionException, TimeoutException {
-    Scheduler customScheduler =
-        service.createCustomScheduler(config().withMaxConcurrentTasks(1).withWaitAllowed(true), CORES, () -> 1000L);
-    Scheduler ioScheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
-
-    Latch latch = new Latch();
-
-    // Fill up the IO pool
-    for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt(); ++i) {
-      consumeThread(ioScheduler, latch);
-    }
-
-    Future<Boolean> submitted = customScheduler.submit(() -> {
-      ioScheduler.submit(() -> {
-      });
-
-      fail("Didn't wait");
-      return null;
-    });
-
-    // Asssert that the task is waiting
-    expected.expect(TimeoutException.class);
-    try {
-      submitted.get(5, SECONDS);
-    } finally {
-      latch.countDown();
-    }
-  }
-
-  @Test
   @Description("Tests that periodic tasks scheduled to a busy Scheduler are skipped but the job continues executing.")
   public void rejectionPolicyScheduledPeriodic()
       throws MuleException, InterruptedException, ExecutionException, TimeoutException {
