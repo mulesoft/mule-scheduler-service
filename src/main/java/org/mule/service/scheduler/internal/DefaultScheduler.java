@@ -121,13 +121,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     checkShutdown();
     requireNonNull(command);
 
-    final RunnableFuture<?> task = newTaskFor(command, null);
-
-    final ScheduledFutureDecorator<?> scheduled =
-        new ScheduledFutureDecorator<>(scheduledExecutor.schedule(schedulableTask(task), delay, unit), task, false);
-
-    putTask(task, scheduled);
-    return scheduled;
+    return doSchedule(newTaskFor(command, null), delay, unit);
   }
 
   @Override
@@ -135,8 +129,10 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     checkShutdown();
     requireNonNull(callable);
 
-    final RunnableFuture<V> task = newTaskFor(callable);
+    return doSchedule(newTaskFor(callable), delay, unit);
+  }
 
+  private <V> ScheduledFuture<V> doSchedule(final RunnableFuture<V> task, long delay, TimeUnit unit) {
     final ScheduledFuture<V> scheduled =
         new ScheduledFutureDecorator(scheduledExecutor.schedule(schedulableTask(task), delay, unit), task, false);
 
