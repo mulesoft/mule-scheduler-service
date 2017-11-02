@@ -29,8 +29,9 @@ import io.qameta.allure.Story;
 @Story(TASK_SCHEDULING)
 public class ReactorSchedulersTestCase extends AbstractMuleVsJavaExecutorTestCase {
 
-  public ReactorSchedulersTestCase(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService> executorFactory) {
-    super(executorFactory);
+  public ReactorSchedulersTestCase(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService> executorFactory,
+                                   String param) {
+    super(executorFactory, param);
   }
 
   @Test

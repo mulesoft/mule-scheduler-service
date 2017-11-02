@@ -10,6 +10,7 @@ import static java.lang.Integer.MAX_VALUE;
 import static java.lang.String.format;
 import static java.lang.System.currentTimeMillis;
 import static java.lang.System.lineSeparator;
+import static java.lang.Thread.currentThread;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -164,10 +165,10 @@ public class SchedulerThreadPools {
       throw new LifecycleException(e, this);
     }
 
-    cpuLightExecutor.prestartAllCoreThreads();
-    ioExecutor.prestartAllCoreThreads();
-    computationExecutor.prestartAllCoreThreads();
-    scheduledExecutor.prestartAllCoreThreads();
+    ensureExecutorTakingTasks(cpuLightExecutor);
+    ensureExecutorTakingTasks(ioExecutor);
+    ensureExecutorTakingTasks(computationExecutor);
+    ensureExecutorTakingTasks(scheduledExecutor);
   }
 
   /**
@@ -361,7 +362,7 @@ public class SchedulerThreadPools {
         new ThreadPoolExecutor(config.getMaxConcurrentTasks(), config.getMaxConcurrentTasks(), 0L, MILLISECONDS, workQueue,
                                new SchedulerThreadFactory(customChildGroup, "%s.%02d"),
                                byCallerThreadGroupPolicy.get());
-    executor.prestartAllCoreThreads();
+    ensureExecutorTakingTasks(executor);
 
     final CustomScheduler customScheduler =
         new CustomScheduler(schedulerName, executor, workers, scheduledExecutor, quartzScheduler, CUSTOM, stopTimeout,
@@ -369,6 +370,26 @@ public class SchedulerThreadPools {
     customSchedulersExecutors.add(executor);
     addScheduler(activeCustomSchedulers, customScheduler);
     return customScheduler;
+  }
+
+  /*
+   * When using a SynchronousQueue on an Executor, even if calling prestartAllCoreThreads(), a race condition may occur where the
+   * worker threads are started but before it starts to take elements from the queue, the user of the Executor dispatches some
+   * task to it. <p> In that case, the task will be rejected. To avoid this, a wait is forced until the core thread is actually
+   * taking tasks from the queue.
+   */
+  private void ensureExecutorTakingTasks(final ThreadPoolExecutor executor) {
+    executor.prestartAllCoreThreads();
+
+    if (executor.getQueue() instanceof SynchronousQueue) {
+      try {
+        executor.getQueue().put(() -> {
+        });
+      } catch (InterruptedException e) {
+        currentThread().interrupt();
+        throw new RuntimeException(e);
+      }
+    }
   }
 
   private ThreadGroup resolveThreadGroupForCustomScheduler(SchedulerConfig config) {

@@ -52,8 +52,9 @@ public class DefaultSchedulerScheduleTestCase extends AbstractMuleVsJavaExecutor
   private static final long TASK_DURATION_MILLIS = 200;
   private static final long TEST_DELAY_MILLIS = 1000;
 
-  public DefaultSchedulerScheduleTestCase(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService> executorFactory) {
-    super(executorFactory);
+  public DefaultSchedulerScheduleTestCase(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService> executorFactory,
+                                          String param) {
+    super(executorFactory, param);
   }
 
   @Test

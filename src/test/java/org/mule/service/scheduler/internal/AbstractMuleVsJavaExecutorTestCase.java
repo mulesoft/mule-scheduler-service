@@ -27,18 +27,19 @@ public abstract class AbstractMuleVsJavaExecutorTestCase extends BaseDefaultSche
 
   protected ScheduledExecutorService executor;
 
-  public AbstractMuleVsJavaExecutorTestCase(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService> executorFactory) {
+  public AbstractMuleVsJavaExecutorTestCase(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService> executorFactory,
+                                            String param) {
     this.executorFactory = executorFactory;
   }
 
-  @Parameters
+  @Parameters(name = "{1}")
   public static Collection<Object[]> data() {
     return asList(new Object[][] {
         // Use a default ScheduledExecutorService to compare behavior
         {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
-            .useSharedScheduledExecutor()},
+            .useSharedScheduledExecutor(), "java"},
         {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
-            .createScheduledSameThreadExecutor()}
+            .createScheduledSameThreadExecutor(), "mule"}
     });
   }
 
