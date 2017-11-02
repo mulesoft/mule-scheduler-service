@@ -6,7 +6,11 @@
  */
 package org.mule.service.scheduler.internal.executor;
 
+import static java.lang.Thread.currentThread;
+import static java.lang.Thread.sleep;
+import static java.util.Collections.singletonMap;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static junit.framework.Assert.assertFalse;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
@@ -19,8 +23,12 @@ import org.mule.runtime.api.scheduler.SchedulerBusyException;
 import org.mule.runtime.core.api.util.StringUtils;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 
+import org.hamcrest.Matchers;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -29,11 +37,6 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
-
-import org.hamcrest.Matchers;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
 public class WaitPolicyTestCase extends AbstractMuleTestCase {
 
@@ -44,7 +47,7 @@ public class WaitPolicyTestCase extends AbstractMuleTestCase {
   @Before
   public void startExecutor() {
     // allow 1 active & 1 queued Thread
-    executor = new ThreadPoolExecutor(1, 1, 10000L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>(1));
+    executor = new ThreadPoolExecutor(1, 1, 10000L, MILLISECONDS, new LinkedBlockingQueue<Runnable>(1));
     executor.prestartAllCoreThreads();
 
     // the lock must be fair to guarantee FIFO access to the executor;
@@ -101,7 +104,7 @@ public class WaitPolicyTestCase extends AbstractMuleTestCase {
 
       // wait until the thread is actually enqueued on the lock
       while (submitter.isAlive() && !executorLock.hasQueuedThread(submitter)) {
-        Thread.sleep(10);
+        sleep(10);
       }
     }
 
@@ -114,7 +117,7 @@ public class WaitPolicyTestCase extends AbstractMuleTestCase {
     assertEquals(0, SleepyTask.activeTasks.get());
 
     // tasks wait forever
-    LastRejectedWaitPolicy policy = new LastRejectedWaitPolicy(-1, TimeUnit.SECONDS);
+    LastRejectedWaitPolicy policy = new LastRejectedWaitPolicy(-1, SECONDS);
     executor.setRejectedExecutionHandler(policy);
 
     // create tasks
@@ -132,7 +135,7 @@ public class WaitPolicyTestCase extends AbstractMuleTestCase {
     assertFalse(submitters.isEmpty());
 
     // the last task should have been queued
-    assertFalse(executor.awaitTermination(4000, TimeUnit.MILLISECONDS));
+    assertFalse(executor.awaitTermination(4000, MILLISECONDS));
     assertSame(waiting, policy.lastRejectedRunnable());
     assertEquals(0, SleepyTask.activeTasks.get());
   }
@@ -142,7 +145,7 @@ public class WaitPolicyTestCase extends AbstractMuleTestCase {
     assertEquals(0, SleepyTask.activeTasks.get());
 
     // set a reasonable retry interval
-    LastRejectedWaitPolicy policy = new LastRejectedWaitPolicy(2500, TimeUnit.MILLISECONDS);
+    LastRejectedWaitPolicy policy = new LastRejectedWaitPolicy(2500, MILLISECONDS);
     executor.setRejectedExecutionHandler(policy);
 
     // create tasks
@@ -188,7 +191,7 @@ public class WaitPolicyTestCase extends AbstractMuleTestCase {
     assertFalse(submitters.isEmpty());
 
     // give failure a chance
-    Thread.sleep(failureInterval * 10);
+    sleep(failureInterval * 10);
 
     // make sure there was one failure
     LinkedList<Map<Thread, Throwable>> exceptions = threadGroup.collectedExceptions();
@@ -213,11 +216,13 @@ class LastRejectedWaitPolicy extends WaitPolicy {
   private volatile Runnable _rejected;
 
   public LastRejectedWaitPolicy() {
-    super();
+    super((r, e) -> {
+    });
   }
 
   public LastRejectedWaitPolicy(long time, TimeUnit timeUnit) {
-    super(time, timeUnit);
+    super(time, timeUnit, (r, e) -> {
+    });
   }
 
   public Runnable lastRejectedRunnable() {
@@ -259,9 +264,9 @@ class SleepyTask extends Object implements Runnable {
     activeTasks.incrementAndGet();
 
     try {
-      Thread.sleep(sleepTime);
+      sleep(sleepTime);
     } catch (InterruptedException iex) {
-      Thread.currentThread().interrupt();
+      currentThread().interrupt();
     } finally {
       activeTasks.decrementAndGet();
     }
@@ -288,7 +293,7 @@ class ExceptionCollectingThreadGroup extends ThreadGroup {
   @Override
   public void uncaughtException(Thread t, Throwable e) {
     synchronized (exceptions) {
-      exceptions.add(Collections.singletonMap(t, e));
+      exceptions.add(singletonMap(t, e));
     }
   }
 }

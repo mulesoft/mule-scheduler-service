@@ -70,7 +70,9 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
       return;
     }
     if (cancelled) {
-      logger.debug("Task " + this.toString() + " has been cancelled. Retunrning immendiately.");
+      if (logger.isDebugEnabled()) {
+        logger.debug("Task " + this.toString() + " has been cancelled. Retunrning immendiately.");
+      }
       return;
     }
 
