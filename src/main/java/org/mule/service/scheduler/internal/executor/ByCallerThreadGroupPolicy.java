@@ -42,7 +42,7 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
   }
 
   private final AbortPolicy abort = new AbortBusyPolicy();
-  private final WaitPolicy wait = new WaitPolicy();
+  private final WaitPolicy wait = new WaitPolicy(abort);
   private final CallerRunsPolicy callerRuns = new CallerRunsPolicy();
 
   private volatile long rejectedCount;

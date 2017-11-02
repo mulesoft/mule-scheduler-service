@@ -27,34 +27,42 @@ public class WaitPolicy implements RejectedExecutionHandler {
   private final long time;
   private final TimeUnit timeUnit;
 
+  private RejectedExecutionHandler shutdownPolicy;
+
   /**
    * Constructs a <tt>WaitPolicy</tt> which waits (almost) forever.
+   *
+   * @param shutdownPolicy the policy to use when the executor is shutdown.
    */
-  public WaitPolicy() {
+  public WaitPolicy(RejectedExecutionHandler shutdownPolicy) {
     // effectively waits forever
-    this(MAX_VALUE, SECONDS);
+    this(MAX_VALUE, SECONDS, shutdownPolicy);
   }
 
   /**
    * Constructs a <tt>WaitPolicy</tt> with timeout. A negative <code>time</code> value is interpreted as
    * <code>Long.MAX_VALUE</code>.
    */
-  public WaitPolicy(long time, TimeUnit timeUnit) {
+  public WaitPolicy(long time, TimeUnit timeUnit, RejectedExecutionHandler shutdownPolicy) {
     super();
     this.time = (time < 0 ? MAX_VALUE : time);
     this.timeUnit = timeUnit;
+    this.shutdownPolicy = shutdownPolicy;
   }
 
   @Override
-  @SuppressWarnings("boxing")
   public void rejectedExecution(Runnable r, ThreadPoolExecutor e) {
-    try {
-      if (!e.getQueue().offer(r, time, timeUnit)) {
-        throw new SchedulerBusyException(format("Scheduler did not accept within %1d %2s", time, timeUnit));
+    if (e.isShutdown()) {
+      shutdownPolicy.rejectedExecution(r, e);
+    } else {
+      try {
+        if (!e.getQueue().offer(r, time, timeUnit)) {
+          throw new SchedulerBusyException(format("Scheduler did not accept within %1d %2s", time, timeUnit));
+        }
+      } catch (InterruptedException ie) {
+        Thread.currentThread().interrupt();
+        throw new RejectedExecutionException(ie);
       }
-    } catch (InterruptedException ie) {
-      Thread.currentThread().interrupt();
-      throw new RejectedExecutionException(ie);
     }
   }
 
