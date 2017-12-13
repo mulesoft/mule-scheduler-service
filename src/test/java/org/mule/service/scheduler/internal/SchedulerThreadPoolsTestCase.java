@@ -22,6 +22,7 @@ import static org.junit.rules.ExpectedException.none;
 import static org.mockito.Mockito.mock;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
+import static org.mule.runtime.core.api.util.IOUtils.toByteArray;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
@@ -32,6 +33,7 @@ import org.mule.runtime.api.scheduler.SchedulerBusyException;
 import org.mule.runtime.api.util.concurrent.Latch;
 import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
+import org.mule.service.scheduler.internal.util.Delegator;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
@@ -53,6 +55,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
@@ -229,6 +232,52 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     scheduler.get().submit(() -> {
       assertThat(currentThread().getContextClassLoader(), is(testClassLoader.getParent()));
     }).get();
+  }
+
+  @Test
+  @Description("Tests that a scheduler Executor thread doesn't hold a reference to an artifact classloader through the inheritedAccessControlContext.")
+  public void threadsDontReferenceClassLoaderFromAccessControlContext() throws Exception {
+    Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L);
+
+    // The inheritedAccessControlContext holds a reference to the classloaders of any class in the call stack that starts the
+    // thread.
+    // With this test, we ensure that the threads are started with only container/service code in the stack, and not from an
+    // artifact classloader (represented here by this child classloader).
+    ClassLoader testClassLoader = new ClassLoader(this.getClass().getClassLoader()) {
+
+      @Override
+      public Class<?> loadClass(String name) throws ClassNotFoundException {
+        if (Delegator.class.getName().equals(name)) {
+          byte[] classBytes;
+          try {
+            classBytes =
+                toByteArray(this.getClass().getResourceAsStream("/org/mule/service/scheduler/internal/util/Delegator.class"));
+            return this.defineClass(null, classBytes, 0, classBytes.length);
+          } catch (Exception e) {
+            return super.loadClass(name);
+          }
+        } else {
+          return super.loadClass(name);
+        }
+      }
+    };
+
+    PhantomReference<ClassLoader> clRef = new PhantomReference<>(testClassLoader, new ReferenceQueue<>());
+
+    Consumer<Runnable> delegator =
+        (Consumer<Runnable>) testClassLoader.loadClass(Delegator.class.getName()).newInstance();
+
+    delegator.accept(() -> scheduler.execute(() -> {
+    }));
+
+    delegator = null;
+    testClassLoader = null;
+
+    new PollingProber(GC_POLLING_TIMEOUT, DEFAULT_POLLING_INTERVAL).check(new JUnitLambdaProbe(() -> {
+      System.gc();
+      assertThat(clRef.isEnqueued(), is(true));
+      return true;
+    }, "A hard reference is being mantained to the child ClassLoader."));
   }
 
   @Test

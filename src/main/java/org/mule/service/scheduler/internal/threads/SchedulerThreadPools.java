@@ -20,6 +20,7 @@ import static org.mule.service.scheduler.ThreadType.IO;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.MuleException;
+import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lifecycle.LifecycleException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
@@ -44,6 +45,7 @@ import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionHandler;
@@ -150,6 +152,10 @@ public class SchedulerThreadPools {
                                threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
                                0, SECONDS, createQueue(threadPoolsConfig.getCpuIntensiveQueueSize().getAsInt()),
                                new SchedulerThreadFactory(computationGroup), byCallerThreadGroupPolicy.get());
+
+    prestartCoreThreads(cpuLightExecutor, threadPoolsConfig.getCpuLightPoolSize().getAsInt());
+    prestartCoreThreads(ioExecutor, threadPoolsConfig.getIoCorePoolSize().getAsInt());
+    prestartCoreThreads(computationExecutor, threadPoolsConfig.getCpuIntensivePoolSize().getAsInt());
 
     scheduledExecutor = new ScheduledThreadPoolExecutor(1, new SchedulerThreadFactory(timerGroup, "%s"));
     scheduledExecutor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
@@ -357,12 +363,39 @@ public class SchedulerThreadPools {
                                new SchedulerThreadFactory(customChildGroup, "%s.%02d"),
                                byCallerThreadGroupPolicy.get());
 
+    prestartCoreThreads(executor, config.getMaxConcurrentTasks());
+
     final CustomScheduler customScheduler =
         new CustomScheduler(schedulerName, executor, workers, scheduledExecutor, quartzScheduler, CUSTOM, stopTimeout,
                             shutdownCallback(activeCustomSchedulers));
     customSchedulersExecutors.add(executor);
     addScheduler(activeCustomSchedulers, customScheduler);
     return customScheduler;
+  }
+
+  /**
+   * Workaround to avoid a race condition when a {@link SynchronousQueue} is combined with a call to
+   * {@link ThreadPoolExecutor#prestartAllCoreThreads()}.
+   * <p>
+   * When using a SynchronousQueue on an Executor, even if calling prestartAllCoreThreads(), a race condition may occur where the
+   * worker threads are started but before it starts to take elements from the queue, the user of the Executor dispatches some
+   * task to it.
+   * <p>
+   * In that case, the threads are prestarted by dispatching work to the executor as a workaround, which avoids the issue.
+   *
+   * @param executor the executor to prestart the threads for
+   * @param corePoolSize the number of threads to start in e=the {@code executor}
+   */
+  private void prestartCoreThreads(final ThreadPoolExecutor executor, int corePoolSize) {
+    CountDownLatch prestartLatch = new CountDownLatch(corePoolSize);
+    for (int i = 0; i < corePoolSize; ++i) {
+      executor.execute(() -> prestartLatch.countDown());
+    }
+    try {
+      prestartLatch.await(30, SECONDS);
+    } catch (InterruptedException e) {
+      throw new MuleRuntimeException(e);
+    }
   }
 
   private ThreadGroup resolveThreadGroupForCustomScheduler(SchedulerConfig config) {
