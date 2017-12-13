@@ -87,7 +87,9 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     final String currentThreadName = currentThread.getName();
 
     currentThread.setContextClassLoader(classLoader);
-    currentThread.setName(currentThreadName + ": " + getSchedulerName());
+    if (getThreadNameSuffix() != null) {
+      currentThread.setName(currentThreadName + ": " + getThreadNameSuffix());
+    }
 
     try {
       task.run();
@@ -114,7 +116,9 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
         }
 
         currentThread.setContextClassLoader(currentClassLoader);
-        currentThread.setName(currentThreadName);
+        if (getThreadNameSuffix() != null) {
+          currentThread.setName(currentThreadName);
+        }
       }
     }
   }
@@ -144,4 +148,6 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   }
 
   public abstract String getSchedulerName();
+
+  public abstract String getThreadNameSuffix();
 }

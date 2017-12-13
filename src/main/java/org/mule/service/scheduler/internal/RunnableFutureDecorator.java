@@ -97,7 +97,13 @@ class RunnableFutureDecorator<V> extends AbstractRunnableFutureDecorator<V> {
     return getSchedulerName() + " - " + taskAsString;
   }
 
+  @Override
   public String getSchedulerName() {
     return scheduler.getName();
+  }
+
+  @Override
+  public String getThreadNameSuffix() {
+    return scheduler.getThreadNameSuffix();
   }
 }
