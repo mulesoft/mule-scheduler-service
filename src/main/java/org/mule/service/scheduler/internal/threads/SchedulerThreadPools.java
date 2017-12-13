@@ -128,7 +128,9 @@ public class SchedulerThreadPools {
                                0, SECONDS,
                                createQueue(threadPoolsConfig.getCpuLightQueueSize().getAsInt()),
                                new SchedulerThreadFactory(cpuLightGroup), byCallerThreadGroupPolicy.get());
-    ioExecutor = new ThreadPoolExecutor(threadPoolsConfig.getIoCorePoolSize().getAsInt(),
+
+    // TODO (elrodro83) MULE-14203 Make IO thread pool have an optimal core size
+    ioExecutor = new ThreadPoolExecutor(0,
                                         threadPoolsConfig.getIoMaxPoolSize().getAsInt(),
                                         threadPoolsConfig.getIoKeepAlive().getAsLong(), MILLISECONDS,
                                         // At first, it may seem that a SynchronousQueue is not the best option here since it may

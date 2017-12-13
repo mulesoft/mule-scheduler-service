@@ -65,7 +65,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
   private static final int CORES = getRuntime().availableProcessors();
 
-  private static final int GC_POLLING_TIMEOUT = 10000;
+  private static final long GC_POLLING_TIMEOUT = 10000;
 
   @Rule
   public ExpectedException expected = none();
@@ -208,11 +208,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
     testClassLoader = null;
 
-    new PollingProber(GC_POLLING_TIMEOUT, DEFAULT_POLLING_INTERVAL).check(new JUnitLambdaProbe(() -> {
-      System.gc();
-      assertThat(clRef.isEnqueued(), is(true));
-      return true;
-    }, "A hard reference is being mantained to the child ClassLoader."));
+    assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
   }
 
   public void scheduleToCustomWithClassLoader(final ClassLoader testClassLoader) throws InterruptedException, ExecutionException {
@@ -239,6 +235,40 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   public void threadsDontReferenceClassLoaderFromAccessControlContext() throws Exception {
     Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L);
 
+    ClassLoader delegatorClassLoader = createDelegatorClassLoader();
+    PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
+
+    Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
+    delegator.accept(() -> scheduler.execute(() -> {
+    }));
+
+    delegator = null;
+    delegatorClassLoader = null;
+
+    assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
+  }
+
+  @Test
+  @Description("Tests that IO threads in excess of the core size don't hold a reference to an artifact classloader through the inheritedAccessControlContext.")
+  public void elasticIoThreadsDontReferenceClassLoaderFromAccessControlContext() throws Exception {
+    Scheduler scheduler = service.createIoScheduler(config(), threadPoolsConfig.getIoCorePoolSize().getAsInt() + 1, () -> 1000L);
+
+    ClassLoader delegatorClassLoader = createDelegatorClassLoader();
+    PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
+
+    Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
+    for (int i = 0; i < threadPoolsConfig.getIoCorePoolSize().getAsInt() + 1; ++i) {
+      delegator.accept(() -> scheduler.execute(() -> {
+      }));
+    }
+
+    delegator = null;
+    delegatorClassLoader = null;
+
+    assertNoClassLoaderReferenceHeld(clRef, threadPoolsConfig.getIoKeepAlive().getAsLong() + GC_POLLING_TIMEOUT);
+  }
+
+  private ClassLoader createDelegatorClassLoader() {
     // The inheritedAccessControlContext holds a reference to the classloaders of any class in the call stack that starts the
     // thread.
     // With this test, we ensure that the threads are started with only container/service code in the stack, and not from an
@@ -261,23 +291,16 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
         }
       }
     };
+    return testClassLoader;
+  }
 
-    PhantomReference<ClassLoader> clRef = new PhantomReference<>(testClassLoader, new ReferenceQueue<>());
-
-    Consumer<Runnable> delegator =
-        (Consumer<Runnable>) testClassLoader.loadClass(Delegator.class.getName()).newInstance();
-
-    delegator.accept(() -> scheduler.execute(() -> {
-    }));
-
-    delegator = null;
-    testClassLoader = null;
-
-    new PollingProber(GC_POLLING_TIMEOUT, DEFAULT_POLLING_INTERVAL).check(new JUnitLambdaProbe(() -> {
-      System.gc();
-      assertThat(clRef.isEnqueued(), is(true));
-      return true;
-    }, "A hard reference is being mantained to the child ClassLoader."));
+  private void assertNoClassLoaderReferenceHeld(PhantomReference<ClassLoader> clRef, long timeoutMillis) {
+    new PollingProber(timeoutMillis, DEFAULT_POLLING_INTERVAL)
+        .check(new JUnitLambdaProbe(() -> {
+          System.gc();
+          assertThat(clRef.isEnqueued(), is(true));
+          return true;
+        }, "A hard reference is being mantained to the child ClassLoader."));
   }
 
   @Test
