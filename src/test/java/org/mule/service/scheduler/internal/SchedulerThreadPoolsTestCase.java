@@ -22,6 +22,7 @@ import static org.junit.rules.ExpectedException.none;
 import static org.mockito.Mockito.mock;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
+import static org.mule.runtime.core.api.util.IOUtils.toByteArray;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
@@ -32,6 +33,7 @@ import org.mule.runtime.api.scheduler.SchedulerBusyException;
 import org.mule.runtime.api.util.concurrent.Latch;
 import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
+import org.mule.service.scheduler.internal.util.Delegator;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
@@ -53,6 +55,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
@@ -62,7 +65,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
   private static final int CORES = getRuntime().availableProcessors();
 
-  private static final int GC_POLLING_TIMEOUT = 10000;
+  private static final long GC_POLLING_TIMEOUT = 10000;
 
   @Rule
   public ExpectedException expected = none();
@@ -205,11 +208,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
     testClassLoader = null;
 
-    new PollingProber(GC_POLLING_TIMEOUT, DEFAULT_POLLING_INTERVAL).check(new JUnitLambdaProbe(() -> {
-      System.gc();
-      assertThat(clRef.isEnqueued(), is(true));
-      return true;
-    }, "A hard reference is being mantained to the child ClassLoader."));
+    assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
   }
 
   public void scheduleToCustomWithClassLoader(final ClassLoader testClassLoader) throws InterruptedException, ExecutionException {
@@ -229,6 +228,79 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     scheduler.get().submit(() -> {
       assertThat(currentThread().getContextClassLoader(), is(testClassLoader.getParent()));
     }).get();
+  }
+
+  @Test
+  @Description("Tests that a scheduler Executor thread doesn't hold a reference to an artifact classloader through the inheritedAccessControlContext.")
+  public void threadsDontReferenceClassLoaderFromAccessControlContext() throws Exception {
+    Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L);
+
+    ClassLoader delegatorClassLoader = createDelegatorClassLoader();
+    PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
+
+    Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
+    delegator.accept(() -> scheduler.execute(() -> {
+    }));
+
+    delegator = null;
+    delegatorClassLoader = null;
+
+    assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
+  }
+
+  @Test
+  @Description("Tests that IO threads in excess of the core size don't hold a reference to an artifact classloader through the inheritedAccessControlContext.")
+  public void elasticIoThreadsDontReferenceClassLoaderFromAccessControlContext() throws Exception {
+    Scheduler scheduler = service.createIoScheduler(config(), threadPoolsConfig.getIoCorePoolSize().getAsInt() + 1, () -> 1000L);
+
+    ClassLoader delegatorClassLoader = createDelegatorClassLoader();
+    PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
+
+    Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
+    for (int i = 0; i < threadPoolsConfig.getIoCorePoolSize().getAsInt() + 1; ++i) {
+      delegator.accept(() -> scheduler.execute(() -> {
+      }));
+    }
+
+    delegator = null;
+    delegatorClassLoader = null;
+
+    assertNoClassLoaderReferenceHeld(clRef, threadPoolsConfig.getIoKeepAlive().getAsLong() + GC_POLLING_TIMEOUT);
+  }
+
+  private ClassLoader createDelegatorClassLoader() {
+    // The inheritedAccessControlContext holds a reference to the classloaders of any class in the call stack that starts the
+    // thread.
+    // With this test, we ensure that the threads are started with only container/service code in the stack, and not from an
+    // artifact classloader (represented here by this child classloader).
+    ClassLoader testClassLoader = new ClassLoader(this.getClass().getClassLoader()) {
+
+      @Override
+      public Class<?> loadClass(String name) throws ClassNotFoundException {
+        if (Delegator.class.getName().equals(name)) {
+          byte[] classBytes;
+          try {
+            classBytes =
+                toByteArray(this.getClass().getResourceAsStream("/org/mule/service/scheduler/internal/util/Delegator.class"));
+            return this.defineClass(null, classBytes, 0, classBytes.length);
+          } catch (Exception e) {
+            return super.loadClass(name);
+          }
+        } else {
+          return super.loadClass(name);
+        }
+      }
+    };
+    return testClassLoader;
+  }
+
+  private void assertNoClassLoaderReferenceHeld(PhantomReference<ClassLoader> clRef, long timeoutMillis) {
+    new PollingProber(timeoutMillis, DEFAULT_POLLING_INTERVAL)
+        .check(new JUnitLambdaProbe(() -> {
+          System.gc();
+          assertThat(clRef.isEnqueued(), is(true));
+          return true;
+        }, "A hard reference is being mantained to the child ClassLoader."));
   }
 
   @Test
