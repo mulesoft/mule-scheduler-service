@@ -22,6 +22,8 @@ import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHED
 
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.Scheduler;
+import org.mule.runtime.api.scheduler.SchedulerConfig;
+import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 import org.mule.tck.junit4.AbstractMuleTestCase;
@@ -87,24 +89,28 @@ public class ThreadNameTestCase extends AbstractMuleTestCase {
   private Function<SchedulerThreadPools, Scheduler> schedulerFactory;
   private Scheduler scheduler;
   private AtomicReference<Optional<AssertionError>> failureRef;
-  private Matcher<String> prefixMatcher;
+  private Function<Scheduler, Matcher<String>> prefixMatcher;
 
   @Parameters
   public static Collection<Object[]> data() {
     return asList(new Object[][] {
         {(Function<SchedulerThreadPools, Scheduler>) service -> service
             .createCpuLightScheduler(config().withName(ThreadNameTestCase.class.getSimpleName()), 1, () -> 1000L),
-            startsWith("[MuleRuntime].cpuLight")},
+            (Function<Scheduler, Matcher<String>>) scheduler -> allOf(startsWith("[MuleRuntime].cpuLight"),
+                                                                      endsWith(ThreadNameTestCase.class.getSimpleName() + " @"
+                                                                          + toHexString(scheduler.hashCode())))},
         {(Function<SchedulerThreadPools, Scheduler>) service -> service.createCustomScheduler(config().withPrefix("owner")
             .withMaxConcurrentTasks(1).withName(ThreadNameTestCase.class.getSimpleName()), 1, () -> 1000L),
-            startsWith("[owner]." + ThreadNameTestCase.class.getSimpleName())},
+            (Function<Scheduler, Matcher<String>>) scheduler -> allOf(startsWith("[owner]."
+                + ThreadNameTestCase.class.getSimpleName()))},
         {(Function<SchedulerThreadPools, Scheduler>) service -> service.createCustomScheduler(config().withMaxConcurrentTasks(1)
             .withName(ThreadNameTestCase.class.getSimpleName()), 1, () -> 1000L),
-            startsWith(ThreadNameTestCase.class.getSimpleName())}
+            (Function<Scheduler, Matcher<String>>) scheduler -> allOf(startsWith(ThreadNameTestCase.class.getSimpleName()))}
     });
   }
 
-  public ThreadNameTestCase(Function<SchedulerThreadPools, Scheduler> schedulerFactory, Matcher<String> prefixMatcher) {
+  public ThreadNameTestCase(Function<SchedulerThreadPools, Scheduler> schedulerFactory,
+                            Function<Scheduler, Matcher<String>> prefixMatcher) {
     this.schedulerFactory = schedulerFactory;
     this.prefixMatcher = prefixMatcher;
   }
@@ -133,20 +139,14 @@ public class ThreadNameTestCase extends AbstractMuleTestCase {
 
   @Test
   public void threadNameForOneShotTask() throws InterruptedException, ExecutionException, TimeoutException {
-    scheduler.submit(new ThreadNameAssertingRunnable(failureRef,
-                                                     allOf(prefixMatcher,
-                                                           endsWith(ThreadNameTestCase.class.getSimpleName() + " @"
-                                                               + toHexString(scheduler.hashCode())))));
+    scheduler.submit(new ThreadNameAssertingRunnable(failureRef, prefixMatcher.apply(scheduler)));
 
     pollingCheck();
   }
 
   @Test
   public void threadNameForRepeatableTask() throws InterruptedException, ExecutionException, TimeoutException {
-    scheduler.scheduleAtFixedRate(new ThreadNameAssertingRunnable(failureRef,
-                                                                  allOf(prefixMatcher,
-                                                                        endsWith(ThreadNameTestCase.class.getSimpleName() + " @"
-                                                                            + toHexString(scheduler.hashCode())))),
+    scheduler.scheduleAtFixedRate(new ThreadNameAssertingRunnable(failureRef, prefixMatcher.apply(scheduler)),
                                   0, 1, SECONDS);
 
     pollingCheck();
@@ -154,10 +154,7 @@ public class ThreadNameTestCase extends AbstractMuleTestCase {
 
   @Test
   public void threadNameForCronTask() throws InterruptedException, ExecutionException, TimeoutException {
-    scheduler.scheduleWithCronExpression(new ThreadNameAssertingRunnable(failureRef,
-                                                                         allOf(prefixMatcher,
-                                                                               endsWith(ThreadNameTestCase.class.getSimpleName()
-                                                                                   + " @" + toHexString(scheduler.hashCode())))),
+    scheduler.scheduleWithCronExpression(new ThreadNameAssertingRunnable(failureRef, prefixMatcher.apply(scheduler)),
                                          "* * * * * ?");
 
     pollingCheck();

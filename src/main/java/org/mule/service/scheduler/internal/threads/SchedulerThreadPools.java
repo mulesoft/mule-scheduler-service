@@ -492,6 +492,11 @@ public class SchedulerThreadPools {
       executor.shutdownNow();
       return cancelledTasks;
     }
+
+    @Override
+    public String getThreadNameSuffix() {
+      return null;
+    }
   }
 
   public List<Scheduler> getSchedulers() {
