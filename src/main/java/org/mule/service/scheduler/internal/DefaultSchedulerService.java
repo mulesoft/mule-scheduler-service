@@ -14,8 +14,8 @@ import static java.util.Collections.unmodifiableList;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
-import static org.mule.runtime.core.api.config.MuleProperties.OBJECT_SCHEDULER_BASE_CONFIG;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.core.api.config.MuleProperties.OBJECT_SCHEDULER_BASE_CONFIG;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -24,11 +24,12 @@ import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lifecycle.Startable;
 import org.mule.runtime.api.lifecycle.Stoppable;
 import org.mule.runtime.api.scheduler.Scheduler;
-import org.mule.runtime.api.scheduler.SchedulerView;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
 import org.mule.runtime.api.scheduler.SchedulerContainerPoolsConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfigFactory;
 import org.mule.runtime.api.scheduler.SchedulerService;
+import org.mule.runtime.api.scheduler.SchedulerView;
+import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.reporting.DefaultSchedulerView;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 
@@ -72,6 +73,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   private Lock pollsReadLock = pollsLock.readLock();
   private Lock pollsWriteLock = pollsLock.writeLock();
 
+  private ContainerThreadPoolsConfig containerThreadPoolsConfig;
   private LoadingCache<SchedulerPoolsConfigFactory, SchedulerThreadPools> poolsByConfig;
   private Scheduler poolsMaintenanceScheduler;
   private ScheduledFuture<?> poolsMaintenanceTask;
@@ -269,10 +271,9 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   @Override
   public void start() throws MuleException {
-    logger.info("Starting " + this.toString() + "...");
-
     pollsWriteLock.lock();
     try {
+      containerThreadPoolsConfig = loadThreadPoolsConfig();
       poolsByConfig = newBuilder()
           .weakKeys()
           .removalListener(new RemovalListener<SchedulerPoolsConfigFactory, SchedulerThreadPools>() {
@@ -295,14 +296,13 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
             @Override
             public SchedulerThreadPools load(SchedulerPoolsConfigFactory key) throws Exception {
               SchedulerThreadPools containerThreadPools =
-                  new SchedulerThreadPools(getName(), key.getConfig().orElse(loadThreadPoolsConfig()));
+                  new SchedulerThreadPools(getName(), key.getConfig().orElse(containerThreadPoolsConfig));
               containerThreadPools.start();
 
               return containerThreadPools;
             }
           });
 
-      logger.info("Started " + this.toString());
       started = true;
 
       poolsMaintenanceScheduler = customScheduler(config().withName("Scheduler Maintenace").withMaxConcurrentTasks(1));
@@ -341,6 +341,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
       poolsMaintenanceScheduler.stop();
       poolsByConfig.invalidateAll();
       poolsByConfig = null;
+      containerThreadPoolsConfig = null;
     } finally {
       pollsWriteLock.unlock();
     }
@@ -365,5 +366,29 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     } finally {
       pollsReadLock.unlock();
     }
+  }
+
+  @Override
+  public List<String> splashMessageLines() {
+    List<String> lines = new ArrayList<>();
+
+    lines.add("Resolved configuration values:");
+    lines.add("");
+    lines.add("gracefulShutdownTimeout:       " + containerThreadPoolsConfig.getGracefulShutdownTimeout().getAsLong() + " ms");
+    lines.add("cpuLight.threadPool.size:      " + containerThreadPoolsConfig.getCpuLightPoolSize().getAsInt());
+    lines.add("cpuLight.workQueue.size:       " + containerThreadPoolsConfig.getCpuLightQueueSize().getAsInt());
+    lines.add("io.threadPool.maxSize:         " + containerThreadPoolsConfig.getIoMaxPoolSize().getAsInt());
+    lines.add("io.threadPool.threadKeepAlive: " + containerThreadPoolsConfig.getIoKeepAlive().getAsLong() + " ms");
+    lines.add("cpuIntensive.threadPool.size:  " + containerThreadPoolsConfig.getCpuIntensivePoolSize().getAsInt());
+    lines.add("cpuIntensive.workQueue.size:   " + containerThreadPoolsConfig.getCpuIntensiveQueueSize().getAsInt());
+    lines.add("");
+    lines.add("These can be modified by editing 'conf/scheduler-pools.conf'");
+
+    return lines;
+  }
+
+  @Override
+  public String toString() {
+    return this.getClass().getSimpleName();
   }
 }
