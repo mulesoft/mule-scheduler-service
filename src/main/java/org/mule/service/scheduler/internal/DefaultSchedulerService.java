@@ -9,6 +9,7 @@ package org.mule.service.scheduler.internal;
 import static com.google.common.cache.CacheBuilder.newBuilder;
 import static java.lang.Long.getLong;
 import static java.lang.Runtime.getRuntime;
+import static java.lang.System.lineSeparator;
 import static java.lang.Thread.currentThread;
 import static java.util.Collections.unmodifiableList;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -369,22 +370,29 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   }
 
   @Override
-  public List<String> splashMessageLines() {
-    List<String> lines = new ArrayList<>();
+  public String getSplashMessage() {
+    StringBuilder splashMessage = new StringBuilder();
 
-    lines.add("Resolved configuration values:");
-    lines.add("");
-    lines.add("gracefulShutdownTimeout:       " + containerThreadPoolsConfig.getGracefulShutdownTimeout().getAsLong() + " ms");
-    lines.add("cpuLight.threadPool.size:      " + containerThreadPoolsConfig.getCpuLightPoolSize().getAsInt());
-    lines.add("cpuLight.workQueue.size:       " + containerThreadPoolsConfig.getCpuLightQueueSize().getAsInt());
-    lines.add("io.threadPool.maxSize:         " + containerThreadPoolsConfig.getIoMaxPoolSize().getAsInt());
-    lines.add("io.threadPool.threadKeepAlive: " + containerThreadPoolsConfig.getIoKeepAlive().getAsLong() + " ms");
-    lines.add("cpuIntensive.threadPool.size:  " + containerThreadPoolsConfig.getCpuIntensivePoolSize().getAsInt());
-    lines.add("cpuIntensive.workQueue.size:   " + containerThreadPoolsConfig.getCpuIntensiveQueueSize().getAsInt());
-    lines.add("");
-    lines.add("These can be modified by editing 'conf/scheduler-pools.conf'");
+    splashMessage.append("Resolved configuration values:").append(lineSeparator());
+    splashMessage.append("" + lineSeparator());
+    splashMessage.append("gracefulShutdownTimeout:       ")
+        .append(containerThreadPoolsConfig.getGracefulShutdownTimeout().getAsLong() + " ms" + lineSeparator());
+    splashMessage.append("cpuLight.threadPool.size:      ")
+        .append(containerThreadPoolsConfig.getCpuLightPoolSize().getAsInt() + lineSeparator());
+    splashMessage.append("cpuLight.workQueue.size:       ")
+        .append(containerThreadPoolsConfig.getCpuLightQueueSize().getAsInt() + lineSeparator());
+    splashMessage.append("io.threadPool.maxSize:         ")
+        .append(containerThreadPoolsConfig.getIoMaxPoolSize().getAsInt() + lineSeparator());
+    splashMessage.append("io.threadPool.threadKeepAlive: ")
+        .append(containerThreadPoolsConfig.getIoKeepAlive().getAsLong() + " ms" + lineSeparator());
+    splashMessage.append("cpuIntensive.threadPool.size:  ")
+        .append(containerThreadPoolsConfig.getCpuIntensivePoolSize().getAsInt() + lineSeparator());
+    splashMessage.append("cpuIntensive.workQueue.size:   ")
+        .append(containerThreadPoolsConfig.getCpuIntensiveQueueSize().getAsInt() + lineSeparator());
+    splashMessage.append("" + lineSeparator());
+    splashMessage.append("These can be modified by editing 'conf/scheduler-pools.conf'" + lineSeparator());
 
-    return lines;
+    return splashMessage.toString();
   }
 
   @Override
