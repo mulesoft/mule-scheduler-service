@@ -325,6 +325,27 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
+  public void onlyCustomMayConfigureDirectRunCpuLightWhenTargetBusyCpuLight() {
+    expected.expect(IllegalArgumentException.class);
+    expected.expectMessage("Only custom schedulers may define 'directRunCpuLightWhenTargetBusy' behaviour");
+    service.createCpuLightScheduler(config().withDirectRunCpuLightWhenTargetBusy(true), CORES, () -> 1000L);
+  }
+
+  @Test
+  public void onlyCustomMayConfigureDirectRunCpuLightWhenTargetBusyCpuIntensive() {
+    expected.expect(IllegalArgumentException.class);
+    expected.expectMessage("Only custom schedulers may define 'directRunCpuLightWhenTargetBusy' behaviour");
+    service.createCpuIntensiveScheduler(config().withDirectRunCpuLightWhenTargetBusy(true), CORES, () -> 1000L);
+  }
+
+  @Test
+  public void onlyCustomMayConfigureDirectRunCpuLightWhenTargetBusyIO() {
+    expected.expect(IllegalArgumentException.class);
+    expected.expectMessage("Only custom schedulers may define 'directRunCpuLightWhenTargetBusy' behaviour");
+    service.createIoScheduler(config().withDirectRunCpuLightWhenTargetBusy(true), CORES, () -> 1000L);
+  }
+
+  @Test
   @Description("Tests that tasks dispatched from a CPU Light thread to a busy Scheduler are rejected.")
   public void rejectionPolicyCpuLight() throws MuleException, InterruptedException, ExecutionException, TimeoutException {
     Scheduler sourceScheduler = service.createCpuLightScheduler(config(), CORES, () -> 1000L);
@@ -437,6 +458,98 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     expected.expect(TimeoutException.class);
     try {
       submitted.get(5, SECONDS);
+    } finally {
+      latch.countDown();
+    }
+  }
+
+  @Test
+  @Description("Tests that when the CPU-lite pool is full, any task dispatched from a CUSTOM pool with DirectRunToFullCpuLight falg to CPU-lite is run directlyi in the caller thread.")
+  public void customDirectRunToFullCpuLight() throws InterruptedException, ExecutionException, TimeoutException {
+    Scheduler customScheduler =
+        service.createCustomScheduler(config().withMaxConcurrentTasks(1).withDirectRunCpuLightWhenTargetBusy(true), CORES,
+                                      () -> 1000L);
+    Scheduler cpuLightScheduler = service.createCpuLightScheduler(config(), CORES, () -> 1000L);
+
+    Latch latch = new Latch();
+
+    // Fill up the CPU-lite pool
+    for (int i = 0; i < threadPoolsConfig.getCpuLightPoolSize().getAsInt()
+        + threadPoolsConfig.getCpuLightQueueSize().getAsInt(); ++i) {
+      consumeThread(cpuLightScheduler, latch);
+    }
+
+    AtomicReference<Thread> callerThread = new AtomicReference<>();
+    AtomicReference<Thread> taskRunThread = new AtomicReference<>();
+
+    Future<Boolean> submitted = customScheduler.submit(() -> {
+      callerThread.set(currentThread());
+
+      cpuLightScheduler.submit(() -> {
+        taskRunThread.set(currentThread());
+      });
+
+      return null;
+    });
+
+    try {
+      submitted.get(5, SECONDS);
+    } finally {
+      latch.countDown();
+    }
+
+    assertThat(taskRunThread.get(), sameInstance(callerThread.get()));
+  }
+
+  @Test
+  @Description("Tests that the behavior of combining runCpuLightWhenTargetBusy and waitAllowed depends on the target thread.")
+  public void customWaitToFullIoWaitsAndWaitToFullIoWaits() throws InterruptedException, ExecutionException, TimeoutException {
+    Scheduler customScheduler = service
+        .createCustomScheduler(config().withMaxConcurrentTasks(1).withWaitAllowed(true).withDirectRunCpuLightWhenTargetBusy(true),
+                               CORES, () -> 1000L);
+    Scheduler ioScheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
+    Scheduler cpuLightScheduler = service.createCpuLightScheduler(config(), CORES, () -> 1000L);
+
+    Latch latch = new Latch();
+
+    // Fill up the IO pool
+    for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt(); ++i) {
+      consumeThread(ioScheduler, latch);
+    }
+    // Fill up the CPU-lite pool
+    for (int i = 0; i < threadPoolsConfig.getCpuLightPoolSize().getAsInt()
+        + threadPoolsConfig.getCpuLightQueueSize().getAsInt(); ++i) {
+      consumeThread(cpuLightScheduler, latch);
+    }
+
+    AtomicReference<Thread> callerThread = new AtomicReference<>();
+    AtomicReference<Thread> taskRunThread = new AtomicReference<>();
+
+    Future<Boolean> submittedCpuLight = customScheduler.submit(() -> {
+      callerThread.set(currentThread());
+
+      cpuLightScheduler.submit(() -> {
+        taskRunThread.set(currentThread());
+      });
+
+      return null;
+    });
+
+    Future<Boolean> submittedIo = customScheduler.submit(() -> {
+      ioScheduler.submit(() -> {
+      });
+
+      fail("Didn't wait");
+      return null;
+    });
+
+    try {
+      submittedCpuLight.get(5, SECONDS);
+      assertThat(taskRunThread.get(), sameInstance(callerThread.get()));
+
+      // Asssert that the task is waiting
+      expected.expect(TimeoutException.class);
+      submittedIo.get(5, SECONDS);
     } finally {
       latch.countDown();
     }
