@@ -7,6 +7,7 @@
 package org.mule.service.scheduler.internal.executor;
 
 import static java.lang.Thread.currentThread;
+import static java.util.Collections.emptySet;
 import static org.apache.commons.lang3.StringUtils.rightPad;
 import static org.mule.service.scheduler.internal.DefaultSchedulerService.USAGE_TRACE_INTERVAL_SECS;
 import static org.mule.service.scheduler.internal.DefaultSchedulerService.traceLogger;
@@ -44,7 +45,7 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
    * @param parentGroup the {@link SchedulerService} parent {@link ThreadGroup}
    */
   public ByCallerThrottlingPolicy(int maxConcurrentTasks, Set<ThreadGroup> waitGroups, ThreadGroup parentGroup) {
-    super(waitGroups, parentGroup);
+    super(waitGroups, emptySet(), parentGroup);
     this.maxConcurrentTasks = maxConcurrentTasks;
   }
 
