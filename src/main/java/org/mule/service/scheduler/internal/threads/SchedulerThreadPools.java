@@ -86,6 +86,8 @@ public class SchedulerThreadPools {
   private final ThreadGroup timerGroup;
   private final ThreadGroup customGroup;
   private final ThreadGroup customWaitGroup;
+  private final ThreadGroup customCallerRunsGroup;
+  private final ThreadGroup customCallerRunsAnsWaitGroup;
 
   private final Supplier<RejectedExecutionHandler> byCallerThreadGroupPolicy;
 
@@ -116,9 +118,14 @@ public class SchedulerThreadPools {
     timerGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + TIMER_THREADS_NAME);
     customGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
     customWaitGroup = new ThreadGroup(customGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
+    customCallerRunsGroup = new ThreadGroup(customGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
+    customCallerRunsAnsWaitGroup = new ThreadGroup(customGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
 
-    byCallerThreadGroupPolicy =
-        () -> new ByCallerThreadGroupPolicy(new HashSet<>(asList(ioGroup, customWaitGroup)), schedulerGroup);
+    byCallerThreadGroupPolicy = () -> new ByCallerThreadGroupPolicy(new HashSet<>(asList(ioGroup, customWaitGroup,
+                                                                                         customCallerRunsAnsWaitGroup)),
+                                                                    new HashSet<>(asList(computationGroup, customCallerRunsGroup,
+                                                                                         customCallerRunsAnsWaitGroup)),
+                                                                    cpuLightGroup, schedulerGroup);
   }
 
   public void start() throws MuleException {
@@ -252,7 +259,7 @@ public class SchedulerThreadPools {
   }
 
   public Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate, Supplier<Long> stopTimeout) {
-    validateWaitAllowedNotChanged(config);
+    validateCustomSchedulerOnlyConfigNotChanged(config);
     final String schedulerName = resolveCpuLightSchedulerName(config);
     Scheduler scheduler;
     if (shouldThrottle(config, threadPoolsConfig.getCpuLightPoolSize())) {
@@ -273,7 +280,7 @@ public class SchedulerThreadPools {
   }
 
   public Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
-    validateWaitAllowedNotChanged(config);
+    validateCustomSchedulerOnlyConfigNotChanged(config);
     final String schedulerName = resolveIoSchedulerName(config);
     Scheduler scheduler;
     if (shouldThrottle(config, threadPoolsConfig.getIoMaxPoolSize())) {
@@ -312,7 +319,7 @@ public class SchedulerThreadPools {
   }
 
   public Scheduler createCpuIntensiveScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
-    validateWaitAllowedNotChanged(config);
+    validateCustomSchedulerOnlyConfigNotChanged(config);
     final String schedulerName = resolveComputationSchedulerName(config);
     Scheduler scheduler;
     if (shouldThrottle(config, threadPoolsConfig.getCpuIntensivePoolSize())) {
@@ -330,9 +337,12 @@ public class SchedulerThreadPools {
     return scheduler;
   }
 
-  private void validateWaitAllowedNotChanged(SchedulerConfig config) {
+  private void validateCustomSchedulerOnlyConfigNotChanged(SchedulerConfig config) {
     if (config.getWaitAllowed().isPresent()) {
       throw new IllegalArgumentException("Only custom schedulers may define 'waitAllowed' behaviour");
+    }
+    if (config.getDirectRunCpuLightWhenTargetBusy().isPresent()) {
+      throw new IllegalArgumentException("Only custom schedulers may define 'directRunCpuLightWhenTargetBusy' behaviour");
     }
   }
 
@@ -401,7 +411,11 @@ public class SchedulerThreadPools {
   }
 
   private ThreadGroup resolveThreadGroupForCustomScheduler(SchedulerConfig config) {
-    if (config.getWaitAllowed().orElse(false)) {
+    if (config.getDirectRunCpuLightWhenTargetBusy().orElse(false) && config.getWaitAllowed().orElse(false)) {
+      return customCallerRunsAnsWaitGroup;
+    } else if (config.getDirectRunCpuLightWhenTargetBusy().orElse(false)) {
+      return customCallerRunsGroup;
+    } else if (config.getWaitAllowed().orElse(false)) {
       return customWaitGroup;
     } else {
       return customGroup;

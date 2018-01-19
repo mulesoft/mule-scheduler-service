@@ -41,6 +41,8 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
     }
   }
 
+  private final ThreadGroup couLightGroup;
+
   private final AbortPolicy abort = new AbortBusyPolicy();
   private final WaitPolicy wait = new WaitPolicy(abort);
   private final CallerRunsPolicy callerRuns = new CallerRunsPolicy();
@@ -52,10 +54,16 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
    *
    * @param waitGroups the group of threads for which a {@link WaitPolicy} will be applied. For the rest, an {@link AbortPolicy}
    *        (or {@link CallerRunsPolicy} if allowed) will be applied.
+   * @param runCpuLightWhenTargetBusyGroups the group of threads for which a {@link CallerRunsPolicy} will be applied when
+   *        dispatching to cpu-light.
+   * @param couLightGroup the group of cpuLight threads
    * @param parentGroup the {@link SchedulerService} parent {@link ThreadGroup}
    */
-  public ByCallerThreadGroupPolicy(Set<ThreadGroup> waitGroups, ThreadGroup parentGroup) {
-    super(waitGroups, parentGroup);
+  public ByCallerThreadGroupPolicy(Set<ThreadGroup> waitGroups, Set<ThreadGroup> runCpuLightWhenTargetBusyGroups,
+                                   ThreadGroup couLightGroup,
+                                   ThreadGroup parentGroup) {
+    super(waitGroups, runCpuLightWhenTargetBusyGroups, parentGroup);
+    this.couLightGroup = couLightGroup;
   }
 
   @Override
@@ -65,7 +73,8 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
 
     ++rejectedCount;
 
-    if (isWaitGroupThread(targetGroup) && targetGroup == currentThreadGroup) {
+    if ((isRunCpuLightWhenTargetBusyThread(currentThreadGroup) && targetGroup == couLightGroup)
+        || (isWaitGroupThread(targetGroup) && targetGroup == currentThreadGroup)) {
       logRejection(r.toString(), callerRuns.getClass().getSimpleName(), targetGroup.getName());
       callerRuns.rejectedExecution(r, executor);
     } else if (!isSchedulerThread(currentThreadGroup) || isWaitGroupThread(currentThreadGroup)) {
