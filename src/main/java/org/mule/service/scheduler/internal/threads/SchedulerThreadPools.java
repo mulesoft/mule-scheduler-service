@@ -123,7 +123,8 @@ public class SchedulerThreadPools {
 
     byCallerThreadGroupPolicy = () -> new ByCallerThreadGroupPolicy(new HashSet<>(asList(ioGroup, customWaitGroup,
                                                                                          customCallerRunsAnsWaitGroup)),
-                                                                    new HashSet<>(asList(computationGroup, customCallerRunsGroup,
+                                                                    new HashSet<>(asList(cpuLightGroup, computationGroup,
+                                                                                         customCallerRunsGroup,
                                                                                          customCallerRunsAnsWaitGroup)),
                                                                     cpuLightGroup, schedulerGroup);
   }
