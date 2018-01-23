@@ -27,7 +27,7 @@ public abstract class AbstractByCallerPolicy {
   private final ThreadGroup parentGroup;
 
   /**
-   * Builds a new {@link ByCallerThreadGroupPolicy} with the given {@code waitGroups}.
+   * Builds a new {@link AbstractByCallerPolicy} with the given {@code waitGroups}.
    *
    * @param waitGroups the group of threads for which a {@link WaitPolicy} will be applied. For the rest, an {@link AbortPolicy}
    *        will be applied.

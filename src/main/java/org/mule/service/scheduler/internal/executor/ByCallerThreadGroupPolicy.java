@@ -11,6 +11,7 @@ import static org.apache.commons.lang3.StringUtils.rightPad;
 import static org.mule.service.scheduler.internal.DefaultSchedulerService.USAGE_TRACE_INTERVAL_SECS;
 import static org.mule.service.scheduler.internal.DefaultSchedulerService.traceLogger;
 
+import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerBusyException;
 import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadFactory;
@@ -35,19 +36,27 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
 
   private static final class AbortBusyPolicy extends AbortPolicy {
 
+    private final String schedulerName;
+
+    public AbortBusyPolicy(String schedulerName) {
+      this.schedulerName = schedulerName;
+    }
+
     @Override
     public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
-      throw new SchedulerBusyException("Task '" + r.toString() + "' rejected from '" + executor.toString() + "'");
+      throw new SchedulerBusyException("Task '" + r.toString() + "' rejected from Scheduler '" + schedulerName + "' ('"
+          + executor.toString() + "')");
     }
   }
 
   private final ThreadGroup couLightGroup;
 
-  private final AbortPolicy abort = new AbortBusyPolicy();
-  private final WaitPolicy wait = new WaitPolicy(abort);
+  private final AbortPolicy abort;
+  private final WaitPolicy wait;
   private final CallerRunsPolicy callerRuns = new CallerRunsPolicy();
 
   private volatile long rejectedCount;
+
 
   /**
    * Builds a new {@link ByCallerThreadGroupPolicy} with the given {@code waitGroups}.
@@ -58,11 +67,13 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
    *        dispatching to cpu-light.
    * @param couLightGroup the group of cpuLight threads
    * @param parentGroup the {@link SchedulerService} parent {@link ThreadGroup}
+   * @param schedulerName the name of the target {@link Scheduler}
    */
   public ByCallerThreadGroupPolicy(Set<ThreadGroup> waitGroups, Set<ThreadGroup> runCpuLightWhenTargetBusyGroups,
-                                   ThreadGroup couLightGroup,
-                                   ThreadGroup parentGroup) {
+                                   ThreadGroup couLightGroup, ThreadGroup parentGroup, String schedulerName) {
     super(waitGroups, runCpuLightWhenTargetBusyGroups, parentGroup);
+    this.abort = new AbortBusyPolicy(schedulerName);
+    this.wait = new WaitPolicy(abort, schedulerName);
     this.couLightGroup = couLightGroup;
   }
 
