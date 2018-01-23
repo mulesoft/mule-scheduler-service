@@ -16,6 +16,9 @@ import org.mule.runtime.api.scheduler.SchedulerBusyException;
 import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadFactory;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -34,6 +37,8 @@ import java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy;
  */
 public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy implements RejectedExecutionHandler {
 
+  private static final Logger LOGGER = LoggerFactory.getLogger(ByCallerThreadGroupPolicy.class);
+
   private static final class AbortBusyPolicy extends AbortPolicy {
 
     private final String schedulerName;
@@ -44,8 +49,10 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
 
     @Override
     public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
-      throw new SchedulerBusyException("Task '" + r.toString() + "' rejected from Scheduler '" + schedulerName + "' ('"
-          + executor.toString() + "')");
+      String msg = "Task '" + r.toString() + "' rejected from Scheduler '" + schedulerName + "' ('"
+          + executor.toString() + "')";
+      LOGGER.warn(msg);
+      throw new SchedulerBusyException(msg);
     }
   }
 
