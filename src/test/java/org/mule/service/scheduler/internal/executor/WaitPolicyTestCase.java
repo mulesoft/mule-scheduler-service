@@ -217,12 +217,12 @@ class LastRejectedWaitPolicy extends WaitPolicy {
 
   public LastRejectedWaitPolicy() {
     super((r, e) -> {
-    });
+    }, "test");
   }
 
   public LastRejectedWaitPolicy(long time, TimeUnit timeUnit) {
     super(time, timeUnit, (r, e) -> {
-    });
+    }, "test");
   }
 
   public Runnable lastRejectedRunnable() {

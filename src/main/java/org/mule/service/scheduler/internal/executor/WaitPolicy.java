@@ -10,6 +10,7 @@ import static java.lang.Long.MAX_VALUE;
 import static java.lang.String.format;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerBusyException;
 
 import java.util.concurrent.RejectedExecutionException;
@@ -27,27 +28,34 @@ public class WaitPolicy implements RejectedExecutionHandler {
   private final long time;
   private final TimeUnit timeUnit;
 
-  private RejectedExecutionHandler shutdownPolicy;
+  private final RejectedExecutionHandler shutdownPolicy;
+
+  private final String schedulerName;
 
   /**
    * Constructs a <tt>WaitPolicy</tt> which waits (almost) forever.
    *
    * @param shutdownPolicy the policy to use when the executor is shutdown.
+   * @param scheduelrName the name of the target {@link Scheduler}
    */
-  public WaitPolicy(RejectedExecutionHandler shutdownPolicy) {
+  public WaitPolicy(RejectedExecutionHandler shutdownPolicy, String schedulerName) {
     // effectively waits forever
-    this(MAX_VALUE, SECONDS, shutdownPolicy);
+    this(MAX_VALUE, SECONDS, shutdownPolicy, schedulerName);
   }
 
   /**
    * Constructs a <tt>WaitPolicy</tt> with timeout. A negative <code>time</code> value is interpreted as
    * <code>Long.MAX_VALUE</code>.
+   *
+   * @param shutdownPolicy the policy to use when the executor is shutdown.
+   * @param schedulerName the name of the target {@link Scheduler}
    */
-  public WaitPolicy(long time, TimeUnit timeUnit, RejectedExecutionHandler shutdownPolicy) {
+  public WaitPolicy(long time, TimeUnit timeUnit, RejectedExecutionHandler shutdownPolicy, String schedulerName) {
     super();
     this.time = (time < 0 ? MAX_VALUE : time);
     this.timeUnit = timeUnit;
     this.shutdownPolicy = shutdownPolicy;
+    this.schedulerName = schedulerName;
   }
 
   @Override
@@ -57,7 +65,7 @@ public class WaitPolicy implements RejectedExecutionHandler {
     } else {
       try {
         if (!e.getQueue().offer(r, time, timeUnit)) {
-          throw new SchedulerBusyException(format("Scheduler did not accept within %1d %2s", time, timeUnit));
+          throw new SchedulerBusyException(format("Scheduler '%s' did not accept within %1d %2s", schedulerName, time, timeUnit));
         }
       } catch (InterruptedException ie) {
         Thread.currentThread().interrupt();
