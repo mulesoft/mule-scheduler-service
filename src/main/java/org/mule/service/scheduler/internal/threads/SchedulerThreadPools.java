@@ -57,6 +57,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -89,7 +90,7 @@ public class SchedulerThreadPools {
   private final ThreadGroup customCallerRunsGroup;
   private final ThreadGroup customCallerRunsAnsWaitGroup;
 
-  private final Supplier<RejectedExecutionHandler> byCallerThreadGroupPolicy;
+  private final Function<String, RejectedExecutionHandler> byCallerThreadGroupPolicy;
 
   private ThreadPoolExecutor cpuLightExecutor;
   private ThreadPoolExecutor ioExecutor;
@@ -121,12 +122,13 @@ public class SchedulerThreadPools {
     customCallerRunsGroup = new ThreadGroup(customGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
     customCallerRunsAnsWaitGroup = new ThreadGroup(customGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
 
-    byCallerThreadGroupPolicy = () -> new ByCallerThreadGroupPolicy(new HashSet<>(asList(ioGroup, customWaitGroup,
-                                                                                         customCallerRunsAnsWaitGroup)),
-                                                                    new HashSet<>(asList(cpuLightGroup, computationGroup,
-                                                                                         customCallerRunsGroup,
-                                                                                         customCallerRunsAnsWaitGroup)),
-                                                                    cpuLightGroup, schedulerGroup);
+    byCallerThreadGroupPolicy = schedulerName -> new ByCallerThreadGroupPolicy(new HashSet<>(asList(ioGroup, customWaitGroup,
+                                                                                                    customCallerRunsAnsWaitGroup)),
+                                                                               new HashSet<>(asList(cpuLightGroup,
+                                                                                                    computationGroup,
+                                                                                                    customCallerRunsGroup,
+                                                                                                    customCallerRunsAnsWaitGroup)),
+                                                                               cpuLightGroup, schedulerGroup, schedulerName);
   }
 
   public void start() throws MuleException {
@@ -135,7 +137,8 @@ public class SchedulerThreadPools {
                                threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
                                0, SECONDS,
                                createQueue(threadPoolsConfig.getCpuLightQueueSize().getAsInt()),
-                               new SchedulerThreadFactory(cpuLightGroup), byCallerThreadGroupPolicy.get());
+                               new SchedulerThreadFactory(cpuLightGroup),
+                               byCallerThreadGroupPolicy.apply(cpuLightGroup.getName()));
 
     // TODO (elrodro83) MULE-14203 Make IO thread pool have an optimal core size
     ioExecutor = new ThreadPoolExecutor(0,
@@ -156,12 +159,13 @@ public class SchedulerThreadPools {
                                         // that it greatly outweights the gain in the dispatcher.
                                         new SynchronousQueue<>(),
                                         new SchedulerThreadFactory(ioGroup),
-                                        byCallerThreadGroupPolicy.get());
+                                        byCallerThreadGroupPolicy.apply(ioGroup.getName()));
     computationExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
                                threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
                                0, SECONDS, createQueue(threadPoolsConfig.getCpuIntensiveQueueSize().getAsInt()),
-                               new SchedulerThreadFactory(computationGroup), byCallerThreadGroupPolicy.get());
+                               new SchedulerThreadFactory(computationGroup),
+                               byCallerThreadGroupPolicy.apply(computationGroup.getName()));
 
     prestartCoreThreads(cpuLightExecutor, threadPoolsConfig.getCpuLightPoolSize().getAsInt());
     prestartCoreThreads(ioExecutor, threadPoolsConfig.getIoCorePoolSize().getAsInt());
@@ -374,7 +378,7 @@ public class SchedulerThreadPools {
     final ThreadPoolExecutor executor =
         new ThreadPoolExecutor(config.getMaxConcurrentTasks(), config.getMaxConcurrentTasks(), 0L, MILLISECONDS, workQueue,
                                new SchedulerThreadFactory(customChildGroup, "%s.%02d"),
-                               byCallerThreadGroupPolicy.get());
+                               byCallerThreadGroupPolicy.apply(customChildGroup.getName()));
 
     prestartCoreThreads(executor, config.getMaxConcurrentTasks());
 
@@ -501,7 +505,7 @@ public class SchedulerThreadPools {
 
     @Override
     public List<Runnable> shutdownNow() {
-      customSchedulersExecutors.remove(this);
+      customSchedulersExecutors.remove(executor);
 
       final List<Runnable> cancelledTasks = super.shutdownNow();
       executor.shutdownNow();
