@@ -46,8 +46,9 @@ import javax.script.ScriptException;
  */
 public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
-
   private static final Logger logger = getLogger(ContainerThreadPoolsConfig.class);
+
+  public static final String SCHEDULER_POOLS_CONFIG_FILE_PROPERTY = "mule.schedulerPools.configFile";
 
   public static final String PROP_PREFIX = "org.mule.runtime.scheduler.";
   public static final String CPU_LIGHT_PREFIX = PROP_PREFIX + CPU_LIGHT.getName();
@@ -72,10 +73,20 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
    * @throws MuleException for any trouble that happens while parsing the file.
    */
   public static ContainerThreadPoolsConfig loadThreadPoolsConfig() throws MuleException {
+    final ContainerThreadPoolsConfig config = new ContainerThreadPoolsConfig();
+
+    String overriddenConfigFileName = getProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY);
+
+    if (overriddenConfigFileName != null) {
+      File overriddenConfigFile = new File(overriddenConfigFileName);
+
+      logger.info("Loading thread pools configuration from " + overriddenConfigFile.getPath());
+
+      return loadProperties(config, overriddenConfigFile);
+    }
+
     File muleHome =
         getProperty(MULE_HOME_DIRECTORY_PROPERTY) != null ? new File(getProperty(MULE_HOME_DIRECTORY_PROPERTY)) : null;
-
-    final ContainerThreadPoolsConfig config = new ContainerThreadPoolsConfig();
 
     if (muleHome == null) {
       logger.info("No " + MULE_HOME_DIRECTORY_PROPERTY + " defined. Using default values for thread pools.");
@@ -90,6 +101,11 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
     logger.info("Loading thread pools configuration from " + defaultConfigFile.getPath());
 
+    return loadProperties(config, defaultConfigFile);
+  }
+
+  private static ContainerThreadPoolsConfig loadProperties(final ContainerThreadPoolsConfig config, File defaultConfigFile)
+      throws DefaultMuleException, ConfigurationException, MuleException {
     final Properties properties = new Properties();
     try (final FileInputStream configIs = new FileInputStream(defaultConfigFile)) {
       properties.load(configIs);
