@@ -104,10 +104,10 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     return loadProperties(config, defaultConfigFile);
   }
 
-  private static ContainerThreadPoolsConfig loadProperties(final ContainerThreadPoolsConfig config, File defaultConfigFile)
+  private static ContainerThreadPoolsConfig loadProperties(final ContainerThreadPoolsConfig config, File configFile)
       throws DefaultMuleException, ConfigurationException, MuleException {
     final Properties properties = new Properties();
-    try (final FileInputStream configIs = new FileInputStream(defaultConfigFile)) {
+    try (final FileInputStream configIs = new FileInputStream(configFile)) {
       properties.load(configIs);
     } catch (IOException e) {
       throw new DefaultMuleException(e);
@@ -121,39 +121,57 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     engine.put("cores", cores);
     engine.put("mem", mem);
 
-    config.setGracefulShutdownTimeout(resolveNumber(properties, PROP_PREFIX + "gracefulShutdownTimeout", true));
+    resolveNumber(properties, PROP_PREFIX + "gracefulShutdownTimeout", true)
+        .ifPresent(v -> config.setGracefulShutdownTimeout(v));
 
-    config.setCpuLightPoolSize(resolveExpression(properties, CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, config, engine, false));
-    config.setCpuLightQueueSize(resolveExpression(properties, CPU_LIGHT_PREFIX + "." + WORK_QUEUE_SIZE, config, engine, true));
+    resolveExpression(properties, CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, config, engine, false)
+        .ifPresent(v -> config.setCpuLightPoolSize(v));
+    resolveExpression(properties, CPU_LIGHT_PREFIX + "." + WORK_QUEUE_SIZE, config, engine, true)
+        .ifPresent(v -> config.setCpuLightQueueSize(v));
 
-    config.setIoCorePoolSize(resolveExpression(properties, IO_PREFIX + "." + THREAD_POOL_SIZE_CORE, config, engine, false));
-    config.setIoMaxPoolSize(resolveExpression(properties, IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, config, engine, false));
-    config.setIoQueueSize(resolveExpression(properties, IO_PREFIX + "." + WORK_QUEUE_SIZE, config, engine, true));
-    config.setIoKeepAlive(resolveNumber(properties, IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE, true));
+    resolveExpression(properties, IO_PREFIX + "." + THREAD_POOL_SIZE_CORE, config, engine, false)
+        .ifPresent(v -> config.setIoCorePoolSize(v));
+    resolveExpression(properties, IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, config, engine, false)
+        .ifPresent(v -> config.setIoMaxPoolSize(v));
+    resolveExpression(properties, IO_PREFIX + "." + WORK_QUEUE_SIZE, config, engine, true)
+        .ifPresent(v -> config.setIoQueueSize(v));
+    resolveNumber(properties, IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE, true)
+        .ifPresent(v -> config.setIoKeepAlive(v));
 
-    config.setCpuIntensivePoolSize(resolveExpression(properties, CPU_INTENSIVE_PREFIX + "." + THREAD_POOL_SIZE, config, engine,
-                                                     false));
-    config.setCpuIntensiveQueueSize(resolveExpression(properties, CPU_INTENSIVE_PREFIX + "." + WORK_QUEUE_SIZE, config, engine,
-                                                      true));
+    resolveExpression(properties, CPU_INTENSIVE_PREFIX + "." + THREAD_POOL_SIZE, config, engine, false)
+        .ifPresent(v -> config.setCpuIntensivePoolSize(v));
+    resolveExpression(properties, CPU_INTENSIVE_PREFIX + "." + WORK_QUEUE_SIZE, config, engine, true)
+        .ifPresent(v -> config.setCpuIntensiveQueueSize(v));
 
     return config;
   }
 
-  private static long resolveNumber(Properties properties, String propName, boolean allowZero) throws MuleException {
+  private static OptionalLong resolveNumber(Properties properties, String propName, boolean allowZero) throws MuleException {
+    if (!properties.containsKey(propName)) {
+      logger.warn("No property '{}' found in config file. Using default value.", propName);
+      return OptionalLong.empty();
+    }
+
     final String property = properties.getProperty(propName);
     try {
       final long result = parseLong(property);
       validateNumber(propName, result, allowZero);
 
-      return result;
+      return OptionalLong.of(result);
     } catch (NumberFormatException e) {
       throw new DefaultMuleException(propName + ": " + e.getMessage(), e);
     }
   }
 
-  private static int resolveExpression(Properties properties, String propName, ContainerThreadPoolsConfig threadPoolsConfig,
+  private static OptionalInt resolveExpression(Properties properties, String propName,
+                                               ContainerThreadPoolsConfig threadPoolsConfig,
                                        ScriptEngine engine, boolean allowZero)
       throws MuleException {
+    if (!properties.containsKey(propName)) {
+      logger.warn("No property '{}' found in config file. Using default value.", propName);
+      return OptionalInt.empty();
+    }
+
     final String property = properties.getProperty(propName).trim().toLowerCase();
     if (!POOLSIZE_PATTERN.matcher(property).matches()) {
       throw new DefaultMuleException(propName + ": Expression not valid");
@@ -162,7 +180,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
       final int result = ((Number) engine.eval(property)).intValue();
       validateNumber(propName, result, allowZero);
 
-      return result;
+      return OptionalInt.of(result);
     } catch (ScriptException e) {
       throw new DefaultMuleException(propName + ": " + e.getMessage(), e);
     }
@@ -185,11 +203,11 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
   private static long mem = getRuntime().maxMemory() / 1024;
 
   private long gracefulShutdownTimeout = 15000;
-  private int cpuLightQueueSize = 1024;
+  private int cpuLightQueueSize = 0;
   private int cpuLightPoolSize = 2 * cores;
-  private int ioQueueSize = 1024;
+  private int ioQueueSize = 0;
   private int ioCorePoolSize = cores;
-  private int ioMaxPoolSize = 256;
+  private int ioMaxPoolSize = (int) (cores + ((mem - 245760) / 5120));
   private long ioKeepAlive = 30000;
   private int cpuIntensiveQueueSize = 1024;
   private int cpuIntensivePoolSize = 2 * cores;
