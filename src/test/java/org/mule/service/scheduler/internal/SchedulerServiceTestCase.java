@@ -22,14 +22,14 @@ import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
 
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
 import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
 import io.qameta.allure.Feature;
 
@@ -82,7 +82,7 @@ public class SchedulerServiceTestCase extends AbstractMuleTestCase {
   public void artifactGarbageCollectedConfig() {
     assertThat(service.getPools(), hasSize(1));
 
-    // We cannot use Mockito to create this object, beacuase Mockito keeps hard reference to the mocks it creares.
+    // We cannot use Mockito to create this object, because Mockito keeps hard reference to the mocks it creates.
     SchedulerPoolsConfigFactory config = () -> of(getMockConfig());
     PhantomReference<SchedulerPoolsConfigFactory> configFactoryRef = new PhantomReference<>(config, new ReferenceQueue<>());
 
