@@ -7,7 +7,12 @@
 package org.mule.service.scheduler.internal.threads;
 
 import static java.lang.String.format;
+import static java.security.AccessController.doPrivileged;
+import static java.security.AccessController.getContext;
+import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 
+import java.security.AccessControlContext;
+import java.security.PrivilegedAction;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -22,6 +27,8 @@ public class SchedulerThreadFactory implements java.util.concurrent.ThreadFactor
   private final String nameFormat;
   private final AtomicLong counter;
 
+  private AccessControlContext acc = getContext();
+
   public SchedulerThreadFactory(ThreadGroup group) {
     this(group, "%s.%02d");
   }
@@ -34,9 +41,15 @@ public class SchedulerThreadFactory implements java.util.concurrent.ThreadFactor
 
   @Override
   public Thread newThread(Runnable runnable) {
-    final Thread thread = new Thread(group, runnable, format(nameFormat, group.getName(), counter.getAndIncrement()));
-    thread.setContextClassLoader(this.getClass().getClassLoader());
-    return thread;
+    return withContextClassLoader(this.getClass().getClassLoader(), () -> {
+      // Avoid the created thread to inherit the security context of the caller thread's stack.
+      // If the thread creation is triggered by a deployable artifact classloader, a reference to it would be kept by the created
+      // thread without this doProvileged call.
+      return doPrivileged((PrivilegedAction<Thread>) () -> new Thread(group, runnable, format(nameFormat, group.getName(),
+                                                                                              counter.getAndIncrement())),
+                          acc);
+
+    });
   }
 
   public ThreadGroup getGroup() {
