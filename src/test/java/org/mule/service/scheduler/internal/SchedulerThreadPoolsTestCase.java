@@ -12,6 +12,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.sameInstance;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsCollectionContaining.hasItem;
 import static org.hamcrest.core.IsInstanceOf.instanceOf;
@@ -251,6 +252,8 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that IO threads in excess of the core size don't hold a reference to an artifact classloader through the inheritedAccessControlContext.")
   public void elasticIoThreadsDontReferenceClassLoaderFromAccessControlContext() throws Exception {
+    assertThat(threadPoolsConfig.getIoKeepAlive().getAsLong(), greaterThan(GC_POLLING_TIMEOUT));
+
     Scheduler scheduler = service.createIoScheduler(config(), threadPoolsConfig.getIoCorePoolSize().getAsInt() + 1, () -> 1000L);
 
     ClassLoader delegatorClassLoader = createDelegatorClassLoader();
@@ -265,7 +268,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     delegator = null;
     delegatorClassLoader = null;
 
-    assertNoClassLoaderReferenceHeld(clRef, threadPoolsConfig.getIoKeepAlive().getAsLong() + GC_POLLING_TIMEOUT);
+    assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
   }
 
   private ClassLoader createDelegatorClassLoader() {
