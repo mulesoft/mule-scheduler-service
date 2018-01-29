@@ -209,7 +209,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
   private int ioCorePoolSize = cores;
   private int ioMaxPoolSize = (int) (cores + ((mem - 245760) / 5120));
   private long ioKeepAlive = 30000;
-  private int cpuIntensiveQueueSize = 1024;
+  private int cpuIntensiveQueueSize = 2 * cores;
   private int cpuIntensivePoolSize = 2 * cores;
 
   private ContainerThreadPoolsConfig() {

@@ -106,7 +106,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     assertThat(config.getIoQueueSize().getAsInt(), is(0));
     assertThat(config.getIoKeepAlive().getAsLong(), is(30000l));
     assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(2 * cores));
-    assertThat(config.getCpuIntensiveQueueSize().getAsInt(), is(1024));
+    assertThat(config.getCpuIntensiveQueueSize().getAsInt(), is(2 * cores));
   }
 
   @Test
@@ -121,7 +121,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     assertThat(config.getIoQueueSize().getAsInt(), is(0));
     assertThat(config.getIoKeepAlive().getAsLong(), is(30000l));
     assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(2 * cores));
-    assertThat(config.getCpuIntensiveQueueSize().getAsInt(), is(1024));
+    assertThat(config.getCpuIntensiveQueueSize().getAsInt(), is(2 * cores));
   }
 
   @Test
