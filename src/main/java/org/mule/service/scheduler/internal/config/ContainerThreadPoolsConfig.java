@@ -165,7 +165,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
   private static OptionalInt resolveExpression(Properties properties, String propName,
                                                ContainerThreadPoolsConfig threadPoolsConfig,
-                                       ScriptEngine engine, boolean allowZero)
+                                               ScriptEngine engine, boolean allowZero)
       throws MuleException {
     if (!properties.containsKey(propName)) {
       logger.warn("No property '{}' found in config file. Using default value.", propName);
