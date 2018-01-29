@@ -18,6 +18,7 @@ import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsCon
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.CPU_LIGHT_PREFIX;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.IO_PREFIX;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.PROP_PREFIX;
+import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.SCHEDULER_POOLS_CONFIG_FILE_PROPERTY;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.THREAD_POOL_KEEP_ALIVE;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.THREAD_POOL_SIZE;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.THREAD_POOL_SIZE_CORE;
@@ -25,15 +26,11 @@ import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsCon
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.WORK_QUEUE_SIZE;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 
-import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.DefaultMuleException;
+import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 import org.mule.tck.junit4.AbstractMuleTestCase;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Properties;
+import org.mule.tck.junit4.rule.SystemProperty;
 
 import org.junit.After;
 import org.junit.Before;
@@ -42,13 +39,26 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Properties;
+
+import io.qameta.allure.Description;
+
 public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
   private static int cores = getRuntime().availableProcessors();
   private static long mem = getRuntime().maxMemory() / 1024;
 
   @Rule
+  public SystemProperty configFile = new SystemProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY, null);
+
+  @Rule
   public TemporaryFolder tempMuleHome = new TemporaryFolder();
+
+  @Rule
+  public TemporaryFolder tempOtherDir = new TemporaryFolder();
 
   @Rule
   public ExpectedException expected = ExpectedException.none();
@@ -92,7 +102,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     assertThat(config.getCpuLightPoolSize().getAsInt(), is(2 * cores));
     assertThat(config.getCpuLightQueueSize().getAsInt(), is(1024));
     assertThat(config.getIoCorePoolSize().getAsInt(), is(cores));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is(256));
+    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) (cores + ((mem - 245760) / 5120))));
     assertThat(config.getIoQueueSize().getAsInt(), is(1024));
     assertThat(config.getIoKeepAlive().getAsLong(), is(30000l));
     assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(2 * cores));
@@ -107,7 +117,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     assertThat(config.getCpuLightPoolSize().getAsInt(), is(2 * cores));
     assertThat(config.getCpuLightQueueSize().getAsInt(), is(1024));
     assertThat(config.getIoCorePoolSize().getAsInt(), is(cores));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is(256));
+    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) (cores + ((mem - 245760) / 5120))));
     assertThat(config.getIoQueueSize().getAsInt(), is(1024));
     assertThat(config.getIoKeepAlive().getAsLong(), is(30000l));
     assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(2 * cores));
@@ -325,4 +335,44 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     expected.expectMessage(startsWith(IO_PREFIX + "." + WORK_QUEUE_SIZE + ": <eval>:1:3 Expected ) but found eof"));
     loadThreadPoolsConfig();
   }
+
+  @Test
+  @Description("For a missing entry in the config file, the default value is used")
+  public void missingExpression() throws IOException, MuleException {
+    final Properties props = buildDefaultConfigProps();
+    props.remove(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX);
+    props.store(new FileOutputStream(schedulerConfigFile), "defaultConfig");
+
+    final SchedulerPoolsConfig config = loadThreadPoolsConfig();
+
+    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) (cores + ((mem - 245760) / 5120))));
+  }
+
+  @Test
+  @Description("For a missing entry in the config file, the default value is used")
+  public void missingValue() throws IOException, MuleException {
+    final Properties props = buildDefaultConfigProps();
+    props.remove(IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE);
+    props.store(new FileOutputStream(schedulerConfigFile), "defaultConfig");
+
+    final SchedulerPoolsConfig config = loadThreadPoolsConfig();
+
+    assertThat(config.getIoKeepAlive().getAsLong(), is(30000l));
+  }
+
+  @Test
+  @Description("Tests that the mule.schedulerPools.configFile property is honored if present")
+  public void overrideConfigFile() throws IOException, MuleException {
+    final Properties props = buildDefaultConfigProps();
+    props.put(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "1");
+
+    File overrideConfigFile = new File(tempOtherDir.getRoot(), "overriding.conf");
+    props.store(new FileOutputStream(overrideConfigFile), "defaultConfig");
+    System.setProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY, overrideConfigFile.getPath());
+
+    final SchedulerPoolsConfig config = loadThreadPoolsConfig();
+
+    assertThat(config.getIoMaxPoolSize().getAsInt(), is(1));
+  }
+
 }
