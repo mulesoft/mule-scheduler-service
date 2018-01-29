@@ -141,7 +141,7 @@ public class SchedulerThreadPools {
                                byCallerThreadGroupPolicy.apply(cpuLightGroup.getName()));
 
     // TODO (elrodro83) MULE-14203 Make IO thread pool have an optimal core size
-    ioExecutor = new ThreadPoolExecutor(0,
+    ioExecutor = new ThreadPoolExecutor(threadPoolsConfig.getIoCorePoolSize().getAsInt(),
                                         threadPoolsConfig.getIoMaxPoolSize().getAsInt(),
                                         threadPoolsConfig.getIoKeepAlive().getAsLong(), MILLISECONDS,
                                         // At first, it may seem that a SynchronousQueue is not the best option here since it may
@@ -157,7 +157,7 @@ public class SchedulerThreadPools {
                                         // limitations of the other 2 approaches, an improvement is seen in the dispatching of the
                                         // tasks, but at the cost of a slower task taking, which slows down the processing so much
                                         // that it greatly outweights the gain in the dispatcher.
-                                        new SynchronousQueue<>(),
+                                        createQueue(threadPoolsConfig.getIoQueueSize().getAsInt()),
                                         new SchedulerThreadFactory(ioGroup),
                                         byCallerThreadGroupPolicy.apply(ioGroup.getName()));
     computationExecutor =
