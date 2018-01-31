@@ -27,6 +27,7 @@ import org.quartz.impl.StdSchedulerFactory;
 
 import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -52,6 +53,7 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
   @Rule
   public ExpectedException expected = ExpectedException.none();
 
+  protected BlockingQueue<Runnable> sharedExecutorQueue = new ArrayBlockingQueue<>(1);
   protected ExecutorService sharedExecutor;
   protected ScheduledThreadPoolExecutor sharedScheduledExecutor;
   protected org.quartz.Scheduler sharedQuartzScheduler;
@@ -59,7 +61,7 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
   @Before
   public void before() throws Exception {
     sharedExecutor =
-        new ThreadPoolExecutor(1, 1, 0, SECONDS, new ArrayBlockingQueue<>(1), defaultThreadFactory());
+        new ThreadPoolExecutor(1, 1, 0, SECONDS, sharedExecutorQueue, defaultThreadFactory());
     sharedScheduledExecutor = spy(new ScheduledThreadPoolExecutor(1, defaultThreadFactory()));
     sharedScheduledExecutor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
     sharedScheduledExecutor.setRemoveOnCancelPolicy(true);

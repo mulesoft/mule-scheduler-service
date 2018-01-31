@@ -57,6 +57,9 @@ import java.util.function.Supplier;
  */
 public class DefaultScheduler extends AbstractExecutorService implements Scheduler {
 
+  private static final Runnable EMPTY_RUNNABLE = () -> {
+  };
+
   /**
    * Forced shutdown delay. The time to wait while threads are being interrupted.
    */
@@ -134,7 +137,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   private <V> ScheduledFuture<V> doSchedule(final RunnableFuture<V> task, long delay, TimeUnit unit) {
     final ScheduledFuture<V> scheduled =
-        new ScheduledFutureDecorator(scheduledExecutor.schedule(schedulableTask(task), delay, unit), task, false);
+        new ScheduledFutureDecorator(scheduledExecutor.schedule(schedulableTask(task, EMPTY_RUNNABLE), delay, unit), task, false);
 
     putTask(task, scheduled);
     return scheduled;
@@ -152,7 +155,8 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement());
 
     final ScheduledFuture<?> scheduled =
-        new ScheduledFutureDecorator<>(scheduledExecutor.scheduleAtFixedRate(schedulableTask(task), initialDelay, period, unit),
+        new ScheduledFutureDecorator<>(scheduledExecutor.scheduleAtFixedRate(schedulableTask(task, EMPTY_RUNNABLE), initialDelay,
+                                                                             period, unit),
                                        task, true);
 
     putTask(task, scheduled);
@@ -168,33 +172,16 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
       fixedDelayWrapUp(t, delay, unit);
     }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement());
 
-    final ScheduledFutureDecorator<?> scheduled =
-        new ScheduledFutureDecorator<>(scheduledExecutor.schedule(reschedulableTask(task, delay, unit), initialDelay, unit),
-                                       task, true);
+    final ScheduledFutureDecorator<?> scheduled = new ScheduledFutureDecorator<>(scheduledExecutor
+        .schedule(schedulableTask(task, () -> fixedDelayWrapUp(task, delay, unit)), initialDelay, unit), task, true);
 
     putTask(task, scheduled);
     return scheduled;
   }
 
-  private <T> Runnable reschedulableTask(RunnableFuture<T> task, long delay, TimeUnit unit) {
-    return () -> {
-      try {
-        executor.execute(task);
-      } catch (RejectedExecutionException e) {
-        if (!executor.isShutdown()) {
-          // Just log. Do not rethrow so the periodic job is not cancelled
-          logger.warn(e.getClass().getName() + " scheduling next execution of task " + task.toString() + ". Message was: "
-              + e.getMessage());
-
-          fixedDelayWrapUp(task, delay, unit);
-        }
-      }
-    };
-  }
-
   private void fixedDelayWrapUp(RunnableFuture<?> task, long delay, TimeUnit unit) {
     if (!task.isCancelled()) {
-      scheduledExecutor.schedule(reschedulableTask(task, delay, unit), delay, unit);
+      scheduledExecutor.schedule(schedulableTask(task, () -> fixedDelayWrapUp(task, delay, unit)), delay, unit);
     } else {
       taskFinished(task);
     }
@@ -217,7 +204,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement());
 
     JobDataMap jobDataMap = new JobDataMap();
-    jobDataMap.put(JOB_TASK_KEY, schedulableTask(task));
+    jobDataMap.put(JOB_TASK_KEY, schedulableTask(task, EMPTY_RUNNABLE));
     JobDetail job = newJob(jobClass).usingJobData(jobDataMap).build();
 
     CronTrigger trigger = newTrigger()
@@ -235,8 +222,20 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     return scheduled;
   }
 
-  private <T> Runnable schedulableTask(RunnableFuture<T> task) {
-    return () -> executor.execute(task);
+  private <T> Runnable schedulableTask(RunnableFuture<T> task, Runnable rejectionCallback) {
+    return () -> {
+      try {
+        executor.execute(task);
+      } catch (RejectedExecutionException e) {
+        if (!executor.isShutdown()) {
+          // Just log. Do not rethrow so the periodic job is not cancelled
+          logger.warn(e.getClass().getName() + " scheduling next execution of task " + task.toString() + ". Message was: "
+              + e.getMessage());
+
+          rejectionCallback.run();
+        }
+      }
+    };
   }
 
   public void setJobClass(Class<? extends QuartzCronJob> jobClass) {
