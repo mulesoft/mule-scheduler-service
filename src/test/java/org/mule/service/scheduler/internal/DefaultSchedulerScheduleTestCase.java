@@ -34,10 +34,12 @@ import org.mockito.InOrder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
@@ -53,8 +55,8 @@ public class DefaultSchedulerScheduleTestCase extends AbstractMuleVsJavaExecutor
   private static final long TEST_DELAY_MILLIS = 1000;
 
   public DefaultSchedulerScheduleTestCase(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService> executorFactory,
-                                          String param) {
-    super(executorFactory, param);
+                                          BlockingQueue<Runnable> sharedExecutorQueue, String param) {
+    super(executorFactory, sharedExecutorQueue, param);
   }
 
   @Test
@@ -454,7 +456,13 @@ public class DefaultSchedulerScheduleTestCase extends AbstractMuleVsJavaExecutor
     assertThat(awaitLatch(latch), is(true));
     scheduled.cancel(true);
 
-    assertThat((double) NANOSECONDS.toMillis(startTimes.get(1) - endTimes.get(0)), closeTo(0, DELTA_MILLIS));
+    assertThat((double) NANOSECONDS.toMillis(startTimes.get(1) - endTimes.get(0)),
+               executor instanceof DefaultScheduler && sharedExecutorQueue instanceof SynchronousQueue
+                   // A standard java ScheduledExecutor will run the task as soon as possible after the rate has passed.
+                   // On mule, for implementation simplicity, if a tick is skipped for a 1-thread scheduler with no queue, the
+                   // task won't run until the next tick.
+                   ? closeTo(TEST_DELAY_MILLIS - TASK_DURATION_MILLIS, DELTA_MILLIS)
+                   : closeTo(0, DELTA_MILLIS));
   }
 
   @Test

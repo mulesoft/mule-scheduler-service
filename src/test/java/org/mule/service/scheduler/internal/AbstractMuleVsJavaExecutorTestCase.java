@@ -14,7 +14,10 @@ import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
 
 import java.util.Collection;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.SynchronousQueue;
 import java.util.function.Function;
 
 /**
@@ -28,18 +31,23 @@ public abstract class AbstractMuleVsJavaExecutorTestCase extends BaseDefaultSche
   protected ScheduledExecutorService executor;
 
   public AbstractMuleVsJavaExecutorTestCase(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService> executorFactory,
-                                            String param) {
+                                            BlockingQueue<Runnable> sharedExecutorQueue, String param) {
     this.executorFactory = executorFactory;
+    this.sharedExecutorQueue = sharedExecutorQueue;
   }
 
-  @Parameters(name = "{1}")
+  @Parameters(name = "{2}")
   public static Collection<Object[]> data() {
     return asList(new Object[][] {
         // Use a default ScheduledExecutorService to compare behavior
         {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
-            .useSharedScheduledExecutor(), "java"},
+            .useSharedScheduledExecutor(), new SynchronousQueue<>(), "java,syncQueue"},
         {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
-            .createScheduledSameThreadExecutor(), "mule"}
+            .useSharedScheduledExecutor(), new LinkedBlockingQueue<>(1), "java,queue(1)"},
+        {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
+            .createScheduledSameThreadExecutor(), new SynchronousQueue<>(), "mule,syncQueue"},
+        {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
+            .createScheduledSameThreadExecutor(), new LinkedBlockingQueue<>(1), "mule,queue(1)"}
     });
   }
 

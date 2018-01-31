@@ -17,6 +17,7 @@ import static reactor.core.scheduler.Schedulers.fromExecutor;
 
 import org.junit.Test;
 
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -30,8 +31,8 @@ import io.qameta.allure.Story;
 public class ReactorSchedulersTestCase extends AbstractMuleVsJavaExecutorTestCase {
 
   public ReactorSchedulersTestCase(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService> executorFactory,
-                                   String param) {
-    super(executorFactory, param);
+                                   BlockingQueue<Runnable> sharedExecutorQueue, String param) {
+    super(executorFactory, sharedExecutorQueue, param);
   }
 
   @Test
