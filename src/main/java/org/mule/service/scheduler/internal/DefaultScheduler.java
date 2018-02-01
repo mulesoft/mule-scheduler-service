@@ -138,8 +138,8 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   private <V> ScheduledFuture<V> doSchedule(final RunnableFuture<V> task, long delay, TimeUnit unit) {
     final ScheduledFuture<V> scheduled = new ScheduledFutureDecorator(scheduledExecutor.schedule(schedulableTask(task, () -> {
       removeTask(task);
-      // Retry after some time
-      doSchedule(task, 100, MILLISECONDS);
+      // Retry after some time, the max theoretical duration of cpu-light tasks
+      doSchedule(task, 10, MILLISECONDS);
     }), delay, unit), task, false);
 
     putTask(task, scheduled);
