@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.SynchronousQueue;
@@ -220,6 +221,38 @@ public class DefaultSchedulerScheduleTestCase extends AbstractMuleVsJavaExecutor
 
     assertCancelled(scheduled);
     assertTerminationIsNotDelayed(executor);
+  }
+
+  @Test
+  @Description("Tests that a delayed task is eventually triggered if at the original trigger time the target scheduler was busy")
+  public void scheduleWhilebusy() throws InterruptedException, ExecutionException, TimeoutException {
+    final CountDownLatch latch1 = new CountDownLatch(1);
+    final CountDownLatch latch2 = new CountDownLatch(1);
+
+    try {
+      // Use up all available threads
+      for (int i = 0; i < 20; ++i) {
+        executor.execute(() -> {
+          try {
+            latch1.await();
+          } catch (InterruptedException e) {
+            currentThread().interrupt();
+          }
+        });
+      }
+    } catch (RejectedExecutionException e) {
+      // Nothing to do
+    }
+
+    executor.schedule(() -> {
+      latch2.countDown();
+    }, 1, SECONDS);
+
+    // Wait for the time when the scheduled task would be triggered
+    Thread.sleep(2000);
+
+    latch1.countDown();
+    assertThat(latch2.await(5, SECONDS), is(true));
   }
 
   @Test
