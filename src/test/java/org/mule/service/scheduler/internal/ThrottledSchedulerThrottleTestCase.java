@@ -6,6 +6,7 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
@@ -29,9 +30,11 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
 
@@ -84,6 +87,49 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
     if (!latch.await(200, MILLISECONDS)) {
       fail("Task never executed");
     }
+  }
+
+  @Test
+  @Description("Tests that the throttler count is cinsistent after task cancellation")
+  public void interruptionUpdatesThrottleCounterCorrectly() throws InterruptedException, ExecutionException, TimeoutException {
+    final ScheduledExecutorService scheduler = service
+        .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE, () -> 5000L);
+
+    Scheduler cpuLightScheduler = service.createCpuLightScheduler(config(), 2, () -> 5000L);
+
+    Future<?> outerSubmit = cpuLightScheduler.submit(() -> {
+      Future<?> submit = scheduler.submit(() -> {
+        try {
+          Thread.sleep(DEFAULT_TEST_TIMEOUT_SECS * 1000);
+        } catch (InterruptedException e) {
+          currentThread().interrupt();
+        }
+      });
+
+      submit.cancel(true);
+
+      CountDownLatch latch = new CountDownLatch(2);
+
+      doSchedule(scheduler, latch);
+      try {
+        doSchedule(scheduler, latch);
+        fail("Not rejected");
+      } catch (RejectedExecutionException e) {
+        // Expected
+      }
+    });
+
+    outerSubmit.get(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
+  }
+
+  private void doSchedule(final ScheduledExecutorService scheduler, CountDownLatch latch2) {
+    scheduler.submit(() -> {
+      try {
+        latch2.await();
+      } catch (InterruptedException e) {
+        currentThread().interrupt();
+      }
+    });
   }
 
   @Test

@@ -56,9 +56,12 @@ public class ThrottledScheduler extends DefaultScheduler {
   }
 
   @Override
-  protected void removeTask(RunnableFuture<?> task) {
-    super.removeTask(task);
-    thottlingPolicy.throttleWrapUp();
+  protected ScheduledFuture<?> removeTask(RunnableFuture<?> task) {
+    ScheduledFuture<?> removedTask = super.removeTask(task);
+    if (removedTask != null) {
+      thottlingPolicy.throttleWrapUp();
+    }
+    return removedTask;
   }
 
   @Override

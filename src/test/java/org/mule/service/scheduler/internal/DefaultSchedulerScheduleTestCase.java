@@ -225,7 +225,7 @@ public class DefaultSchedulerScheduleTestCase extends AbstractMuleVsJavaExecutor
 
   @Test
   @Description("Tests that a delayed task is eventually triggered if at the original trigger time the target scheduler was busy")
-  public void scheduleWhilebusy() throws InterruptedException, ExecutionException, TimeoutException {
+  public void scheduleWhileBusy() throws InterruptedException, ExecutionException, TimeoutException {
     final CountDownLatch latch1 = new CountDownLatch(1);
     final CountDownLatch latch2 = new CountDownLatch(1);
 
