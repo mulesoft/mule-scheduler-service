@@ -395,8 +395,8 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     scheduledTasks.put(task, scheduledFuture);
   }
 
-  protected void removeTask(RunnableFuture<?> task) {
-    scheduledTasks.remove(task);
+  protected ScheduledFuture<?> removeTask(RunnableFuture<?> task) {
+    return scheduledTasks.remove(task);
   }
 
   private void tryTerminate() {

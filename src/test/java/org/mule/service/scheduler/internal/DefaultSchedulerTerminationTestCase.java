@@ -9,6 +9,7 @@ package org.mule.service.scheduler.internal;
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
 import static java.util.Arrays.asList;
+import static java.util.concurrent.Executors.defaultThreadFactory;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -24,6 +25,13 @@ import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
 
+import org.hamcrest.Matcher;
+import org.hamcrest.TypeSafeMatcher;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
+
 import java.util.Collection;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -31,15 +39,10 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-
-import org.hamcrest.Matcher;
-import org.hamcrest.TypeSafeMatcher;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
@@ -503,6 +506,43 @@ public class DefaultSchedulerTerminationTestCase extends BaseDefaultSchedulerTes
 
     terminationProber().check(new JUnitLambdaProbe(() -> {
       assertThat(taskThread.get(), is(not(nullValue())));
+      assertThat(executor, terminatedMatcher);
+      return true;
+    }));
+  }
+
+  @Test
+  @Description("Tests that calling stop() on a Scheduler while it's running 2 tasks forcefully terminates them")
+  public void terminatedAfterStopForcefullyRunningTasks() throws InterruptedException, ExecutionException, TimeoutException {
+    sharedExecutor.shutdownNow();
+    sharedExecutor = new ThreadPoolExecutor(5, 5, 0, SECONDS, sharedExecutorQueue, defaultThreadFactory());
+
+    final Scheduler executor = (Scheduler) createExecutor();
+
+    final CountDownLatch latch1 = new CountDownLatch(5);
+    final CountDownLatch latch2 = new CountDownLatch(1);
+
+    AtomicInteger interruptedThreads = new AtomicInteger();
+
+    for (int i = 0; i < 5; ++i) {
+      executor.execute(() -> {
+        latch1.countDown();
+        try {
+          awaitLatch(latch2);
+        } finally {
+          if (currentThread().isInterrupted()) {
+            interruptedThreads.incrementAndGet();
+          }
+        }
+      });
+    }
+
+    latch1.await(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
+
+    executor.stop();
+
+    terminationProber().check(new JUnitLambdaProbe(() -> {
+      assertThat(interruptedThreads.get(), is(5));
       assertThat(executor, terminatedMatcher);
       return true;
     }));
