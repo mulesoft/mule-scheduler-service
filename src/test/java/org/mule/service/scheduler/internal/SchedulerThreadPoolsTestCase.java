@@ -48,6 +48,7 @@ import org.junit.rules.ExpectedException;
 import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -304,6 +305,67 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
           assertThat(clRef.isEnqueued(), is(true));
           return true;
         }, "A hard reference is being mantained to the child ClassLoader."));
+  }
+
+  @Test
+  public void threadGroupOfCustomSchedulerNotLeakedAfterShutdown()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L);
+
+    List<PhantomReference> references = recordReferences(scheduler);
+
+    scheduler.shutdown();
+    scheduler = null;
+
+    assertNoThreadGroupReferenceHeld(references);
+  }
+
+  @Test
+  public void threadGroupOfCustomSchedulerNotLeakedAfterShutdownNow()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L);
+
+    List<PhantomReference> references = recordReferences(scheduler);
+
+    scheduler.shutdownNow();
+    scheduler = null;
+
+    assertNoThreadGroupReferenceHeld(references);
+  }
+
+  @Test
+  public void threadGroupOfCustomSchedulerNotLeakedAfterStop() throws InterruptedException, ExecutionException, TimeoutException {
+    Scheduler scheduler = service
+        .createCustomScheduler(config().withName("threadGroupOfCustomSchedulerNotLeakedAfterStop").withMaxConcurrentTasks(1), 1,
+                               () -> 1000L);
+
+    List<PhantomReference> references = recordReferences(scheduler);
+
+    scheduler.stop();
+    scheduler = null;
+
+    assertNoThreadGroupReferenceHeld(references);
+  }
+
+  private List<PhantomReference> recordReferences(Scheduler scheduler)
+      throws InterruptedException, ExecutionException, TimeoutException {
+    List<PhantomReference> references = new ArrayList<>();
+
+    scheduler.submit(() -> {
+      references.add(new PhantomReference<>(currentThread(), new ReferenceQueue<>()));
+      references.add(new PhantomReference<>(currentThread().getThreadGroup(), new ReferenceQueue<>()));
+      return true;
+    }).get(5, SECONDS);
+    return references;
+  }
+
+  private void assertNoThreadGroupReferenceHeld(List<PhantomReference> references) {
+    new PollingProber(GC_POLLING_TIMEOUT, DEFAULT_POLLING_INTERVAL)
+        .check(new JUnitLambdaProbe(() -> {
+          System.gc();
+          references.forEach(ref -> assertThat(ref.toString(), ref.isEnqueued(), is(true)));
+          return true;
+        }, "A hard reference is being mantained to the scheduler threads/thread group."));
   }
 
   @Test
