@@ -28,6 +28,8 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
 
   private static final Logger logger = getLogger(AbstractRunnableFutureDecorator.class);
 
+  private ClassLoader classLoader;
+
   private static Field threadLocalsField;
 
   static {
@@ -54,9 +56,11 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
 
   /**
    * @param id a unique it for this task.
+   * @param classLoader the context {@link ClassLoader} on which the {@code task} should be executed
    */
-  protected AbstractRunnableFutureDecorator(Integer id) {
+  protected AbstractRunnableFutureDecorator(Integer id, ClassLoader classLoader) {
     this.id = id;
+    this.classLoader = classLoader;
   }
 
   protected long beforeRun() {
@@ -77,16 +81,24 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
    * Any {@link Exception} thrown as part of the task processing or bookkeeping is handled by this method and not rethrown.
    *
    * @param task the task to run
-   * @param classLoader the classloader to put in the context of the task when run
    */
-  protected void doRun(RunnableFuture<V> task, ClassLoader classLoader) {
+  protected void doRun(RunnableFuture<V> task) {
+    ClassLoader cl = classLoader;
+
+    if (cl == null) {
+      if (logger.isDebugEnabled()) {
+        logger.debug("Task " + this.toString() + " has been cancelled. Retunrning immendiately.");
+      }
+      return;
+    }
+
     long startTime = beforeRun();
 
     final Thread currentThread = currentThread();
     final ClassLoader currentClassLoader = currentThread.getContextClassLoader();
     final String currentThreadName = currentThread.getName();
 
-    currentThread.setContextClassLoader(classLoader);
+    currentThread.setContextClassLoader(cl);
     if (getThreadNameSuffix() != null) {
       currentThread.setName(currentThreadName + ": " + getThreadNameSuffix());
     }
@@ -121,6 +133,11 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
         }
       }
     }
+  }
+
+  protected void resetClassloader() {
+    // Since this object may be alive until the next time this task is triggered, we are eager to release the claassloader.
+    this.classLoader = null;
   }
 
   protected void wrapUp() throws Exception {

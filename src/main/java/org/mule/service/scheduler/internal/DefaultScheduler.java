@@ -91,7 +91,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   private final Supplier<Long> shutdownTimeoutMillis;
 
-  private final Consumer<Scheduler> shutdownCallback;
+  protected final Consumer<Scheduler> shutdownCallback;
 
   /**
    * @param name the name of this scheduler
@@ -248,6 +248,11 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   @Override
   public void shutdown() {
     logger.debug("Shutting down " + this.toString());
+    doShutdown();
+    stopFinally();
+  }
+
+  protected void doShutdown() {
     this.shutdown = true;
     for (Entry<RunnableFuture<?>, ScheduledFuture<?>> taskEntry : scheduledTasks.entrySet()) {
       final ScheduledFuture<?> scheduledFuture = taskEntry.getValue();
@@ -256,34 +261,35 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
         scheduledFuture.cancel(false);
       }
     }
-    shutdownCallback.accept(this);
-    tryTerminate();
   }
 
   @Override
   public List<Runnable> shutdownNow() {
     logger.debug("Shutting down NOW " + this.toString());
+    try {
+      return doShutdownNow();
+    } finally {
+      stopFinally();
+    }
+  }
+
+  protected List<Runnable> doShutdownNow() {
     this.shutdown = true;
 
     List<Runnable> tasks;
-    try {
-      tasks = new ArrayList<>(scheduledTasks.size());
+    tasks = new ArrayList<>(scheduledTasks.size());
 
-      for (Entry<RunnableFuture<?>, ScheduledFuture<?>> taskEntry : scheduledTasks.entrySet()) {
-        taskEntry.getValue().cancel(true);
-        taskEntry.getKey().cancel(true);
-        if (taskEntry.getKey() instanceof RunnableFutureDecorator
-            && !((RunnableFutureDecorator<?>) taskEntry.getKey()).isStarted()) {
-          tasks.add(taskEntry.getKey());
-        }
+    for (Entry<RunnableFuture<?>, ScheduledFuture<?>> taskEntry : scheduledTasks.entrySet()) {
+      taskEntry.getValue().cancel(true);
+      taskEntry.getKey().cancel(true);
+      if (taskEntry.getKey() instanceof RunnableFutureDecorator
+          && !((RunnableFutureDecorator<?>) taskEntry.getKey()).isStarted()) {
+        tasks.add(taskEntry.getKey());
       }
-      scheduledTasks.clear();
-
-      return tasks;
-    } finally {
-      shutdownCallback.accept(this);
-      tryTerminate();
     }
+    scheduledTasks.clear();
+
+    return tasks;
   }
 
   @Override
@@ -313,14 +319,15 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   @Override
   public void stop() {
+    logger.debug("Stopping " + this.toString());
     // Disable new tasks from being submitted
-    shutdown();
+    doShutdown();
     try {
       // Wait a while for existing tasks to terminate
       final Long timeout = shutdownTimeoutMillis.get();
       if (!awaitTermination(timeout, MILLISECONDS)) {
         // Cancel currently executing tasks and return list of pending tasks
-        List<Runnable> cancelledJobs = shutdownNow();
+        List<Runnable> cancelledJobs = doShutdownNow();
         // Wait a while for tasks to respond to being cancelled
         if (!awaitTermination(FORCEFUL_SHUTDOWN_TIMEOUT_SECS, SECONDS)) {
           logger.warn("Scheduler " + this.toString() + " did not shutdown gracefully after " + timeout + " "
@@ -339,10 +346,17 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
       }
     } catch (InterruptedException ie) {
       // (Re-)Cancel if current thread also interrupted
-      shutdownNow();
+      doShutdownNow();
       // Preserve interrupt status
       currentThread().interrupt();
+    } finally {
+      stopFinally();
     }
+  }
+
+  protected void stopFinally() {
+    shutdownCallback.accept(this);
+    tryTerminate();
   }
 
   @Override
@@ -399,7 +413,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     return scheduledTasks.remove(task);
   }
 
-  private void tryTerminate() {
+  protected void tryTerminate() {
     if (isTerminated()) {
       terminationLatch.countDown();
     }

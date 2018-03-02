@@ -27,7 +27,6 @@ class RunnableFutureDecorator<V> extends AbstractRunnableFutureDecorator<V> {
   private static final Logger logger = getLogger(RunnableFutureDecorator.class);
 
   private final RunnableFuture<V> task;
-  private final ClassLoader classLoader;
 
   private final DefaultScheduler scheduler;
 
@@ -44,16 +43,15 @@ class RunnableFutureDecorator<V> extends AbstractRunnableFutureDecorator<V> {
    */
   RunnableFutureDecorator(RunnableFuture<V> task, ClassLoader classLoader, DefaultScheduler scheduler, String taskAsString,
                           Integer id) {
-    super(id);
+    super(id, classLoader);
     this.task = task;
-    this.classLoader = classLoader;
     this.scheduler = scheduler;
     this.taskAsString = taskAsString;
   }
 
   @Override
   public void run() {
-    doRun(task, classLoader);
+    doRun(task);
   }
 
   @Override
@@ -64,6 +62,7 @@ class RunnableFutureDecorator<V> extends AbstractRunnableFutureDecorator<V> {
 
   @Override
   public boolean cancel(boolean mayInterruptIfRunning) {
+    resetClassloader();
     if (logger.isDebugEnabled()) {
       logger.debug("Cancelling task " + this.toString() + " (mayInterruptIfRunning=" + mayInterruptIfRunning + ")...");
     }
