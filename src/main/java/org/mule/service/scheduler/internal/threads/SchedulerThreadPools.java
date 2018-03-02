@@ -10,6 +10,10 @@ import static java.lang.Integer.MAX_VALUE;
 import static java.lang.String.format;
 import static java.lang.System.currentTimeMillis;
 import static java.lang.System.lineSeparator;
+import static java.lang.System.nanoTime;
+import static java.lang.Thread.currentThread;
+import static java.lang.Thread.sleep;
+import static java.lang.Thread.yield;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -383,8 +387,8 @@ public class SchedulerThreadPools {
     prestartCoreThreads(executor, config.getMaxConcurrentTasks());
 
     final CustomScheduler customScheduler =
-        new CustomScheduler(schedulerName, executor, workers, scheduledExecutor, quartzScheduler, CUSTOM, stopTimeout,
-                            shutdownCallback(activeCustomSchedulers));
+        new CustomScheduler(schedulerName, executor, customChildGroup, workers, scheduledExecutor, quartzScheduler, CUSTOM,
+                            stopTimeout, shutdownCallback(activeCustomSchedulers));
     customSchedulersExecutors.add(executor);
     addScheduler(activeCustomSchedulers, customScheduler);
     return customScheduler;
@@ -489,27 +493,74 @@ public class SchedulerThreadPools {
   private class CustomScheduler extends DefaultScheduler {
 
     private final ExecutorService executor;
+    private final ThreadGroup threadGroup;
 
-    private CustomScheduler(String name, ExecutorService executor, int workers, ScheduledExecutorService scheduledExecutor,
-                            org.quartz.Scheduler quartzScheduler, ThreadType threadsType, Supplier<Long> shutdownTimeoutMillis,
-                            Consumer<Scheduler> shutdownCallback) {
-      super(name, executor, workers, scheduledExecutor, quartzScheduler, threadsType, shutdownTimeoutMillis, shutdownCallback);
+    private CustomScheduler(String name, ExecutorService executor, ThreadGroup threadGroup, int workers,
+                            ScheduledExecutorService scheduledExecutor, org.quartz.Scheduler quartzScheduler,
+                            ThreadType threadsType, Supplier<Long> shutdownTimeoutMillis, Consumer<Scheduler> shutdownCallback) {
+      super(name, executor, workers, scheduledExecutor, quartzScheduler, threadsType, shutdownTimeoutMillis,
+            shutdownCallback);
       this.executor = executor;
+      this.threadGroup = threadGroup;
     }
 
     @Override
     public void shutdown() {
-      super.shutdown();
+      logger.debug("Shutting down " + this.toString());
+      doShutdown();
       executor.shutdown();
+      shutdownWrapUp();
     }
 
     @Override
     public List<Runnable> shutdownNow() {
-      customSchedulersExecutors.remove(executor);
+      logger.debug("Shutting down NOW " + this.toString());
+      try {
+        List<Runnable> cancelledTasks = doShutdownNow();
+        executor.shutdownNow();
+        return cancelledTasks;
+      } finally {
+        shutdownWrapUp();
+      }
+    }
 
-      final List<Runnable> cancelledTasks = super.shutdownNow();
+    @Override
+    protected void stopFinally() {
       executor.shutdownNow();
-      return cancelledTasks;
+      shutdownWrapUp();
+    }
+
+    private void shutdownWrapUp() {
+      shutdownCallback.accept(this);
+
+      IllegalThreadStateException destroyException = null;
+      final long stopNanos = nanoTime() + SECONDS.toNanos(30);
+      while (nanoTime() <= stopNanos && !threadGroup.isDestroyed()) {
+        try {
+          threadGroup.destroy();
+          destroyException = null;
+          break;
+        } catch (IllegalThreadStateException e) {
+          // The wrapup of the threads is done asynchronously by java, so we perform this repeatedly until it runs after the
+          // wrapup (ref: Thread#exit()).
+          // If after the specified timeout still cannot be destroyed, the the exception is thrown.
+          destroyException = e;
+          try {
+            yield();
+            sleep(50);
+          } catch (InterruptedException e1) {
+            currentThread().interrupt();
+            break;
+          }
+        }
+      }
+
+      if (destroyException != null) {
+        throw destroyException;
+      }
+
+      customSchedulersExecutors.remove(executor);
+      tryTerminate();
     }
 
     @Override

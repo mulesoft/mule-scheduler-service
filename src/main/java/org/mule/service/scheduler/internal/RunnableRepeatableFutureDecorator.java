@@ -30,7 +30,6 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
 
   private final Supplier<RunnableFuture<V>> taskSupplier;
   private final Consumer<RunnableRepeatableFutureDecorator<V>> wrapUpCallback;
-  private final ClassLoader classLoader;
 
   private final DefaultScheduler scheduler;
 
@@ -53,10 +52,9 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
   RunnableRepeatableFutureDecorator(Supplier<RunnableFuture<V>> taskSupplier,
                                     Consumer<RunnableRepeatableFutureDecorator<V>> wrapUpCallback,
                                     ClassLoader classLoader, DefaultScheduler scheduler, String taskAsString, Integer id) {
-    super(id);
+    super(id, classLoader);
     this.taskSupplier = taskSupplier;
     this.wrapUpCallback = wrapUpCallback;
-    this.classLoader = classLoader;
     this.scheduler = scheduler;
     this.taskAsString = taskAsString;
   }
@@ -78,7 +76,7 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
 
     task = taskSupplier.get();
 
-    doRun(task, classLoader);
+    doRun(task);
   }
 
   @Override
@@ -100,6 +98,7 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
   @Override
   public boolean cancel(boolean mayInterruptIfRunning) {
     this.cancelled = true;
+    resetClassloader();
     boolean success = true;
     if (task != null) {
       if (logger.isDebugEnabled()) {
