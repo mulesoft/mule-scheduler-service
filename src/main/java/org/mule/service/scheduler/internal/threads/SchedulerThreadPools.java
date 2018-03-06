@@ -534,7 +534,8 @@ public class SchedulerThreadPools {
       shutdownCallback.accept(this);
 
       IllegalThreadStateException destroyException = null;
-      final long stopNanos = nanoTime() + SECONDS.toNanos(30);
+      // TODO MULE-14675 Set value back to 30 secs
+      final long stopNanos = nanoTime() + SECONDS.toNanos(5);
       while (nanoTime() <= stopNanos && !threadGroup.isDestroyed()) {
         try {
           threadGroup.destroy();
@@ -555,12 +556,15 @@ public class SchedulerThreadPools {
         }
       }
 
-      if (destroyException != null) {
-        throw destroyException;
-      }
-
       customSchedulersExecutors.remove(executor);
       tryTerminate();
+
+      if (destroyException != null) {
+        // TODO MULE-14675
+        // This happens when using commons-pool2 with an eviction policy.
+        // The timer thread used for eviction is never destroyed so its ThreadGroup cannot be destroyed.
+        logger.error("Unable to destroy thread group", destroyException);
+      }
     }
 
     @Override
