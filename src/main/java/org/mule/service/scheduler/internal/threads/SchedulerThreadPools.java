@@ -533,9 +533,33 @@ public class SchedulerThreadPools {
     private void shutdownWrapUp() {
       shutdownCallback.accept(this);
 
+      IllegalThreadStateException destroyException = doDestroyThreadGroup();
+
+      if (destroyException != null) {
+        threadGroup.interrupt();
+        destroyException = doDestroyThreadGroup();
+      }
+
+      customSchedulersExecutors.remove(executor);
+      tryTerminate();
+
+      if (destroyException != null) {
+        Thread[] threads = new Thread[threadGroup.activeCount()];
+        threadGroup.enumerate(threads, true);
+        StringBuilder threadNamesBuilder = new StringBuilder();
+        for (Thread thread : threads) {
+          threadNamesBuilder.append("\t* " + thread.getName() + lineSeparator());
+        }
+
+        logger.error("Unable to destroy ThreadGroup '{}' of Scheduler '{}' ({}). Remaining threads in the group are:"
+            + lineSeparator() + "{}", threadGroup.getName(), this.getName(), destroyException.toString(), threadNamesBuilder);
+      }
+    }
+
+    private IllegalThreadStateException doDestroyThreadGroup() {
       IllegalThreadStateException destroyException = null;
-      // TODO MULE-14675 Set value back to 30 secs
-      final long stopNanos = nanoTime() + SECONDS.toNanos(5);
+
+      final long stopNanos = nanoTime() + MILLISECONDS.toNanos(shutdownTimeoutMillis.get()) + SECONDS.toNanos(1);
       while (nanoTime() <= stopNanos && !threadGroup.isDestroyed()) {
         try {
           threadGroup.destroy();
@@ -555,16 +579,7 @@ public class SchedulerThreadPools {
           }
         }
       }
-
-      customSchedulersExecutors.remove(executor);
-      tryTerminate();
-
-      if (destroyException != null) {
-        // TODO MULE-14675
-        // This happens when using commons-pool2 with an eviction policy.
-        // The timer thread used for eviction is never destroyed so its ThreadGroup cannot be destroyed.
-        logger.error("Unable to destroy thread group", destroyException);
-      }
+      return destroyException;
     }
 
     @Override

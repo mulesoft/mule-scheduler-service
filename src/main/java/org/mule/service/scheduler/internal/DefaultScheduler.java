@@ -89,7 +89,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   private volatile boolean shutdown = false;
 
-  private final Supplier<Long> shutdownTimeoutMillis;
+  protected final Supplier<Long> shutdownTimeoutMillis;
 
   protected final Consumer<Scheduler> shutdownCallback;
 
