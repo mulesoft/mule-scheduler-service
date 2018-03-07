@@ -15,6 +15,9 @@
 
     <properties>
         <formatterConfigPath>formatter.xml</formatterConfigPath>
+
+        <!-- TODO MULE-14667 Upgrade to reactor 3.2.0 -->
+        <projectReactorVersion>3.2.0.M1-MULE-001</projectReactorVersion>
     </properties>
 
     <scm>
@@ -93,6 +96,7 @@
         <dependency>
             <groupId>org.mule.projectreactor</groupId>
             <artifactId>reactor-core</artifactId>
+            <version>${projectReactorVersion}</version>
             <scope>test</scope>
         </dependency>
         <dependency>
