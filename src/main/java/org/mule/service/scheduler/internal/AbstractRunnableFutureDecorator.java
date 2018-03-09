@@ -49,7 +49,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     }
   }
 
-  private final Integer id;
+  private final int id;
 
   private volatile boolean ranAtLeastOnce = false;
   private volatile boolean started = false;
@@ -58,7 +58,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
    * @param id a unique it for this task.
    * @param classLoader the context {@link ClassLoader} on which the {@code task} should be executed
    */
-  protected AbstractRunnableFutureDecorator(Integer id, ClassLoader classLoader) {
+  protected AbstractRunnableFutureDecorator(int id, ClassLoader classLoader) {
     this.id = id;
     this.classLoader = classLoader;
   }
@@ -161,7 +161,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
 
   @Override
   public int hashCode() {
-    return id.hashCode();
+    return Integer.hashCode(id);
   }
 
   public abstract String getSchedulerName();

@@ -93,22 +93,32 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
 
     if ((isRunCpuLightWhenTargetBusyThread(currentThreadGroup) && targetGroup == couLightGroup)
         || (isWaitGroupThread(targetGroup) && targetGroup == currentThreadGroup)) {
-      logRejection(r.toString(), callerRuns.getClass().getSimpleName(), targetGroup.getName());
+      if (isLogRejectionEnabled()) {
+        logRejection(r.toString(), callerRuns.getClass().getSimpleName(), targetGroup.getName());
+      }
       callerRuns.rejectedExecution(r, executor);
     } else if (!isSchedulerThread(currentThreadGroup) || isWaitGroupThread(currentThreadGroup)) {
-      logRejection(r.toString(), wait.getClass().getSimpleName(), targetGroup.getName());
+      if (isLogRejectionEnabled()) {
+        logRejection(r.toString(), wait.getClass().getSimpleName(), targetGroup.getName());
+      }
       // MULE-11460 Make CPU-intensive pool a ForkJoinPool - keep the parallelism when waiting.
       wait.rejectedExecution(r, executor);
     } else {
-      logRejection(r.toString(), abort.getClass().getSimpleName(), targetGroup.getName());
+      if (isLogRejectionEnabled()) {
+        logRejection(r.toString(), abort.getClass().getSimpleName(), targetGroup.getName());
+      }
       abort.rejectedExecution(r, executor);
     }
+  }
+
+  private boolean isLogRejectionEnabled() {
+    return USAGE_TRACE_INTERVAL_SECS != null ? traceLogger.isWarnEnabled() : traceLogger.isDebugEnabled();
   }
 
   private void logRejection(String taskAsString, String strategy, String targetAsString) {
     if (USAGE_TRACE_INTERVAL_SECS != null) {
       traceLogger.warn("Task rejected ({}) from '{}' scheduler: {}", rightPad(strategy, 16), targetAsString, taskAsString);
-    } else if (traceLogger.isDebugEnabled()) {
+    } else {
       traceLogger.debug("Task rejected ({}) from '{}' scheduler: {}", rightPad(strategy, 16), targetAsString, taskAsString);
     }
   }
