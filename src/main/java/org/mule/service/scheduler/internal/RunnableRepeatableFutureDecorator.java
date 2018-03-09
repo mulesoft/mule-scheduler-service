@@ -51,7 +51,7 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
    */
   RunnableRepeatableFutureDecorator(Supplier<RunnableFuture<V>> taskSupplier,
                                     Consumer<RunnableRepeatableFutureDecorator<V>> wrapUpCallback,
-                                    ClassLoader classLoader, DefaultScheduler scheduler, String taskAsString, Integer id) {
+                                    ClassLoader classLoader, DefaultScheduler scheduler, String taskAsString, int id) {
     super(id, classLoader);
     this.taskSupplier = taskSupplier;
     this.wrapUpCallback = wrapUpCallback;

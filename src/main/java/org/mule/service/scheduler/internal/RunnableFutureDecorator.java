@@ -42,7 +42,7 @@ class RunnableFutureDecorator<V> extends AbstractRunnableFutureDecorator<V> {
    * @param id a unique it for this task.
    */
   RunnableFutureDecorator(RunnableFuture<V> task, ClassLoader classLoader, DefaultScheduler scheduler, String taskAsString,
-                          Integer id) {
+                          int id) {
     super(id, classLoader);
     this.task = task;
     this.scheduler = scheduler;

@@ -49,7 +49,7 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
     this.maxConcurrentTasks = maxConcurrentTasks;
   }
 
-  public void throttle(Runnable throttledCallback, RunnableFuture<?> task, String schedulerRepresentation) {
+  public void throttle(Runnable throttledCallback, RunnableFuture<?> task, ThrottledScheduler scheduler) {
     ThreadGroup currentThreadGroup = currentThread().getThreadGroup();
 
     ++rejectedCount;
@@ -59,7 +59,9 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
         synchronized (runningTasks) {
           runningTasks.incrementAndGet();
           while (runningTasks.get() > maxConcurrentTasks) {
-            logThrottle(task.toString(), "WaitPolicy", schedulerRepresentation);
+            if (isLogThrottleEnabled()) {
+              logThrottle(task.toString(), "WaitPolicy", scheduler.toString());
+            }
             runningTasks.wait();
           }
         }
@@ -71,9 +73,11 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
     } else {
       synchronized (runningTasks) {
         if (runningTasks.incrementAndGet() > maxConcurrentTasks) {
-          logThrottle(task.toString(), "AbortPolicy", schedulerRepresentation);
+          if (isLogThrottleEnabled()) {
+            logThrottle(task.toString(), "AbortPolicy", scheduler.toString());
+          }
           throw new SchedulerTaskThrottledException("Task '" + task.toString() + "' throttled back from '"
-              + schedulerRepresentation + "'");
+              + scheduler.toString() + "'");
         } else {
           throttledCallback.run();
         }
@@ -88,10 +92,14 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
     }
   }
 
+  private boolean isLogThrottleEnabled() {
+    return USAGE_TRACE_INTERVAL_SECS != null ? traceLogger.isWarnEnabled() : traceLogger.isDebugEnabled();
+  }
+
   private void logThrottle(String taskAsString, String strategy, String targetAsString) {
     if (USAGE_TRACE_INTERVAL_SECS != null) {
       traceLogger.warn("Task throttled back ({}) from '{}' scheduler: {}", rightPad(strategy, 16), targetAsString, taskAsString);
-    } else if (traceLogger.isDebugEnabled()) {
+    } else {
       traceLogger.debug("Task throttled back ({}) from '{}' scheduler: {}", rightPad(strategy, 16), targetAsString, taskAsString);
     }
   }
