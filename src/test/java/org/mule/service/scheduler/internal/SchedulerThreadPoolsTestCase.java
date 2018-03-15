@@ -50,6 +50,7 @@ import java.lang.ref.ReferenceQueue;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -364,6 +365,20 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
           references.forEach(ref -> assertThat(ref.toString(), ref.isEnqueued(), is(true)));
           return true;
         }, "A hard reference is being mantained to the scheduler threads/thread group."));
+  }
+
+  @Test
+  public void customSchedulerShutodownFromWithin() throws InterruptedException, ExecutionException, TimeoutException {
+    Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L);
+    Future<?> stopSubmit = scheduler.submit(() -> scheduler.stop());
+
+    expected.expect(CancellationException.class);
+    try {
+      stopSubmit.get(10, SECONDS);
+    } finally {
+      assertThat(scheduler.isShutdown(), is(true));
+      assertThat(scheduler.isTerminated(), is(true));
+    }
   }
 
   @Test
