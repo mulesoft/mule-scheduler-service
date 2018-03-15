@@ -533,6 +533,15 @@ public class SchedulerThreadPools {
     private void shutdownWrapUp() {
       shutdownCallback.accept(this);
 
+      if (threadGroup.equals(currentThread().getThreadGroup())) {
+        // Avoid thread suicide
+        ioExecutor.execute(() -> destroyThreadGroup());
+      } else {
+        destroyThreadGroup();
+      }
+    }
+
+    private void destroyThreadGroup() {
       IllegalThreadStateException destroyException = doDestroyThreadGroup();
 
       if (destroyException != null) {
