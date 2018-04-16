@@ -80,7 +80,9 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     if (overriddenConfigFileName != null) {
       File overriddenConfigFile = new File(overriddenConfigFileName);
 
-      logger.info("Loading thread pools configuration from " + overriddenConfigFile.getPath());
+      if (logger.isDebugEnabled()) {
+        logger.debug("Loading thread pools configuration from " + overriddenConfigFile.getPath());
+      }
 
       return loadProperties(config, overriddenConfigFile);
     }
@@ -99,7 +101,9 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
       return config;
     }
 
-    logger.info("Loading thread pools configuration from " + defaultConfigFile.getPath());
+    if (logger.isDebugEnabled()) {
+      logger.debug("Loading thread pools configuration from " + defaultConfigFile.getPath());
+    }
 
     return loadProperties(config, defaultConfigFile);
   }
