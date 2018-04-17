@@ -51,7 +51,9 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
     public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
       String msg = "Task '" + r.toString() + "' rejected from Scheduler '" + schedulerName + "' ('"
           + executor.toString() + "')";
-      LOGGER.warn(msg);
+      if (!executor.isShutdown()) {
+        LOGGER.warn(msg);
+      }
       throw new SchedulerBusyException(msg);
     }
   }
