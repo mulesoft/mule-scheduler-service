@@ -45,7 +45,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     try {
       threadLocalsField.set(currentThread(), null);
     } catch (Exception e) {
-      new MuleRuntimeException(e);
+      throw new MuleRuntimeException(e);
     }
   }
 
