@@ -386,10 +386,13 @@ public class SchedulerThreadPools {
 
     prestartCoreThreads(executor, config.getMaxConcurrentTasks());
 
+    Set<ThreadPoolExecutor> executors = customSchedulersExecutors;
+
     final CustomScheduler customScheduler =
-        new CustomScheduler(schedulerName, executor, customChildGroup, workers, scheduledExecutor, quartzScheduler, CUSTOM,
-                            stopTimeout, shutdownCallback(activeCustomSchedulers));
-    customSchedulersExecutors.add(executor);
+        new CustomScheduler(schedulerName, executor, customChildGroup, workers, scheduledExecutor, quartzScheduler, ioExecutor,
+                            CUSTOM, stopTimeout,
+                            shutdownCallback(activeCustomSchedulers).andThen(s -> executors.remove(executor)));
+    executors.add(executor);
     addScheduler(activeCustomSchedulers, customScheduler);
     return customScheduler;
   }
@@ -490,18 +493,22 @@ public class SchedulerThreadPools {
     return !ste.getClassName().contains("$Proxy");
   }
 
-  private class CustomScheduler extends DefaultScheduler {
+  private static class CustomScheduler extends DefaultScheduler {
 
     private final ExecutorService executor;
     private final ThreadGroup threadGroup;
 
+    private final ThreadPoolExecutor groupDestroyerExecutor;
+
     private CustomScheduler(String name, ExecutorService executor, ThreadGroup threadGroup, int workers,
                             ScheduledExecutorService scheduledExecutor, org.quartz.Scheduler quartzScheduler,
+                            ThreadPoolExecutor groupDestroyerExecutor,
                             ThreadType threadsType, Supplier<Long> shutdownTimeoutMillis, Consumer<Scheduler> shutdownCallback) {
       super(name, executor, workers, scheduledExecutor, quartzScheduler, threadsType, shutdownTimeoutMillis,
             shutdownCallback);
       this.executor = executor;
       this.threadGroup = threadGroup;
+      this.groupDestroyerExecutor = groupDestroyerExecutor;
     }
 
     @Override
@@ -535,7 +542,7 @@ public class SchedulerThreadPools {
 
       if (threadGroup.equals(currentThread().getThreadGroup())) {
         // Avoid thread suicide
-        ioExecutor.execute(() -> destroyThreadGroup());
+        groupDestroyerExecutor.execute(() -> destroyThreadGroup());
       } else {
         destroyThreadGroup();
       }
@@ -549,7 +556,6 @@ public class SchedulerThreadPools {
         destroyException = doDestroyThreadGroup();
       }
 
-      customSchedulersExecutors.remove(executor);
       tryTerminate();
 
       if (destroyException != null) {
