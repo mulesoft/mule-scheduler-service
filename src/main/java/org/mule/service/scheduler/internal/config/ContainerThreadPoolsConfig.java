@@ -71,10 +71,6 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
           + "|max\\s*\\(\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*,\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*\\)"
           + "|min\\s*\\(\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*,\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*\\)$");
 
-  public static void main(String[] args) {
-    System.out.println(POOLSIZE_PATTERN);
-  }
-
   /**
    * Loads the configuration from the {@code &#123;mule.home&#125;/conf/scheduler-pools.conf} file.
    *
