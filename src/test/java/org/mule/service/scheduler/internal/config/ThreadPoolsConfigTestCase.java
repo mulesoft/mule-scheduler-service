@@ -6,6 +6,7 @@
  */
 package org.mule.service.scheduler.internal.config;
 
+import static java.lang.Math.max;
 import static java.lang.Runtime.getRuntime;
 import static java.lang.System.clearProperty;
 import static java.lang.System.setProperty;
@@ -84,7 +85,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     props.setProperty(CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, "2*cores");
     props.setProperty(CPU_LIGHT_PREFIX + "." + WORK_QUEUE_SIZE, "mem / (2*3*32)");
     props.setProperty(IO_PREFIX + "." + THREAD_POOL_SIZE_CORE, "cores");
-    props.setProperty(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "cores + ((mem - 245760) / 5120)");
+    props.setProperty(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "max(2, cores + ((mem - 245760) / 5120))");
     props.setProperty(IO_PREFIX + "." + WORK_QUEUE_SIZE, "mem / (2*3*32)");
     props.setProperty(IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE, "30000");
     props.setProperty(CPU_INTENSIVE_PREFIX + "." + THREAD_POOL_SIZE, "2*cores");
@@ -102,7 +103,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     assertThat(config.getCpuLightPoolSize().getAsInt(), is(2 * cores));
     assertThat(config.getCpuLightQueueSize().getAsInt(), is(0));
     assertThat(config.getIoCorePoolSize().getAsInt(), is(cores));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) (cores + ((mem - 245760) / 5120))));
+    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) max(2, cores + ((mem - 245760) / 5120))));
     assertThat(config.getIoQueueSize().getAsInt(), is(0));
     assertThat(config.getIoKeepAlive().getAsLong(), is(30000l));
     assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(2 * cores));
@@ -117,7 +118,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     assertThat(config.getCpuLightPoolSize().getAsInt(), is(2 * cores));
     assertThat(config.getCpuLightQueueSize().getAsInt(), is(0));
     assertThat(config.getIoCorePoolSize().getAsInt(), is(cores));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) (cores + ((mem - 245760) / 5120))));
+    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) max(2, cores + ((mem - 245760) / 5120))));
     assertThat(config.getIoQueueSize().getAsInt(), is(0));
     assertThat(config.getIoKeepAlive().getAsLong(), is(30000l));
     assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(2 * cores));
@@ -135,7 +136,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     assertThat(config.getCpuLightPoolSize().getAsInt(), is(2 * cores));
     assertThat(config.getCpuLightQueueSize().getAsInt(), is((int) (mem / (2 * 3 * 32))));
     assertThat(config.getIoCorePoolSize().getAsInt(), is(cores));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) (cores + ((mem - 245760) / 5120))));
+    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) max(2, cores + ((mem - 245760) / 5120))));
     assertThat(config.getIoQueueSize().getAsInt(), is((int) (mem / (2 * 3 * 32))));
     assertThat(config.getIoKeepAlive().getAsLong(), is(30000l));
     assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(2 * cores));
@@ -345,7 +346,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) (cores + ((mem - 245760) / 5120))));
+    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) max(2, cores + ((mem - 245760) / 5120))));
   }
 
   @Test

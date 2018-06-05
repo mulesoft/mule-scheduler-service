@@ -8,6 +8,7 @@ package org.mule.service.scheduler.internal.config;
 
 import static java.io.File.separator;
 import static java.lang.Long.parseLong;
+import static java.lang.Math.max;
 import static java.lang.Runtime.getRuntime;
 import static java.lang.System.getProperty;
 import static java.util.regex.Pattern.compile;
@@ -40,7 +41,7 @@ import javax.script.ScriptException;
 /**
  * Bean that contains the thread pools configuration for the runtime.
  * <p>
- * All of its getter methods for configuration values eturn non-null values.
+ * All of its getter methods for configuration values return non-null values.
  *
  * @since 1.0
  */
@@ -63,8 +64,16 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
   public static final String WORK_QUEUE_SIZE = WORK_QUEUE + ".size";
 
   private static final String NUMBER_OR_VAR_REGEXP = "([0-9]+(\\.[0-9]+)?)|cores|mem";
+  private static final String FORMULA_FUNCTION_PARAM =
+      "(" + NUMBER_OR_VAR_REGEXP + ")?(\\s*[-+\\/*\\(\\)]\\s*(" + NUMBER_OR_VAR_REGEXP + ")?)*";
   private static final Pattern POOLSIZE_PATTERN =
-      compile("(" + NUMBER_OR_VAR_REGEXP + ")?(\\s*[-+\\/*\\(\\)]\\s*(" + NUMBER_OR_VAR_REGEXP + ")?)*");
+      compile("^" + FORMULA_FUNCTION_PARAM
+          + "|max\\s*\\(\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*,\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*\\)"
+          + "|min\\s*\\(\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*,\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*\\)$");
+
+  public static void main(String[] args) {
+    System.out.println(POOLSIZE_PATTERN);
+  }
 
   /**
    * Loads the configuration from the {@code &#123;mule.home&#125;/conf/scheduler-pools.conf} file.
@@ -176,10 +185,13 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
       return OptionalInt.empty();
     }
 
-    final String property = properties.getProperty(propName).trim().toLowerCase();
+    String property = properties.getProperty(propName).trim().toLowerCase();
     if (!POOLSIZE_PATTERN.matcher(property).matches()) {
       throw new DefaultMuleException(propName + ": Expression not valid");
     }
+
+    property = property.replaceAll("(max|min)", "Math.$1");
+
     try {
       final int result = ((Number) engine.eval(property)).intValue();
       validateNumber(propName, result, allowZero);
@@ -211,7 +223,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
   private int cpuLightPoolSize = 2 * cores;
   private int ioQueueSize = 0;
   private int ioCorePoolSize = cores;
-  private int ioMaxPoolSize = (int) (cores + ((mem - 245760) / 5120));
+  private int ioMaxPoolSize = (int) max(2, cores + ((mem - 245760) / 5120));
   private long ioKeepAlive = 30000;
   private int cpuIntensiveQueueSize = 2 * cores;
   private int cpuIntensivePoolSize = 2 * cores;
