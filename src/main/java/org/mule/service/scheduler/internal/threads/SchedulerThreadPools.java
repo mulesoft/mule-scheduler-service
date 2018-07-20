@@ -62,6 +62,7 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -95,6 +96,7 @@ public class SchedulerThreadPools {
   private final ThreadGroup customCallerRunsAnsWaitGroup;
 
   private final Function<String, RejectedExecutionHandler> byCallerThreadGroupPolicy;
+  private final Predicate<ThreadGroup> cpuWorkChecker;
 
   private ThreadPoolExecutor cpuLightExecutor;
   private ThreadPoolExecutor ioExecutor;
@@ -126,13 +128,28 @@ public class SchedulerThreadPools {
     customCallerRunsGroup = new ThreadGroup(customGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
     customCallerRunsAnsWaitGroup = new ThreadGroup(customGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
 
-    byCallerThreadGroupPolicy = schedulerName -> new ByCallerThreadGroupPolicy(new HashSet<>(asList(ioGroup, customWaitGroup,
-                                                                                                    customCallerRunsAnsWaitGroup)),
+    final Set<ThreadGroup> waitGroups = new HashSet<>(asList(ioGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
+    final Set<ThreadGroup> cpuWorkGroups = new HashSet<>(asList(cpuLightGroup, computationGroup));
+
+    byCallerThreadGroupPolicy = schedulerName -> new ByCallerThreadGroupPolicy(waitGroups,
                                                                                new HashSet<>(asList(cpuLightGroup,
                                                                                                     computationGroup,
                                                                                                     customCallerRunsGroup,
                                                                                                     customCallerRunsAnsWaitGroup)),
                                                                                cpuLightGroup, schedulerGroup, schedulerName);
+
+    cpuWorkChecker = threadGroup -> {
+      if (threadGroup != null) {
+        while (threadGroup.getParent() != null) {
+          if (cpuWorkGroups.contains(threadGroup)) {
+            return true;
+          } else {
+            threadGroup = threadGroup.getParent();
+          }
+        }
+      }
+      return false;
+    };
   }
 
   public void start() throws MuleException {
@@ -491,6 +508,10 @@ public class SchedulerThreadPools {
 
   private boolean skip(StackTraceElement ste) {
     return !ste.getClassName().contains("$Proxy");
+  }
+
+  public boolean isCurrentThreadForCpuWork() {
+    return cpuWorkChecker.test(currentThread().getThreadGroup());
   }
 
   private static class CustomScheduler extends DefaultScheduler {
