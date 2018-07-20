@@ -58,7 +58,7 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
     }
   }
 
-  private final ThreadGroup couLightGroup;
+  private final ThreadGroup cpuLightGroup;
 
   private final AbortPolicy abort;
   private final WaitPolicy wait;
@@ -74,16 +74,16 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
    *        (or {@link CallerRunsPolicy} if allowed) will be applied.
    * @param runCpuLightWhenTargetBusyGroups the group of threads for which a {@link CallerRunsPolicy} will be applied when
    *        dispatching to cpu-light.
-   * @param couLightGroup the group of cpuLight threads
+   * @param cpuLightGroup the group of cpuLight threads
    * @param parentGroup the {@link SchedulerService} parent {@link ThreadGroup}
    * @param schedulerName the name of the target {@link Scheduler}
    */
   public ByCallerThreadGroupPolicy(Set<ThreadGroup> waitGroups, Set<ThreadGroup> runCpuLightWhenTargetBusyGroups,
-                                   ThreadGroup couLightGroup, ThreadGroup parentGroup, String schedulerName) {
+                                   ThreadGroup cpuLightGroup, ThreadGroup parentGroup, String schedulerName) {
     super(waitGroups, runCpuLightWhenTargetBusyGroups, parentGroup);
     this.abort = new AbortBusyPolicy(schedulerName);
     this.wait = new WaitPolicy(abort, schedulerName);
-    this.couLightGroup = couLightGroup;
+    this.cpuLightGroup = cpuLightGroup;
   }
 
   @Override
@@ -93,7 +93,7 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
 
     ++rejectedCount;
 
-    if ((isRunCpuLightWhenTargetBusyThread(currentThreadGroup) && targetGroup == couLightGroup)
+    if ((isRunCpuLightWhenTargetBusyThread(currentThreadGroup) && targetGroup == cpuLightGroup)
         || (isWaitGroupThread(targetGroup) && targetGroup == currentThreadGroup)) {
       if (isLogRejectionEnabled()) {
         logRejection(r.toString(), callerRuns.getClass().getSimpleName(), targetGroup.getName());

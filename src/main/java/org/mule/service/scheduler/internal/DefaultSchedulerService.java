@@ -271,6 +271,33 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   }
 
   @Override
+  public boolean isCurrentThreadForCpuWork() {
+    checkStarted();
+    pollsReadLock.lock();
+    try {
+      return poolsByConfig.get(SchedulerContainerPoolsConfig.getInstance()).isCurrentThreadForCpuWork();
+    } catch (ExecutionException e) {
+      throw new MuleRuntimeException(e.getCause());
+    } finally {
+      pollsReadLock.unlock();
+    }
+  }
+
+  @Override
+  @Inject
+  public boolean isCurrentThreadForCpuWork(SchedulerPoolsConfigFactory poolsConfigFactory) {
+    checkStarted();
+    pollsReadLock.lock();
+    try {
+      return poolsByConfig.get(poolsConfigFactory).isCurrentThreadForCpuWork();
+    } catch (ExecutionException e) {
+      throw new MuleRuntimeException(e.getCause());
+    } finally {
+      pollsReadLock.unlock();
+    }
+  }
+
+  @Override
   public void start() throws MuleException {
     pollsWriteLock.lock();
     try {
