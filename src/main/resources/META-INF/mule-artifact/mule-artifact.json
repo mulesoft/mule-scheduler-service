@@ -5,11 +5,11 @@
   "contracts": [
     {
       "serviceProviderClassName": "org.mule.service.scheduler.provider.SchedulerServiceProvider",
-      "satisfiedServiceClassName": "org.mule.runtime.api.scheduler.SchedulerService"
+      "contractClassName": "org.mule.runtime.api.scheduler.SchedulerService"
     }
   ],
   "serviceProviderClassName": "org.mule.service.scheduler.provider.SchedulerServiceProvider",
-  "satisfiedServiceClassName": ["org.mule.runtime.api.scheduler.SchedulerService"],
+  "contractClassName": ["org.mule.runtime.api.scheduler.SchedulerService"],
   "classLoaderModelLoaderDescriptor": {
     "id": "mule",
     "attributes": {}
