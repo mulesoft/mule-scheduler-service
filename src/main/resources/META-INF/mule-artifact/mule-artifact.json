@@ -8,8 +8,6 @@
       "contractClassName": "org.mule.runtime.api.scheduler.SchedulerService"
     }
   ],
-  "serviceProviderClassName": "org.mule.service.scheduler.provider.SchedulerServiceProvider",
-  "contractClassName": ["org.mule.runtime.api.scheduler.SchedulerService"],
   "classLoaderModelLoaderDescriptor": {
     "id": "mule",
     "attributes": {}
