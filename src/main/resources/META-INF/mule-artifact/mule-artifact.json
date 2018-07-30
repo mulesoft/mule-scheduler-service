@@ -1,8 +1,13 @@
 {
   "name": "Scheduler service",
-  "minMuleVersion": "4.1.0",
+  "minMuleVersion": "4.2.0",
   "requiredProduct": "MULE",
-  "serviceProviderClassName": "org.mule.service.scheduler.provider.SchedulerServiceProvider",
+  "contracts": [
+    {
+      "serviceProviderClassName": "org.mule.service.scheduler.provider.SchedulerServiceProvider",
+      "contractClassName": "org.mule.runtime.api.scheduler.SchedulerService"
+    }
+  ],
   "classLoaderModelLoaderDescriptor": {
     "id": "mule",
     "attributes": {}

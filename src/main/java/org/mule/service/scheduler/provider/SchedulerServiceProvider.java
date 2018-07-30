@@ -6,14 +6,10 @@
  */
 package org.mule.service.scheduler.provider;
 
-import static java.util.Collections.singletonList;
-
+import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.api.service.ServiceDefinition;
 import org.mule.runtime.api.service.ServiceProvider;
-import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.service.scheduler.internal.DefaultSchedulerService;
-
-import java.util.List;
 
 /**
  * Provides a definition for {@link SchedulerService}.
@@ -26,8 +22,7 @@ public class SchedulerServiceProvider implements ServiceProvider {
       new ServiceDefinition(SchedulerService.class, new DefaultSchedulerService());
 
   @Override
-  public List<ServiceDefinition> providedServices() {
-    return singletonList(serviceDefinition);
+  public ServiceDefinition getServiceDefinition() {
+    return serviceDefinition;
   }
-
 }
