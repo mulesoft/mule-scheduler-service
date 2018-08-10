@@ -9,6 +9,7 @@ package org.mule.service.scheduler.internal.threads;
 import static java.lang.Integer.MAX_VALUE;
 import static java.lang.String.format;
 import static java.lang.System.currentTimeMillis;
+import static java.lang.System.getProperties;
 import static java.lang.System.lineSeparator;
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
@@ -17,6 +18,7 @@ import static java.lang.Thread.yield;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.mule.runtime.core.api.config.MuleProperties.SYSTEM_PROPERTY_PREFIX;
 import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
 import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
 import static org.mule.service.scheduler.ThreadType.CUSTOM;
@@ -81,6 +83,13 @@ public class SchedulerThreadPools {
   private static final String COMPUTATION_THREADS_NAME = CPU_INTENSIVE.getName();
   private static final String TIMER_THREADS_NAME = "timer";
   private static final String CUSTOM_THREADS_NAME = CUSTOM.getName();
+
+  /**
+   * If set, the location where an Scheduler was created will be put in the name of the Scheduler always, regardless of whether
+   * the schedulerConfig has a name already or not.
+   */
+  private static final boolean ALWAYS_SHOW_SCHEDULER_CREATION_LOCATION =
+      getProperties().containsKey(SYSTEM_PROPERTY_PREFIX + "scheduler.alwaysShowSchedulerCreationLocation");
 
   private String name;
   private SchedulerPoolsConfig threadPoolsConfig;
@@ -452,31 +461,30 @@ public class SchedulerThreadPools {
   }
 
   private String resolveCpuLightSchedulerName(SchedulerConfig config) {
-    if (!config.hasName()) {
-      config = config.withName(resolveSchedulerCreationLocation(CPU_LIGHT_THREADS_NAME));
-    }
-    return config.getSchedulerName();
+    return resolveSchedulerName(config, CPU_LIGHT_THREADS_NAME);
   }
 
   private String resolveIoSchedulerName(SchedulerConfig config) {
-    if (!config.hasName()) {
-      config = config.withName(resolveSchedulerCreationLocation(IO_THREADS_NAME));
-    }
-    return config.getSchedulerName();
+    return resolveSchedulerName(config, IO_THREADS_NAME);
   }
 
   private String resolveComputationSchedulerName(SchedulerConfig config) {
-    if (!config.hasName()) {
-      config = config.withName(resolveSchedulerCreationLocation(COMPUTATION_THREADS_NAME));
-    }
-    return config.getSchedulerName();
+    return resolveSchedulerName(config, COMPUTATION_THREADS_NAME);
   }
 
   private String resolveCustomSchedulerName(SchedulerConfig config) {
+    return resolveSchedulerName(config, CUSTOM_THREADS_NAME);
+  }
+
+  private String resolveSchedulerName(SchedulerConfig config, String prefix) {
     if (!config.hasName()) {
-      config = config.withName(resolveSchedulerCreationLocation(CUSTOM_THREADS_NAME));
+      config = config.withName(resolveSchedulerCreationLocation(prefix));
+      return config.getSchedulerName();
+    } else if (ALWAYS_SHOW_SCHEDULER_CREATION_LOCATION) {
+      return config.getSchedulerName() + " " + resolveSchedulerCreationLocation(null);
+    } else {
+      return config.getSchedulerName();
     }
-    return config.getSchedulerName();
   }
 
   private String resolveCustomThreadsName(SchedulerConfig config) {
@@ -498,12 +506,12 @@ public class SchedulerThreadPools {
     }
 
     if (skip(ste)) {
-      ste = stackTrace[3];
+      ste = stackTrace[4];
     } else {
       ste = stackTrace[i];
     }
 
-    return prefix + "@" + (ste.getClassName() + "." + ste.getMethodName() + ":" + ste.getLineNumber());
+    return (prefix != null ? prefix : "") + "@" + ste.getClassName() + "." + ste.getMethodName() + ":" + ste.getLineNumber();
   }
 
   private boolean skip(StackTraceElement ste) {
