@@ -18,13 +18,10 @@ import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
 import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
 import static org.mule.service.scheduler.ThreadType.IO;
 import static org.slf4j.LoggerFactory.getLogger;
-
 import org.mule.runtime.api.exception.DefaultMuleException;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 import org.mule.runtime.core.api.config.ConfigurationException;
-
-import org.slf4j.Logger;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -38,6 +35,8 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
+import org.slf4j.Logger;
+
 /**
  * Bean that contains the thread pools configuration for the runtime.
  * <p>
@@ -47,8 +46,8 @@ import javax.script.ScriptException;
  */
 public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
-  private static final Logger logger = getLogger(ContainerThreadPoolsConfig.class);
-
+  private static final Logger LOGGER = getLogger(ContainerThreadPoolsConfig.class);
+  private static final Pattern MAX_MIN_PATTERN = compile("(max|min)");
   public static final String SCHEDULER_POOLS_CONFIG_FILE_PROPERTY = "mule.schedulerPools.configFile";
 
   public static final String PROP_PREFIX = "org.mule.runtime.scheduler.";
@@ -85,8 +84,8 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     if (overriddenConfigFileName != null) {
       File overriddenConfigFile = new File(overriddenConfigFileName);
 
-      if (logger.isDebugEnabled()) {
-        logger.debug("Loading thread pools configuration from " + overriddenConfigFile.getPath());
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Loading thread pools configuration from " + overriddenConfigFile.getPath());
       }
 
       return loadProperties(config, overriddenConfigFile);
@@ -96,18 +95,18 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
         getProperty(MULE_HOME_DIRECTORY_PROPERTY) != null ? new File(getProperty(MULE_HOME_DIRECTORY_PROPERTY)) : null;
 
     if (muleHome == null) {
-      logger.info("No " + MULE_HOME_DIRECTORY_PROPERTY + " defined. Using default values for thread pools.");
+      LOGGER.info("No " + MULE_HOME_DIRECTORY_PROPERTY + " defined. Using default values for thread pools.");
       return config;
     }
 
     File defaultConfigFile = new File(muleHome, "conf" + separator + "scheduler-pools.conf");
     if (!defaultConfigFile.exists()) {
-      logger.info("No thread pools config file found. Using default values.");
+      LOGGER.info("No thread pools config file found. Using default values.");
       return config;
     }
 
-    if (logger.isDebugEnabled()) {
-      logger.debug("Loading thread pools configuration from " + defaultConfigFile.getPath());
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Loading thread pools configuration from " + defaultConfigFile.getPath());
     }
 
     return loadProperties(config, defaultConfigFile);
@@ -157,7 +156,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
   private static OptionalLong resolveNumber(Properties properties, String propName, boolean allowZero) throws MuleException {
     if (!properties.containsKey(propName)) {
-      logger.warn("No property '{}' found in config file. Using default value.", propName);
+      LOGGER.warn("No property '{}' found in config file. Using default value.", propName);
       return OptionalLong.empty();
     }
 
@@ -177,7 +176,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
                                                ScriptEngine engine, boolean allowZero)
       throws MuleException {
     if (!properties.containsKey(propName)) {
-      logger.warn("No property '{}' found in config file. Using default value.", propName);
+      LOGGER.warn("No property '{}' found in config file. Using default value.", propName);
       return OptionalInt.empty();
     }
 
@@ -186,7 +185,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
       throw new DefaultMuleException(propName + ": Expression not valid");
     }
 
-    property = property.replaceAll("(max|min)", "Math.$1");
+    property = MAX_MIN_PATTERN.matcher(property).replaceAll("Math.$1");
 
     try {
       final int result = ((Number) engine.eval(property)).intValue();
