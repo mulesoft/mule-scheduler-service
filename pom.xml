@@ -105,9 +105,8 @@
             <version>${mule.version}</version>
             <scope>test</scope>
         </dependency>
-        <!-- TODO MULE-14667 Upgrade to reactor 3.2.0 -->
         <dependency>
-            <groupId>org.mule.projectreactor</groupId>
+            <groupId>io.projectreactor</groupId>
             <artifactId>reactor-core</artifactId>
             <scope>test</scope>
         </dependency>
