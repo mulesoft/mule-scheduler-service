@@ -6,6 +6,7 @@
  */
 package org.mule.service.scheduler.internal.executor;
 
+import static java.lang.System.currentTimeMillis;
 import static java.lang.Thread.currentThread;
 import static org.apache.commons.lang3.StringUtils.rightPad;
 import static org.mule.service.scheduler.internal.DefaultSchedulerService.USAGE_TRACE_INTERVAL_SECS;
@@ -24,6 +25,7 @@ import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor.AbortPolicy;
 import java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Dynamically determines the {@link RejectedExecutionHandler} implementation to use according to the {@link ThreadGroup} of the
@@ -43,6 +45,8 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
 
     private final String schedulerName;
 
+    private AtomicLong lastRejectionLog = new AtomicLong(-1);
+
     public AbortBusyPolicy(String schedulerName) {
       this.schedulerName = schedulerName;
     }
@@ -52,7 +56,21 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
       String msg = "Task '" + r.toString() + "' rejected from Scheduler '" + schedulerName + "' ('"
           + executor.toString() + "')";
       if (!executor.isShutdown()) {
-        LOGGER.warn(msg);
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.warn(msg);
+        } else {
+          lastRejectionLog.updateAndGet(t -> {
+            long now = currentTimeMillis();
+            if (t < now - 5000) {
+              LOGGER.warn(msg + ". Similar log entries will be suppressed for the following 5 seconds for scheduler '"
+                  + schedulerName + "'.");
+
+              return now;
+            } else {
+              return t;
+            }
+          });
+        }
       }
       throw new SchedulerBusyException(msg);
     }
