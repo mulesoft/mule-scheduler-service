@@ -184,7 +184,11 @@ public class DefaultSchedulerQuartzTestCase extends BaseDefaultSchedulerTestCase
     scheduled.cancel(true);
 
     verify(sharedQuartzScheduler).scheduleJob(any(JobDetail.class), argThat(new CronTriggerMatcher(everySecond)));
-    assertThat((double) NANOSECONDS.toMillis(startTimes.get(2) - endTimes.get(1)), closeTo(0, DELTA_MILLIS));
+
+    new PollingProber().check(new JUnitLambdaProbe(() -> {
+      assertThat((double) NANOSECONDS.toMillis(startTimes.get(2) - endTimes.get(1)), closeTo(0, DELTA_MILLIS));
+      return true;
+    }));
   }
 
   @Test
