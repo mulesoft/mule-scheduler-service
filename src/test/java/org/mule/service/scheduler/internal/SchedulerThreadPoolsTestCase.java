@@ -368,7 +368,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
-  public void customSchedulerShutodownFromWithin() throws InterruptedException, ExecutionException, TimeoutException {
+  public void customSchedulerShutdownFromWithin() throws InterruptedException, ExecutionException, TimeoutException {
     Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L);
     Future<?> stopSubmit = scheduler.submit(() -> scheduler.stop());
 
@@ -376,8 +376,11 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     try {
       stopSubmit.get(10, SECONDS);
     } finally {
-      assertThat(scheduler.isShutdown(), is(true));
-      assertThat(scheduler.isTerminated(), is(true));
+      new PollingProber().check(new JUnitLambdaProbe(() -> {
+        assertThat("Shutdown", scheduler.isShutdown(), is(true));
+        assertThat("Terminated", scheduler.isTerminated(), is(true));
+        return true;
+      }));
     }
   }
 
