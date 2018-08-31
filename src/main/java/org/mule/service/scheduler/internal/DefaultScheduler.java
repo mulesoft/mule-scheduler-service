@@ -8,6 +8,7 @@ package org.mule.service.scheduler.internal;
 
 import static java.lang.Integer.toHexString;
 import static java.lang.Runtime.getRuntime;
+import static java.lang.System.currentTimeMillis;
 import static java.lang.System.lineSeparator;
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
@@ -47,6 +48,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -65,7 +67,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
    */
   private static final long FORCEFUL_SHUTDOWN_TIMEOUT_SECS = 5;
 
-  private static final Logger logger = getLogger(DefaultScheduler.class);
+  private static final Logger LOGGER = getLogger(DefaultScheduler.class);
 
   private final AtomicInteger idGenerator = new AtomicInteger(0);
 
@@ -225,6 +227,8 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     return scheduled;
   }
 
+  private AtomicLong lastSchedulableRejectionLog = new AtomicLong(-1);
+
   private <T> Runnable schedulableTask(RunnableFuture<T> task, Runnable rejectionCallback) {
     return () -> {
       try {
@@ -232,8 +236,23 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
       } catch (RejectedExecutionException e) {
         if (!executor.isShutdown()) {
           // Just log. Do not rethrow so the periodic job is not cancelled
-          logger.warn(e.getClass().getName() + " scheduling next execution of task " + task.toString() + ". Message was: "
-              + e.getMessage());
+          if (LOGGER.isDebugEnabled()) {
+            LOGGER.warn("{} scheduling next execution of task {}. Message was: {}", e.getClass().getName(), task.toString(),
+                        e.getMessage());
+          } else {
+            lastSchedulableRejectionLog.updateAndGet(t -> {
+              long now = currentTimeMillis();
+              if (t < now - 5000) {
+                LOGGER
+                    .warn("{} scheduling next execution of task {}. Message was: {}. Similar log entries will be suppressed for the following 5 seconds for scheduler '{}'.",
+                          e.getClass().getName(), task.toString(), e.getMessage(), getName());
+
+                return now;
+              } else {
+                return t;
+              }
+            });
+          }
 
           rejectionCallback.run();
         }
@@ -247,7 +266,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   @Override
   public void shutdown() {
-    logger.debug("Shutting down " + this.toString());
+    LOGGER.debug("Shutting down " + this.toString());
     doShutdown();
     stopFinally();
   }
@@ -265,7 +284,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   @Override
   public List<Runnable> shutdownNow() {
-    logger.debug("Shutting down NOW " + this.toString());
+    LOGGER.debug("Shutting down NOW " + this.toString());
     try {
       return doShutdownNow();
     } finally {
@@ -319,7 +338,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   @Override
   public void stop() {
-    logger.debug("Stopping " + this.toString());
+    LOGGER.debug("Stopping " + this.toString());
     // Disable new tasks from being submitted
     doShutdown();
     try {
@@ -330,18 +349,18 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
         List<Runnable> cancelledJobs = doShutdownNow();
         // Wait a while for tasks to respond to being cancelled
         if (!awaitTermination(FORCEFUL_SHUTDOWN_TIMEOUT_SECS, SECONDS)) {
-          logger.warn("Scheduler " + this.toString() + " did not shutdown gracefully after " + timeout + " "
+          LOGGER.warn("Scheduler " + this.toString() + " did not shutdown gracefully after " + timeout + " "
               + MILLISECONDS.toString() + ".");
         } else {
           if (!cancelledJobs.isEmpty()) {
-            logger.warn("Scheduler " + this.toString() + " terminated.");
+            LOGGER.warn("Scheduler " + this.toString() + " terminated.");
           }
         }
 
-        if (logger.isDebugEnabled()) {
-          logger.debug("The jobs " + cancelledJobs + " were cancelled.");
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("The jobs " + cancelledJobs + " were cancelled.");
         } else {
-          logger.info(cancelledJobs.size() + " jobs were cancelled.");
+          LOGGER.info(cancelledJobs.size() + " jobs were cancelled.");
         }
       }
     } catch (InterruptedException ie) {
