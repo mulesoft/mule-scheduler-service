@@ -100,7 +100,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
 
     currentThread.setContextClassLoader(cl);
     if (getThreadNameSuffix() != null) {
-      currentThread.setName(currentThreadName + ": " + getThreadNameSuffix());
+      currentThread.setName(currentThreadName.concat(": ").concat(getThreadNameSuffix()));
     }
 
     try {
