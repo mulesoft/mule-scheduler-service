@@ -593,6 +593,13 @@ public class SchedulerThreadPools {
         StringBuilder threadNamesBuilder = new StringBuilder();
         for (Thread thread : threads) {
           threadNamesBuilder.append("\t* " + thread.getName() + lineSeparator());
+
+          if (logger.isDebugEnabled()) {
+            final StackTraceElement[] stackTrace = thread.getStackTrace();
+            for (int i = 1; i < stackTrace.length; i++) {
+              threadNamesBuilder.append("\t\tat ").append(stackTrace[i]).append(lineSeparator());
+            }
+          }
         }
 
         logger.error("Unable to destroy ThreadGroup '{}' of Scheduler '{}' ({}). Remaining threads in the group are:"

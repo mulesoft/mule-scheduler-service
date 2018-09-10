@@ -13,6 +13,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 
 import org.slf4j.Logger;
+import org.slf4j.MDC;
 
 import java.lang.reflect.Field;
 import java.util.concurrent.ExecutionException;
@@ -101,6 +102,9 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     currentThread.setContextClassLoader(cl);
     if (getThreadNameSuffix() != null) {
       currentThread.setName(currentThreadName.concat(": ").concat(getThreadNameSuffix()));
+    }
+    if (logger.isTraceEnabled()) {
+      MDC.put("task", task.toString());
     }
 
     try {
