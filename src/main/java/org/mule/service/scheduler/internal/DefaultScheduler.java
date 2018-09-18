@@ -21,16 +21,9 @@ import static org.quartz.CronScheduleBuilder.cronSchedule;
 import static org.quartz.JobBuilder.newJob;
 import static org.quartz.TriggerBuilder.newTrigger;
 import static org.slf4j.LoggerFactory.getLogger;
-
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.service.scheduler.ThreadType;
-
-import org.quartz.CronTrigger;
-import org.quartz.JobDataMap;
-import org.quartz.JobDetail;
-import org.quartz.SchedulerException;
-import org.slf4j.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,6 +44,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
+
+import org.quartz.CronTrigger;
+import org.quartz.JobDataMap;
+import org.quartz.JobDetail;
+import org.quartz.SchedulerException;
+import org.slf4j.Logger;
 
 /**
  * Proxy for a {@link ScheduledExecutorService} that adds tracking of the source of the dispatched tasks.
@@ -91,7 +90,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   private volatile boolean shutdown = false;
 
-  protected final Supplier<Long> shutdownTimeoutMillis;
+  protected Supplier<Long> shutdownTimeoutMillis;
 
   protected final Consumer<Scheduler> shutdownCallback;
 
@@ -344,6 +343,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     try {
       // Wait a while for existing tasks to terminate
       final Long timeout = shutdownTimeoutMillis.get();
+      shutdownTimeoutMillis = null;
       if (!awaitTermination(timeout, MILLISECONDS)) {
         // Cancel currently executing tasks and return list of pending tasks
         List<Runnable> cancelledJobs = doShutdownNow();
