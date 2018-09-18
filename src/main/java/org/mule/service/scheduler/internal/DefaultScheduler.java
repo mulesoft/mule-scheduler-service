@@ -343,7 +343,6 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     try {
       // Wait a while for existing tasks to terminate
       final Long timeout = shutdownTimeoutMillis.get();
-      shutdownTimeoutMillis = null;
       if (!awaitTermination(timeout, MILLISECONDS)) {
         // Cancel currently executing tasks and return list of pending tasks
         List<Runnable> cancelledJobs = doShutdownNow();
@@ -370,6 +369,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
       currentThread().interrupt();
     } finally {
       stopFinally();
+      shutdownTimeoutMillis = null;
     }
   }
 
