@@ -337,7 +337,17 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   @Override
   public void stop() {
-    LOGGER.debug("Stopping " + this.toString());
+    if (shutdown) {
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug(toString() + " is already stopped");
+      }
+
+      return;
+    }
+
+    if (LOGGER.isDebugEnabled()) {
+      LOGGER.debug("Stopping " + this.toString());
+    }
     // Disable new tasks from being submitted
     doShutdown();
     try {
