@@ -128,11 +128,11 @@
             <artifactId>disruptor</artifactId>
             <version>${disruptorVersion}</version>
         </dependency>
-<!--         <dependency> -->
-<!--             <groupId>org.jctools</groupId> -->
-<!--             <artifactId>jctools-core</artifactId> -->
-<!--             <version>${jcToolsVersion}</version> -->
-<!--         </dependency> -->
+        <dependency>
+            <groupId>org.jctools</groupId>
+            <artifactId>jctools-core</artifactId>
+            <version>${jcToolsVersion}</version>
+        </dependency>
         <dependency>
             <groupId>de.ruedigermoeller</groupId>
             <artifactId>kontraktor</artifactId>
