@@ -256,17 +256,17 @@
                                         <!--Run only a certain class-->
                                         <argument>${jmh.benchmark}</argument>
                                         <!--Create json report-->
-                                        <argument>-rf</argument>
-                                        <argument>json</argument>
+<!--                                         <argument>-rf</argument> -->
+<!--                                         <argument>json</argument> -->
                                         <!--Enable gc profiler-->
-                                        <argument>-prof</argument>
-                                        <argument>gc</argument>
+<!--                                         <argument>-prof</argument> -->
+<!--                                         <argument>gc</argument> -->
                                         <!--Number of Iterations-->
-                                        <argument>-i</argument>
-                                        <argument>5</argument>
+<!--                                         <argument>-i</argument> -->
+<!--                                         <argument>5</argument> -->
                                         <!--Number of Warmup Iterations-->
-                                        <argument>-wi</argument>
-                                        <argument>3</argument>
+<!--                                         <argument>-wi</argument> -->
+<!--                                         <argument>3</argument> -->
                                     </arguments>
                                 </configuration>
                             </execution>
