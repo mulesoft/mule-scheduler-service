@@ -44,7 +44,7 @@ public class CustomBlockingMpmcQueue<E> extends MpmcArrayQueue<E> implements Blo
 
   @Override
   public int drainTo(Collection<? super E> c) {
-    throw new UnsupportedOperationException("not implemented");
+    return drain(e -> c.add(e));
   }
 
   @Override

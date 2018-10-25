@@ -194,14 +194,14 @@ public class ExecutorServiceVersusDisruptor {
     return subjects.disruptorExecutor.submit(TASK).get();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(1)
   @BenchmarkMode({AverageTime, Throughput})
   public long disruptorWlExecutorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
     return subjects.disruptorWlExecutor.submit(TASK).get();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(1)
   @BenchmarkMode({AverageTime, Throughput})
   public long jcSleepExecutorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
@@ -215,7 +215,7 @@ public class ExecutorServiceVersusDisruptor {
     return subjects.jcYieldExecutor.submit(TASK).get();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(1)
   @BenchmarkMode({AverageTime, Throughput})
   public long swDisruptorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
@@ -226,7 +226,7 @@ public class ExecutorServiceVersusDisruptor {
     return future.get();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(1)
   @BenchmarkMode({AverageTime, Throughput})
   public long ywDisruptorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
@@ -258,14 +258,14 @@ public class ExecutorServiceVersusDisruptor {
     return subjects.disruptorExecutor.submit(TASK).get();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(MAX)
   @BenchmarkMode({AverageTime, Throughput})
   public long disruptorWlExecutorAllThread(Subjects subjects) throws InterruptedException, ExecutionException {
     return subjects.disruptorWlExecutor.submit(TASK).get();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(MAX)
   @BenchmarkMode({AverageTime, Throughput})
   public long jcSleepExecutorAllThread(Subjects subjects) throws InterruptedException, ExecutionException {
@@ -279,7 +279,7 @@ public class ExecutorServiceVersusDisruptor {
     return subjects.jcYieldExecutor.submit(TASK).get();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(MAX)
   @BenchmarkMode({AverageTime, Throughput})
   public long swDisruptorAllThreads(Subjects subjects) throws InterruptedException, ExecutionException {
@@ -290,7 +290,7 @@ public class ExecutorServiceVersusDisruptor {
     return future.get();
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(MAX)
   @BenchmarkMode({AverageTime, Throughput})
   public long ywDisruptorAllThreads(Subjects subjects) throws InterruptedException, ExecutionException {
