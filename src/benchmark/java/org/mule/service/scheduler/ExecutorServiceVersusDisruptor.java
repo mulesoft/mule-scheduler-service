@@ -27,6 +27,7 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 
+import com.conversantmedia.util.concurrent.DisruptorBlockingQueue;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.SleepingWaitStrategy;
@@ -52,6 +53,8 @@ public class ExecutorServiceVersusDisruptor {
 
     private ThreadPoolExecutor sqExecutor;
     private ThreadPoolExecutor abqExecutor;
+    private ThreadPoolExecutor disruptorWlExecutor;
+    private ThreadPoolExecutor disruptorExecutor;
 
     private Disruptor<CompletableFutureEvent> swDisruptor;
     private Disruptor<CompletableFutureEvent> ywDisruptor;
@@ -64,6 +67,10 @@ public class ExecutorServiceVersusDisruptor {
       int cores = getRuntime().availableProcessors();
       sqExecutor = new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS, new SynchronousQueue<Runnable>());
       abqExecutor = new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS, new ArrayBlockingQueue<Runnable>(cores));
+      disruptorWlExecutor =
+          new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS, new DisruptorBlockingQueue<Runnable>(cores, true));
+      disruptorExecutor =
+          new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS, new DisruptorBlockingQueue<Runnable>(cores, false));
 
       // Executor that will be used to construct new threads for consumers
       // Executor executor = Executors.newCachedThreadPool();
@@ -123,7 +130,8 @@ public class ExecutorServiceVersusDisruptor {
       abqExecutor.shutdownNow();
       swDisruptor.shutdown();
       ywDisruptor.shutdown();
-      // disruptorExecutor.shutdownNow();
+      disruptorExecutor.shutdownNow();
+      disruptorWlExecutor.shutdownNow();
     }
 
   }
@@ -151,6 +159,20 @@ public class ExecutorServiceVersusDisruptor {
   @BenchmarkMode({AverageTime, Throughput})
   public long abqExecutorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
     return subjects.abqExecutor.submit(TASK).get();
+  }
+
+  @Benchmark
+  @Threads(1)
+  @BenchmarkMode({AverageTime, Throughput})
+  public long disruptorExecutorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
+    return subjects.disruptorExecutor.submit(TASK).get();
+  }
+
+  @Benchmark
+  @Threads(1)
+  @BenchmarkMode({AverageTime, Throughput})
+  public long disruptorWlExecutorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
+    return subjects.disruptorWlExecutor.submit(TASK).get();
   }
 
   @Benchmark
@@ -187,6 +209,20 @@ public class ExecutorServiceVersusDisruptor {
   @BenchmarkMode({AverageTime, Throughput})
   public long abqExecutorAllThreads(Subjects subjects) throws InterruptedException, ExecutionException {
     return subjects.abqExecutor.submit(TASK).get();
+  }
+
+  @Benchmark
+  @Threads(MAX)
+  @BenchmarkMode({AverageTime, Throughput})
+  public long disruptorExecutorAllThread(Subjects subjects) throws InterruptedException, ExecutionException {
+    return subjects.disruptorExecutor.submit(TASK).get();
+  }
+
+  @Benchmark
+  @Threads(MAX)
+  @BenchmarkMode({AverageTime, Throughput})
+  public long disruptorWlExecutorAllThread(Subjects subjects) throws InterruptedException, ExecutionException {
+    return subjects.disruptorWlExecutor.submit(TASK).get();
   }
 
   @Benchmark
