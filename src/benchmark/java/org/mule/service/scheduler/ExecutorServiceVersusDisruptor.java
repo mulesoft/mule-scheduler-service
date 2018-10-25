@@ -30,11 +30,19 @@ import org.openjdk.jmh.annotations.Warmup;
 import com.bluedevel.concurrent.CustomBlockingMpmcQueue;
 import com.bluedevel.concurrent.CustomBlockingYieldMpmcQueue;
 import com.conversantmedia.util.concurrent.DisruptorBlockingQueue;
+import com.lmax.disruptor.EventHandler;
+import com.lmax.disruptor.RingBuffer;
+import com.lmax.disruptor.SleepingWaitStrategy;
+import com.lmax.disruptor.YieldingWaitStrategy;
+import com.lmax.disruptor.dsl.Disruptor;
+import com.lmax.disruptor.dsl.ProducerType;
 
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 
 @Fork(1)
@@ -52,97 +60,110 @@ public class ExecutorServiceVersusDisruptor {
     private ThreadPoolExecutor jcSleepExecutor;
     private ThreadPoolExecutor jcYieldExecutor;
 
-    // private Disruptor<CompletableFutureEvent> swDisruptor;
-    // private Disruptor<CompletableFutureEvent> ywDisruptor;
-    // // private ExecutorService disruptorExecutor;
-    // private RingBuffer<CompletableFutureEvent> swRingBuffer;
-    // private RingBuffer<CompletableFutureEvent> ywRingBuffer;
+    private Disruptor<CompletableFutureEvent> swDisruptor;
+    private Disruptor<CompletableFutureEvent> ywDisruptor;
+    // private ExecutorService disruptorExecutor;
+    private RingBuffer<CompletableFutureEvent> swRingBuffer;
+    private RingBuffer<CompletableFutureEvent> ywRingBuffer;
 
-    // private static class CompletableFutureEvent {
-    //
-    // CompletableFuture<Long> future;
-    //
-    // }
+    private static class CompletableFutureEvent {
+
+      CompletableFuture<Long> future;
+
+    }
 
     @Setup(Level.Trial)
     public void doSetup() {
       int cores = getRuntime().availableProcessors();
 
-      sqExecutor = new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS, new SynchronousQueue<Runnable>());
-      abqExecutor = new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS, new ArrayBlockingQueue<Runnable>(cores));
-      disruptorWlExecutor =
-          new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS, new DisruptorBlockingQueue<Runnable>(cores, true));
-      disruptorExecutor =
-          new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS, new DisruptorBlockingQueue<Runnable>(cores, false));
+      ThreadFactory threadFactory = (ThreadFactory) r -> {
+        Thread t = new Thread(r);
+        t.setDaemon(true);
+        return t;
+      };
 
-      jcSleepExecutor =
-          new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS, new CustomBlockingMpmcQueue<Runnable>(cores));
-      jcYieldExecutor =
-          new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS, new CustomBlockingYieldMpmcQueue<Runnable>(cores));
+      sqExecutor = new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS,
+                                          new SynchronousQueue<Runnable>(), threadFactory);
+      abqExecutor = new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS,
+                                           new ArrayBlockingQueue<Runnable>(cores), threadFactory);
+      disruptorWlExecutor = new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS,
+                                                   new DisruptorBlockingQueue<Runnable>(cores, true),
+                                                   threadFactory);
+      disruptorExecutor = new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS,
+                                                 new DisruptorBlockingQueue<Runnable>(cores, false),
+                                                 threadFactory);
 
-      // // Executor that will be used to construct new threads for consumers
-      // // Executor executor = Executors.newCachedThreadPool();
-      //
-      // // Specify the size of the ring buffer, must be power of 2.
-      // int bufferSize = cores * 2;
-      //
-      // // Construct the Disruptor
-      // // Disruptor<LongEvent> disruptor = new Disruptor<>(LongEvent::new, bufferSize, executor);
-      // // disruptorExecutor = newCachedThreadPool();
-      //
-      // // disruptor = new Disruptor<>(MyEvent::new, bufferSize, (ThreadFactory) r -> new Thread(r), ProducerType.MULTI,
-      // // new YieldingWaitStrategy());
-      //
-      // // Connect the handlers
-      // EventHandler<? super CompletableFutureEvent> eventHandler = (event, sequence, endOfBatch) -> {
-      // event.future.complete(TASK.call());
-      // };
-      // EventHandler<? super CompletableFutureEvent>[] eventHandlers = new EventHandler[cores * 2];
-      // for (int i = 0; i < cores * 2; ++i) {
-      // eventHandlers[i] = eventHandler;
-      // }
-      //
-      // swDisruptor =
-      // new Disruptor<>(CompletableFutureEvent::new, bufferSize, (ThreadFactory) r -> new Thread(r), ProducerType.MULTI,
-      // new SleepingWaitStrategy());
-      //
-      // swDisruptor.handleEventsWith(eventHandlers);
-      //
-      // // Start the Disruptor, starts all threads running
-      // swDisruptor.start();
-      //
-      // // Get the ring buffer from the Disruptor to be used for publishing.
-      // swRingBuffer = swDisruptor.getRingBuffer();
-      //
-      // ywDisruptor =
-      // new Disruptor<>(CompletableFutureEvent::new, bufferSize, (ThreadFactory) r -> new Thread(r), ProducerType.MULTI,
+      jcSleepExecutor = new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS,
+                                               new CustomBlockingMpmcQueue<Runnable>(cores),
+                                               threadFactory);
+      jcYieldExecutor = new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS,
+                                               new CustomBlockingYieldMpmcQueue<Runnable>(cores),
+                                               threadFactory);
+
+      // Executor that will be used to construct new threads for consumers
+      // Executor executor = Executors.newCachedThreadPool();
+
+      // Specify the size of the ring buffer, must be power of 2.
+      int bufferSize = cores * 2;
+
+      // Construct the Disruptor
+      // Disruptor<LongEvent> disruptor = new Disruptor<>(LongEvent::new, bufferSize, executor);
+      // disruptorExecutor = newCachedThreadPool();
+
+      // disruptor = new Disruptor<>(MyEvent::new, bufferSize, (ThreadFactory) r -> new Thread(r), ProducerType.MULTI,
       // new YieldingWaitStrategy());
-      //
-      // ywDisruptor.handleEventsWith(eventHandlers);
-      //
-      // // Start the Disruptor, starts all threads running
-      // ywDisruptor.start();
-      //
-      // // Get the ring buffer from the Disruptor to be used for publishing.
-      // ywRingBuffer = ywDisruptor.getRingBuffer();
-      //
-      // // for (long l = 0; true; l++) {
-      // // ringBuffer.publishEvent((event, sequence, timestamp) -> event.setTimestampIn(timestamp), currentTimeMillis());
-      // // Thread.sleep(1000);
-      // // }
+
+      // Connect the handlers
+      EventHandler<? super CompletableFutureEvent> eventHandler = (event, sequence, endOfBatch) -> {
+        event.future.complete(TASK.call());
+      };
+      EventHandler<? super CompletableFutureEvent>[] eventHandlers = new EventHandler[cores * 2];
+      for (int i = 0; i < cores * 2; ++i) {
+        eventHandlers[i] = eventHandler;
+      }
+
+      swDisruptor =
+          new Disruptor<>(CompletableFutureEvent::new, bufferSize, (ThreadFactory) r -> new Thread(r), ProducerType.MULTI,
+                          new SleepingWaitStrategy());
+
+      swDisruptor.handleEventsWith(eventHandlers);
+
+      // Start the Disruptor, starts all threads running
+      swDisruptor.start();
+
+      // Get the ring buffer from the Disruptor to be used for publishing.
+      swRingBuffer = swDisruptor.getRingBuffer();
+
+      ywDisruptor =
+          new Disruptor<>(CompletableFutureEvent::new, bufferSize, (ThreadFactory) r -> new Thread(r), ProducerType.MULTI,
+                          new YieldingWaitStrategy());
+
+      ywDisruptor.handleEventsWith(eventHandlers);
+
+      // Start the Disruptor, starts all threads running
+      ywDisruptor.start();
+
+      // Get the ring buffer from the Disruptor to be used for publishing.
+      ywRingBuffer = ywDisruptor.getRingBuffer();
+
+      // for (long l = 0; true; l++) {
+      // ringBuffer.publishEvent((event, sequence, timestamp) -> event.setTimestampIn(timestamp), currentTimeMillis());
+      // Thread.sleep(1000);
+      // }
     }
 
     @TearDown(Level.Trial)
     public void doTearDown() {
       sqExecutor.shutdownNow();
       abqExecutor.shutdownNow();
-      // swDisruptor.shutdown();
-      // ywDisruptor.shutdown();
       disruptorExecutor.shutdownNow();
       disruptorWlExecutor.shutdownNow();
 
       jcSleepExecutor.shutdownNow();
       jcYieldExecutor.shutdownNow();
+
+      swDisruptor.shutdown();
+      ywDisruptor.shutdown();
     }
 
   }
@@ -194,27 +215,27 @@ public class ExecutorServiceVersusDisruptor {
     return subjects.jcYieldExecutor.submit(TASK).get();
   }
 
-  // @Benchmark
-  // @Threads(1)
-  // @BenchmarkMode({AverageTime, Throughput})
-  // public long swDisruptorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
-  // CompletableFuture<Long> future = new CompletableFuture<>();
-  // subjects.swRingBuffer.publishEvent((event, sequence, f) -> {
-  // event.future = f;
-  // }, future);
-  // return future.get();
-  // }
-  //
-  // @Benchmark
-  // @Threads(1)
-  // @BenchmarkMode({AverageTime, Throughput})
-  // public long ywDisruptorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
-  // CompletableFuture<Long> future = new CompletableFuture<>();
-  // subjects.ywRingBuffer.publishEvent((event, sequence, f) -> {
-  // event.future = f;
-  // }, future);
-  // return future.get();
-  // }
+  @Benchmark
+  @Threads(1)
+  @BenchmarkMode({AverageTime, Throughput})
+  public long swDisruptorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
+    CompletableFuture<Long> future = new CompletableFuture<>();
+    subjects.swRingBuffer.publishEvent((event, sequence, f) -> {
+      event.future = f;
+    }, future);
+    return future.get();
+  }
+
+  @Benchmark
+  @Threads(1)
+  @BenchmarkMode({AverageTime, Throughput})
+  public long ywDisruptorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
+    CompletableFuture<Long> future = new CompletableFuture<>();
+    subjects.ywRingBuffer.publishEvent((event, sequence, f) -> {
+      event.future = f;
+    }, future);
+    return future.get();
+  }
 
   @Benchmark
   @Threads(MAX)
@@ -258,25 +279,25 @@ public class ExecutorServiceVersusDisruptor {
     return subjects.jcYieldExecutor.submit(TASK).get();
   }
 
-  // @Benchmark
-  // @Threads(MAX)
-  // @BenchmarkMode({AverageTime, Throughput})
-  // public long swDisruptorAllThreads(Subjects subjects) throws InterruptedException, ExecutionException {
-  // CompletableFuture<Long> future = new CompletableFuture<>();
-  // subjects.swRingBuffer.publishEvent((event, sequence, f) -> {
-  // event.future = f;
-  // }, future);
-  // return future.get();
-  // }
-  //
-  // @Benchmark
-  // @Threads(MAX)
-  // @BenchmarkMode({AverageTime, Throughput})
-  // public long ywDisruptorAllThreads(Subjects subjects) throws InterruptedException, ExecutionException {
-  // CompletableFuture<Long> future = new CompletableFuture<>();
-  // subjects.ywRingBuffer.publishEvent((event, sequence, f) -> {
-  // event.future = f;
-  // }, future);
-  // return future.get();
-  // }
+  @Benchmark
+  @Threads(MAX)
+  @BenchmarkMode({AverageTime, Throughput})
+  public long swDisruptorAllThreads(Subjects subjects) throws InterruptedException, ExecutionException {
+    CompletableFuture<Long> future = new CompletableFuture<>();
+    subjects.swRingBuffer.publishEvent((event, sequence, f) -> {
+      event.future = f;
+    }, future);
+    return future.get();
+  }
+
+  @Benchmark
+  @Threads(MAX)
+  @BenchmarkMode({AverageTime, Throughput})
+  public long ywDisruptorAllThreads(Subjects subjects) throws InterruptedException, ExecutionException {
+    CompletableFuture<Long> future = new CompletableFuture<>();
+    subjects.ywRingBuffer.publishEvent((event, sequence, f) -> {
+      event.future = f;
+    }, future);
+    return future.get();
+  }
 }
