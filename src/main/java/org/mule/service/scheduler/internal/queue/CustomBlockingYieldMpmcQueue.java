@@ -6,18 +6,24 @@
  */
 package org.mule.service.scheduler.internal.queue;
 
-import org.jctools.queues.MpmcArrayQueue;
-
 import static java.lang.System.nanoTime;
+import static java.lang.Thread.interrupted;
+import static java.lang.Thread.yield;
+
+import org.mule.runtime.core.internal.processor.interceptor.InterceptionException;
+
+import org.jctools.queues.MpmcArrayQueue;
 
 import java.util.Collection;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-/*
+/**
  * A BlockingQueue implementation built upon Nitsan W's JCTools queues.
- *
+ * <p>
  * Use it in a contended executor service, not much else is supported.
+ *
+ * @since 1.1.7
  */
 public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implements BlockingQueue<E> {
 
@@ -28,7 +34,11 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
   @Override
   public void put(E e) throws InterruptedException {
     while (!offer(e)) {
-      Thread.yield();
+      if (interrupted()) {
+        throw new InterceptionException();
+      } else {
+        yield();
+      }
     }
   }
 
@@ -41,7 +51,11 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
         return e;
       }
 
-      Thread.yield();
+      if (interrupted()) {
+        throw new InterceptionException();
+      } else {
+        yield();
+      }
     }
   }
 
@@ -56,23 +70,29 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
   }
 
   @Override
-  public boolean offer(E e, long timeout, TimeUnit unit) {
+  public boolean offer(E e, long timeout, TimeUnit unit) throws InterruptedException {
     throw new UnsupportedOperationException("not implemented");
   }
 
   @Override
-  public E poll(long timeout, TimeUnit unit) {
+  public E poll(long timeout, TimeUnit unit) throws InterruptedException {
     final long timeoutNanos = nanoTime() + unit.toNanos(timeout);
-    
-    while (true) {
+
+    while (nanoTime() < timeoutNanos) {
       E e = poll();
 
-      if (e != null || nanoTime() >= timeoutNanos ) {
+      if (e != null) {
         return e;
       }
 
-      Thread.yield();
+      if (interrupted()) {
+        throw new InterceptionException();
+      } else {
+        yield();
+      }
     }
+
+    return null;
   }
 
   @Override

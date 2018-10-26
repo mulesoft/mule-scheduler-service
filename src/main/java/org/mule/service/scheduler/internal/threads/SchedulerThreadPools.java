@@ -7,6 +7,7 @@
 package org.mule.service.scheduler.internal.threads;
 
 import static java.lang.Integer.MAX_VALUE;
+import static java.lang.Math.max;
 import static java.lang.String.format;
 import static java.lang.System.currentTimeMillis;
 import static java.lang.System.getProperties;
@@ -37,6 +38,7 @@ import org.mule.service.scheduler.internal.DefaultScheduler;
 import org.mule.service.scheduler.internal.ThrottledScheduler;
 import org.mule.service.scheduler.internal.executor.ByCallerThreadGroupPolicy;
 import org.mule.service.scheduler.internal.executor.ByCallerThrottlingPolicy;
+import org.mule.service.scheduler.internal.queue.AsyncHandOffQueue;
 import org.mule.service.scheduler.internal.queue.CustomBlockingYieldMpmcQueue;
 
 import org.quartz.SchedulerException;
@@ -54,7 +56,6 @@ import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -167,34 +168,22 @@ public class SchedulerThreadPools {
         new ThreadPoolExecutor(threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
                                threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
                                0, SECONDS,
-                               createQueue(threadPoolsConfig.getCpuLightQueueSize().getAsInt()),
+                               createQueueForCpuPool(threadPoolsConfig.getCpuLightQueueSize().getAsInt()),
                                new SchedulerThreadFactory(cpuLightGroup),
                                byCallerThreadGroupPolicy.apply(cpuLightGroup.getName()));
 
     // TODO (elrodro83) MULE-14203 Make IO thread pool have an optimal core size
+    AsyncHandOffQueue queueForBlockingPool = createQueueForBlockingPool(threadPoolsConfig.getIoQueueSize().getAsInt());
     ioExecutor = new ThreadPoolExecutor(threadPoolsConfig.getIoCorePoolSize().getAsInt(),
                                         threadPoolsConfig.getIoMaxPoolSize().getAsInt(),
                                         threadPoolsConfig.getIoKeepAlive().getAsLong(), MILLISECONDS,
-                                        // At first, it may seem that a SynchronousQueue is not the best option here since it may
-                                        // block the dispatching thread, which may be a CPU-light.
-                                        // However, the alternatives have some limitations that make them impractical:
-                                        //
-                                        // * Using a LinkedBlockingQueue causes the pool not to grow until the queue is full. This
-                                        // causes unwanted delays in the processing if the core size of the pool is small, or
-                                        // keeping too many idle threads if the core size is large.
-                                        //
-                                        // * Using a custom SynchronizedQueue + RejectedExectuionHandler
-                                        // (https://gist.github.com/elrodro83/96e1ee470237a57fb06376a7e4b04f2b) that addresses the
-                                        // limitations of the other 2 approaches, an improvement is seen in the dispatching of the
-                                        // tasks, but at the cost of a slower task taking, which slows down the processing so much
-                                        // that it greatly outweights the gain in the dispatcher.
-                                        createQueue(threadPoolsConfig.getIoQueueSize().getAsInt()),
+                                        queueForBlockingPool,
                                         new SchedulerThreadFactory(ioGroup),
-                                        byCallerThreadGroupPolicy.apply(ioGroup.getName()));
+                                        queueForBlockingPool.buildHandler(byCallerThreadGroupPolicy.apply(ioGroup.getName())));
     computationExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
                                threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
-                               0, SECONDS, createQueue(threadPoolsConfig.getCpuIntensiveQueueSize().getAsInt()),
+                               0, SECONDS, createQueueForCpuPool(threadPoolsConfig.getCpuIntensiveQueueSize().getAsInt()),
                                new SchedulerThreadFactory(computationGroup),
                                byCallerThreadGroupPolicy.apply(computationGroup.getName()));
 
@@ -217,13 +206,23 @@ public class SchedulerThreadPools {
   }
 
   /**
-   * Create queue using a {@link SynchronousQueue} if size is 0 or a {@link LinkedBlockingQueue} if size > 0.
+   * Create queue using a {@link CustomBlockingYieldMpmcQueue} with the minimal available size.
    *
    * @param size queue size
    * @return new queue instance
    */
-  private BlockingQueue<Runnable> createQueue(int size) {
-    return size == 0 ? new CustomBlockingYieldMpmcQueue<>(2) : new CustomBlockingYieldMpmcQueue<>(size);
+  private AsyncHandOffQueue createQueueForBlockingPool(int size) {
+    return new AsyncHandOffQueue(max(2, size));
+  }
+
+  /**
+   * Create queue using a {@link CustomBlockingYieldMpmcQueue} with the minimal available size.
+   *
+   * @param size queue size
+   * @return new queue instance
+   */
+  private BlockingQueue<Runnable> createQueueForCpuPool(int size) {
+    return new CustomBlockingYieldMpmcQueue<>(max(2, size));
   }
 
   /**
@@ -396,7 +395,7 @@ public class SchedulerThreadPools {
   public Scheduler createCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, int queueSize) {
     String threadsName = resolveCustomThreadsName(config);
     return doCreateCustomScheduler(config, workers, stopTimeout, resolveCustomSchedulerName(config),
-                                   createQueue(queueSize), threadsName);
+                                   createQueueForCpuPool(queueSize), threadsName);
   }
 
   private Scheduler doCreateCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, String schedulerName,

@@ -9,6 +9,8 @@ package org.mule.service.scheduler.internal;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import org.mule.service.scheduler.internal.queue.CustomBlockingYieldMpmcQueue;
+
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameters;
@@ -45,9 +47,13 @@ public abstract class AbstractMuleVsJavaExecutorTestCase extends BaseDefaultSche
         {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
             .useSharedScheduledExecutor(), new LinkedBlockingQueue<>(1), "java,queue(1)"},
         {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
+            .useSharedScheduledExecutor(), new CustomBlockingYieldMpmcQueue<>(1), "java,cbyjc(1)"},
+        {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
             .createScheduledSameThreadExecutor(), new SynchronousQueue<>(), "mule,syncQueue"},
         {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
-            .createScheduledSameThreadExecutor(), new LinkedBlockingQueue<>(1), "mule,queue(1)"}
+            .createScheduledSameThreadExecutor(), new LinkedBlockingQueue<>(1), "mule,queue(1)"},
+        {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
+            .createScheduledSameThreadExecutor(), new CustomBlockingYieldMpmcQueue<>(1), "mule,cbyjc(1)"}
     });
   }
 

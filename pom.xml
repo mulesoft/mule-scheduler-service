@@ -17,7 +17,6 @@
     <properties>
         <formatterConfigPath>formatter.xml</formatterConfigPath>
 
-        <disruptorVersion>3.4.2</disruptorVersion>
         <jcToolsVersion>2.1.2</jcToolsVersion>
         <quartzVersion>2.2.3</quartzVersion>
         <c3p0Version>0.9.5.2-MULE-001</c3p0Version>
@@ -32,8 +31,6 @@
     </scm>
 
     <build>
-        <testSourceDirectory>src/benchmark/java</testSourceDirectory>
-        
         <plugins>
             <plugin>
                 <artifactId>maven-jar-plugin</artifactId>
@@ -57,59 +54,6 @@
                 <version>${mule.app.plugins.maven.plugin.version}</version>
                 <extensions>true</extensions>
             </plugin>
-
-            <plugin>
-                <groupId>org.bsc.maven</groupId>
-                <artifactId>maven-processor-plugin</artifactId>
-                <version>3.2.0</version>
-                <executions>
-                    <execution>
-                        <id>process</id>
-                        <goals>
-                            <goal>process</goal>
-                        </goals>
-                        <phase>generate-test-sources</phase>
-                    </execution>
-                </executions>
-                <configuration>
-                    <processors>
-                        <processor>org.openjdk.jmh.generators.BenchmarkProcessor</processor>
-                    </processors>
-                    <sourceDirectory>src/benchmark/java</sourceDirectory>
-                    <outputDirectory>${project.build.directory}/generated-test-sources</outputDirectory>
-                </configuration>
-                
-                <dependencies>
-                    <dependency>
-                        <groupId>org.openjdk.jmh</groupId>
-                        <artifactId>jmh-core</artifactId>
-                        <version>${jmh.version}</version>
-                    </dependency>
-                    <dependency>
-                        <groupId>org.openjdk.jmh</groupId>
-                        <artifactId>jmh-generator-annprocess</artifactId>
-                        <version>${jmh.version}</version>
-                    </dependency>
-                </dependencies>
-            </plugin>
-
-            <plugin>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>build-helper-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <phase>generate-test-sources</phase>
-                        <goals>
-                            <goal>add-test-source</goal>
-                        </goals>
-                        <configuration>
-                            <sources>
-                                <source>${project.build.directory}/generated-test-sources</source>
-                            </sources>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
         </plugins>
     </build>
     
@@ -124,25 +68,9 @@
         </dependency>
 
         <dependency>
-            <groupId>com.lmax</groupId>
-            <artifactId>disruptor</artifactId>
-            <version>${disruptorVersion}</version>
-        </dependency>
-        <dependency>
             <groupId>org.jctools</groupId>
             <artifactId>jctools-core</artifactId>
             <version>${jcToolsVersion}</version>
-        </dependency>
-        <dependency>
-            <groupId>de.ruedigermoeller</groupId>
-            <artifactId>kontraktor</artifactId>
-            <version>4.22</version>
-        </dependency>
-        
-        <dependency>
-            <groupId>com.conversantmedia</groupId>
-            <artifactId>disruptor</artifactId>
-            <version>1.2.1</version>
         </dependency>
 
         <dependency>
@@ -229,6 +157,58 @@
             <id>micro-benchmark</id>
             <build>
                 <plugins>
+                    <plugin>
+                        <groupId>org.bsc.maven</groupId>
+                        <artifactId>maven-processor-plugin</artifactId>
+                        <version>3.2.0</version>
+                        <executions>
+                            <execution>
+                                <id>process</id>
+                                <goals>
+                                    <goal>process</goal>
+                                </goals>
+                                <phase>generate-test-sources</phase>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <processors>
+                                <processor>org.openjdk.jmh.generators.BenchmarkProcessor</processor>
+                            </processors>
+                            <sourceDirectory>src/test/java</sourceDirectory>
+                            <outputDirectory>${project.build.directory}/generated-test-sources</outputDirectory>
+                        </configuration>
+                        
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.openjdk.jmh</groupId>
+                                <artifactId>jmh-core</artifactId>
+                                <version>${jmh.version}</version>
+                            </dependency>
+                            <dependency>
+                                <groupId>org.openjdk.jmh</groupId>
+                                <artifactId>jmh-generator-annprocess</artifactId>
+                                <version>${jmh.version}</version>
+                            </dependency>
+                        </dependencies>
+                    </plugin>
+        
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <phase>generate-test-sources</phase>
+                                <goals>
+                                    <goal>add-test-source</goal>
+                                </goals>
+                                <configuration>
+                                    <sources>
+                                        <source>${project.build.directory}/generated-test-sources</source>
+                                    </sources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-surefire-plugin</artifactId>

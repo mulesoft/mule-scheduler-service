@@ -21,7 +21,7 @@ import java.util.concurrent.TimeUnit;
  * This is intended only to be used with a {@link ThreadPoolExecutor} along with the {@link RejectedExecutionHandler} returned by
  * {@link #buildHandler(RejectedExecutionHandler)}.
  *
- * @since 4.0
+ * @since 1.1.7
  */
 public class AsyncHandOffQueue implements BlockingQueue<Runnable> {
 
@@ -30,7 +30,7 @@ public class AsyncHandOffQueue implements BlockingQueue<Runnable> {
   public AsyncHandOffQueue(int capacity) {
     this.innerQueue = new CustomBlockingYieldMpmcQueue<>(capacity);
   }
-  
+
   public RejectedExecutionHandler buildHandler(RejectedExecutionHandler delegateRejectedExecutionHandler) {
     return (r, executor) -> {
       try {
