@@ -37,6 +37,7 @@ import org.mule.service.scheduler.internal.DefaultScheduler;
 import org.mule.service.scheduler.internal.ThrottledScheduler;
 import org.mule.service.scheduler.internal.executor.ByCallerThreadGroupPolicy;
 import org.mule.service.scheduler.internal.executor.ByCallerThrottlingPolicy;
+import org.mule.service.scheduler.internal.queue.CustomBlockingYieldMpmcQueue;
 
 import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
@@ -222,7 +223,7 @@ public class SchedulerThreadPools {
    * @return new queue instance
    */
   private BlockingQueue<Runnable> createQueue(int size) {
-    return size == 0 ? new SynchronousQueue<>() : new LinkedBlockingQueue<>(size);
+    return size == 0 ? new CustomBlockingYieldMpmcQueue<>(2) : new CustomBlockingYieldMpmcQueue<>(size);
   }
 
   /**

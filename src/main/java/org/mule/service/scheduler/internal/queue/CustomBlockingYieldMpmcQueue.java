@@ -4,9 +4,11 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
-package com.bluedevel.concurrent;
+package org.mule.service.scheduler.internal.queue;
 
 import org.jctools.queues.MpmcArrayQueue;
+
+import static java.lang.System.nanoTime;
 
 import java.util.Collection;
 import java.util.concurrent.BlockingQueue;
@@ -35,8 +37,9 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
     while (true) {
       E e = poll();
 
-      if (e != null)
+      if (e != null) {
         return e;
+      }
 
       Thread.yield();
     }
@@ -59,7 +62,17 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
 
   @Override
   public E poll(long timeout, TimeUnit unit) {
-    throw new UnsupportedOperationException("not implemented");
+    final long timeoutNanos = nanoTime() + unit.toNanos(timeout);
+    
+    while (true) {
+      E e = poll();
+
+      if (e != null || nanoTime() >= timeoutNanos ) {
+        return e;
+      }
+
+      Thread.yield();
+    }
   }
 
   @Override

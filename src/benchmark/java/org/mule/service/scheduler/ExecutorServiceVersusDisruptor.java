@@ -16,6 +16,8 @@ import static org.openjdk.jmh.annotations.Scope.Benchmark;
 import static org.openjdk.jmh.annotations.Threads.MAX;
 import static org.openjdk.jmh.infra.Blackhole.consumeCPU;
 
+import org.mule.service.scheduler.internal.queue.CustomBlockingYieldMpmcQueue;
+
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
@@ -28,7 +30,6 @@ import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 
 import com.bluedevel.concurrent.CustomBlockingMpmcQueue;
-import com.bluedevel.concurrent.CustomBlockingYieldMpmcQueue;
 import com.conversantmedia.util.concurrent.DisruptorBlockingQueue;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.RingBuffer;
