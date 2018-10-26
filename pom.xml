@@ -160,12 +160,12 @@
                     <plugin>
                         <groupId>org.bsc.maven</groupId>
                         <artifactId>maven-processor-plugin</artifactId>
-                        <version>3.2.0</version>
+                        <version>3.3.3</version>
                         <executions>
                             <execution>
                                 <id>process</id>
                                 <goals>
-                                    <goal>process</goal>
+                                    <goal>process-test</goal>
                                 </goals>
                                 <phase>generate-test-sources</phase>
                             </execution>
@@ -174,16 +174,13 @@
                             <processors>
                                 <processor>org.openjdk.jmh.generators.BenchmarkProcessor</processor>
                             </processors>
-                            <sourceDirectory>src/test/java</sourceDirectory>
                             <outputDirectory>${project.build.directory}/generated-test-sources</outputDirectory>
+                            <excludes>
+                                <exclude>org/mule/service/scheduler/internal/**</exclude>
+                            </excludes>
                         </configuration>
                         
                         <dependencies>
-                            <dependency>
-                                <groupId>org.openjdk.jmh</groupId>
-                                <artifactId>jmh-core</artifactId>
-                                <version>${jmh.version}</version>
-                            </dependency>
                             <dependency>
                                 <groupId>org.openjdk.jmh</groupId>
                                 <artifactId>jmh-generator-annprocess</artifactId>

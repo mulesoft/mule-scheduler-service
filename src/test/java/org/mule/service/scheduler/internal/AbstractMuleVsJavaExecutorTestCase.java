@@ -47,13 +47,13 @@ public abstract class AbstractMuleVsJavaExecutorTestCase extends BaseDefaultSche
         {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
             .useSharedScheduledExecutor(), new LinkedBlockingQueue<>(1), "java,queue(1)"},
         {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
-            .useSharedScheduledExecutor(), new CustomBlockingYieldMpmcQueue<>(1), "java,cbyjc(1)"},
+            .useSharedScheduledExecutor(), new CustomBlockingYieldMpmcQueue<>(2), "java,cbyjc(2)"},
         {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
             .createScheduledSameThreadExecutor(), new SynchronousQueue<>(), "mule,syncQueue"},
         {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
             .createScheduledSameThreadExecutor(), new LinkedBlockingQueue<>(1), "mule,queue(1)"},
         {(Function<AbstractMuleVsJavaExecutorTestCase, ScheduledExecutorService>) test -> test
-            .createScheduledSameThreadExecutor(), new CustomBlockingYieldMpmcQueue<>(1), "mule,cbyjc(1)"}
+            .createScheduledSameThreadExecutor(), new CustomBlockingYieldMpmcQueue<>(2), "mule,cbyjc(2)"}
     });
   }
 

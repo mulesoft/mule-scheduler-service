@@ -6,6 +6,7 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static java.lang.Math.max;
 import static java.lang.Runtime.getRuntime;
 import static java.lang.Thread.currentThread;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -523,7 +524,8 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     Latch latch = new Latch();
 
     // Fill up the IO pool
-    for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt(); ++i) {
+    for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt()
+        + max(2, threadPoolsConfig.getIoQueueSize().getAsInt()); ++i) {
       consumeThread(ioScheduler, latch);
     }
 
@@ -556,7 +558,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
     // Fill up the CPU-lite pool
     for (int i = 0; i < threadPoolsConfig.getCpuLightPoolSize().getAsInt()
-        + threadPoolsConfig.getCpuLightQueueSize().getAsInt(); ++i) {
+        + max(2, threadPoolsConfig.getCpuLightQueueSize().getAsInt()); ++i) {
       consumeThread(cpuLightScheduler, latch);
     }
 
@@ -594,12 +596,13 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     Latch latch = new Latch();
 
     // Fill up the IO pool
-    for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt(); ++i) {
+    for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt()
+        + max(2, threadPoolsConfig.getIoQueueSize().getAsInt()); ++i) {
       consumeThread(ioScheduler, latch);
     }
     // Fill up the CPU-lite pool
     for (int i = 0; i < threadPoolsConfig.getCpuLightPoolSize().getAsInt()
-        + threadPoolsConfig.getCpuLightQueueSize().getAsInt(); ++i) {
+        + max(2, threadPoolsConfig.getCpuLightQueueSize().getAsInt()); ++i) {
       consumeThread(cpuLightScheduler, latch);
     }
 

@@ -23,14 +23,13 @@ import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Fork;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Measurement;
+import org.openjdk.jmh.annotations.OutputTimeUnit;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.SynchronousQueue;
@@ -43,7 +42,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Fork(1)
 @Warmup(iterations = 10, time = 5, timeUnit = SECONDS)
 @Measurement(iterations = 10, time = 5, timeUnit = SECONDS)
-public class ExecutorServiceBlockingQueuesBenchmark {
+public class ExecutorServiceBlockingQueuesBenchmark extends AbstractExecutorServcieBenchmark {
 
   @State(Benchmark)
   public static class Subjects {
@@ -66,7 +65,7 @@ public class ExecutorServiceBlockingQueuesBenchmark {
       };
 
       // Implementation up to 4.1.4
-      sqExecutor = new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS,
+      sqExecutor = new ThreadPoolExecutor(cores, cores * cores, 0L, MILLISECONDS,
                                           new SynchronousQueue<Runnable>(), threadFactory, abortPolicy);
 
       AsyncHandOffQueue asyncHandoffQueue = new AsyncHandOffQueue(2);
@@ -74,7 +73,7 @@ public class ExecutorServiceBlockingQueuesBenchmark {
         throw new RejectedExecutionException();
       });
 
-      jcYieldExecutor = new ThreadPoolExecutor(cores * 2, cores * 2, 0L, MILLISECONDS,
+      jcYieldExecutor = new ThreadPoolExecutor(cores, cores * cores, 0L, MILLISECONDS,
                                                asyncHandoffQueue,
                                                threadFactory, asyncHandoffQueue.buildHandler(abortPolicy));
     }
@@ -88,37 +87,72 @@ public class ExecutorServiceBlockingQueuesBenchmark {
 
   }
 
-  private static Callable<Long> TASK = () -> {
-    sleep(2000);
+  @Benchmark
+  @Threads(1)
+  @BenchmarkMode(Throughput)
+  public long sqExecutorSingleThread(Subjects subjects) throws Exception {
+    return executeBlockingTask(subjects.sqExecutor);
+  }
+
+  @Benchmark
+  @Threads(1)
+  @BenchmarkMode(Throughput)
+  public long jcYieldExecutorSingleThread(Subjects subjects) throws Exception {
+    return executeBlockingTask(subjects.jcYieldExecutor);
+  }
+
+  @Benchmark
+  @Threads(1)
+  @BenchmarkMode(AverageTime)
+  @OutputTimeUnit(MILLISECONDS)
+  public long sqExecutorSingleThreadJustDispatch(Subjects subjects) throws Exception {
+    subjects.sqExecutor.submit(BLOCKING_TASK);
+    sleep(200);
     return currentTimeMillis();
-  };
-
-  @Benchmark
-  @Threads(1)
-  @BenchmarkMode({AverageTime, Throughput})
-  public long sqExecutorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
-    return subjects.sqExecutor.submit(TASK).get();
   }
 
   @Benchmark
   @Threads(1)
-  @BenchmarkMode({AverageTime, Throughput})
-  public long jcYieldExecutorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
-    return subjects.jcYieldExecutor.submit(TASK).get();
+  @BenchmarkMode(AverageTime)
+  @OutputTimeUnit(MILLISECONDS)
+  public long jcYieldExecutorSingleThreadJustDispatch(Subjects subjects) throws Exception {
+    subjects.jcYieldExecutor.submit(BLOCKING_TASK);
+    sleep(200);
+    return currentTimeMillis();
   }
 
   @Benchmark
   @Threads(MAX)
-  @BenchmarkMode({AverageTime, Throughput})
-  public long sqExecutorAllThreads(Subjects subjects) throws InterruptedException, ExecutionException {
-    return subjects.sqExecutor.submit(TASK).get();
+  @BenchmarkMode(AverageTime)
+  @OutputTimeUnit(MILLISECONDS)
+  public long sqExecutorAllThreadsJustDispatch(Subjects subjects) throws Exception {
+    subjects.sqExecutor.submit(BLOCKING_TASK);
+    sleep(200);
+    return currentTimeMillis();
   }
 
   @Benchmark
   @Threads(MAX)
-  @BenchmarkMode({AverageTime, Throughput})
-  public long jcYieldExecutorAllThread(Subjects subjects) throws InterruptedException, ExecutionException {
-    return subjects.jcYieldExecutor.submit(TASK).get();
+  @BenchmarkMode(AverageTime)
+  @OutputTimeUnit(MILLISECONDS)
+  public long jcYieldExecutorAllThreadsJustDispatch(Subjects subjects) throws Exception {
+    subjects.jcYieldExecutor.submit(BLOCKING_TASK);
+    sleep(200);
+    return currentTimeMillis();
+  }
+
+  @Benchmark
+  @Threads(MAX)
+  @BenchmarkMode(Throughput)
+  public long sqExecutorAllThreads(Subjects subjects) throws Exception {
+    return executeBlockingTask(subjects.sqExecutor);
+  }
+
+  @Benchmark
+  @Threads(MAX)
+  @BenchmarkMode(Throughput)
+  public long jcYieldExecutorAllThread(Subjects subjects) throws Exception {
+    return executeBlockingTask(subjects.jcYieldExecutor);
   }
 
 }

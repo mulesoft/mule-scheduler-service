@@ -8,6 +8,7 @@ package org.mule.service.scheduler.internal.executor;
 
 import static java.lang.Long.MAX_VALUE;
 import static java.lang.String.format;
+import static java.lang.Thread.currentThread;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import org.mule.runtime.api.scheduler.Scheduler;
@@ -64,11 +65,16 @@ public class WaitPolicy implements RejectedExecutionHandler {
       shutdownPolicy.rejectedExecution(r, e);
     } else {
       try {
-        if (!e.getQueue().offer(r, time, timeUnit)) {
-          throw new SchedulerBusyException(format("Scheduler '%s' did not accept within %1d %2s", schedulerName, time, timeUnit));
+        if (time == MAX_VALUE) {
+          e.getQueue().put(r);
+        } else {
+          if (!e.getQueue().offer(r, time, timeUnit)) {
+            throw new SchedulerBusyException(format("Scheduler '%s' did not accept within %1d %2s", schedulerName, time,
+                                                    timeUnit));
+          }
         }
       } catch (InterruptedException ie) {
-        Thread.currentThread().interrupt();
+        currentThread().interrupt();
         throw new RejectedExecutionException(ie);
       }
     }

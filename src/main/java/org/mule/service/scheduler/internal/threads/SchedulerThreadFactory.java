@@ -10,6 +10,9 @@ import static java.lang.String.format;
 import static java.security.AccessController.doPrivileged;
 import static java.security.AccessController.getContext;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
+import static org.slf4j.LoggerFactory.getLogger;
+
+import org.slf4j.Logger;
 
 import java.security.AccessControlContext;
 import java.security.PrivilegedAction;
@@ -22,6 +25,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * @since 1.0
  */
 public class SchedulerThreadFactory implements java.util.concurrent.ThreadFactory {
+
+  private static final Logger LOGGER = getLogger(SchedulerThreadPools.class);
 
   private final ThreadGroup group;
   private final String nameFormat;
@@ -45,8 +50,13 @@ public class SchedulerThreadFactory implements java.util.concurrent.ThreadFactor
       // Avoid the created thread to inherit the security context of the caller thread's stack.
       // If the thread creation is triggered by a deployable artifact classloader, a reference to it would be kept by the created
       // thread without this doProvileged call.
-      return doPrivileged((PrivilegedAction<Thread>) () -> new Thread(group, runnable, format(nameFormat, group.getName(),
-                                                                                              counter.getAndIncrement())),
+      return doPrivileged((PrivilegedAction<Thread>) () -> {
+        Thread thread = new Thread(group, runnable, format(nameFormat, group.getName(), counter.getAndIncrement()));
+        thread.setUncaughtExceptionHandler((t, e) -> {
+          LOGGER.error(format("Thread '%s' exited because of exception", t.getName()), e);
+        });
+        return thread;
+      },
                           acc);
 
     });

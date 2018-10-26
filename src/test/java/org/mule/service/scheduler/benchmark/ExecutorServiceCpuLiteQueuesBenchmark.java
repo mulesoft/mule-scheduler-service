@@ -7,14 +7,12 @@
 package org.mule.service.scheduler.benchmark;
 
 import static java.lang.Runtime.getRuntime;
-import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.openjdk.jmh.annotations.Mode.AverageTime;
 import static org.openjdk.jmh.annotations.Mode.Throughput;
 import static org.openjdk.jmh.annotations.Scope.Benchmark;
 import static org.openjdk.jmh.annotations.Threads.MAX;
-import static org.openjdk.jmh.infra.Blackhole.consumeCPU;
 
 import org.mule.service.scheduler.internal.executor.WaitPolicy;
 import org.mule.service.scheduler.internal.queue.CustomBlockingYieldMpmcQueue;
@@ -31,8 +29,6 @@ import org.openjdk.jmh.annotations.Threads;
 import org.openjdk.jmh.annotations.Warmup;
 
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.SynchronousQueue;
@@ -45,7 +41,7 @@ import java.util.concurrent.ThreadPoolExecutor;
 @Fork(1)
 @Warmup(iterations = 10, time = 5, timeUnit = SECONDS)
 @Measurement(iterations = 10, time = 5, timeUnit = SECONDS)
-public class ExecutorServiceCpuLiteQueuesBenchmark {
+public class ExecutorServiceCpuLiteQueuesBenchmark extends AbstractExecutorServcieBenchmark {
 
   @State(Benchmark)
   public static class Subjects {
@@ -91,51 +87,46 @@ public class ExecutorServiceCpuLiteQueuesBenchmark {
 
   }
 
-  private static Callable<Long> TASK = () -> {
-    consumeCPU(2000);
-    return currentTimeMillis();
-  };
-
   @Benchmark
   @Threads(1)
   @BenchmarkMode({AverageTime, Throughput})
-  public long sqExecutorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
-    return subjects.sqExecutor.submit(TASK).get();
+  public long sqExecutorSingleThread(Subjects subjects) throws Exception {
+    return executeCpuTask(subjects.sqExecutor);
   }
 
   @Benchmark
   @Threads(1)
   @BenchmarkMode({AverageTime, Throughput})
-  public long abqExecutorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
-    return subjects.abqExecutor.submit(TASK).get();
+  public long abqExecutorSingleThread(Subjects subjects) throws Exception {
+    return executeCpuTask(subjects.abqExecutor);
   }
 
   @Benchmark
   @Threads(1)
   @BenchmarkMode({AverageTime, Throughput})
-  public long jcYieldExecutorSingleThread(Subjects subjects) throws InterruptedException, ExecutionException {
-    return subjects.jcYieldExecutor.submit(TASK).get();
+  public long jcYieldExecutorSingleThread(Subjects subjects) throws Exception {
+    return executeCpuTask(subjects.jcYieldExecutor);
   }
 
   @Benchmark
   @Threads(MAX)
   @BenchmarkMode({AverageTime, Throughput})
-  public long sqExecutorAllThreads(Subjects subjects) throws InterruptedException, ExecutionException {
-    return subjects.sqExecutor.submit(TASK).get();
+  public long sqExecutorAllThreads(Subjects subjects) throws Exception {
+    return executeCpuTask(subjects.sqExecutor);
   }
 
   @Benchmark
   @Threads(MAX)
   @BenchmarkMode({AverageTime, Throughput})
-  public long abqExecutorAllThreads(Subjects subjects) throws InterruptedException, ExecutionException {
-    return subjects.abqExecutor.submit(TASK).get();
+  public long abqExecutorAllThreads(Subjects subjects) throws Exception {
+    return executeCpuTask(subjects.abqExecutor);
   }
 
   @Benchmark
   @Threads(MAX)
   @BenchmarkMode({AverageTime, Throughput})
-  public long jcYieldExecutorAllThread(Subjects subjects) throws InterruptedException, ExecutionException {
-    return subjects.jcYieldExecutor.submit(TASK).get();
+  public long jcYieldExecutorAllThread(Subjects subjects) throws Exception {
+    return executeCpuTask(subjects.jcYieldExecutor);
   }
 
 }

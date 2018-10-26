@@ -10,8 +10,6 @@ import static java.lang.System.nanoTime;
 import static java.lang.Thread.interrupted;
 import static java.lang.Thread.yield;
 
-import org.mule.runtime.core.internal.processor.interceptor.InterceptionException;
-
 import org.jctools.queues.MpmcArrayQueue;
 
 import java.util.Collection;
@@ -35,7 +33,7 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
   public void put(E e) throws InterruptedException {
     while (!offer(e)) {
       if (interrupted()) {
-        throw new InterceptionException();
+        throw new InterruptedException();
       } else {
         yield();
       }
@@ -52,7 +50,7 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
       }
 
       if (interrupted()) {
-        throw new InterceptionException();
+        throw new InterruptedException();
       } else {
         yield();
       }
@@ -71,14 +69,26 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
 
   @Override
   public boolean offer(E e, long timeout, TimeUnit unit) throws InterruptedException {
-    throw new UnsupportedOperationException("not implemented");
+    final long startNanos = nanoTime();
+
+    boolean offered = offer(e);
+    while (nanoTime() - unit.toNanos(timeout) < startNanos && !offered) {
+      if (interrupted()) {
+        throw new InterruptedException();
+      } else {
+        yield();
+      }
+      offered = offer(e);
+    }
+
+    return offered;
   }
 
   @Override
   public E poll(long timeout, TimeUnit unit) throws InterruptedException {
-    final long timeoutNanos = nanoTime() + unit.toNanos(timeout);
+    final long startNanos = nanoTime();
 
-    while (nanoTime() < timeoutNanos) {
+    while (nanoTime() - unit.toNanos(timeout) < startNanos) {
       E e = poll();
 
       if (e != null) {
@@ -86,7 +96,7 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
       }
 
       if (interrupted()) {
-        throw new InterceptionException();
+        throw new InterruptedException();
       } else {
         yield();
       }
