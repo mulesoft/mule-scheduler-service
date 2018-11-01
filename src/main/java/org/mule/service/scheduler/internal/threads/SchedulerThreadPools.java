@@ -53,9 +53,11 @@ import java.util.List;
 import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -173,17 +175,29 @@ public class SchedulerThreadPools {
                                byCallerThreadGroupPolicy.apply(cpuLightGroup.getName()));
 
     // TODO (elrodro83) MULE-14203 Make IO thread pool have an optimal core size
-    AsyncHandOffQueue queueForBlockingPool = createQueueForBlockingPool(threadPoolsConfig.getIoQueueSize().getAsInt());
     ioExecutor = new ThreadPoolExecutor(threadPoolsConfig.getIoCorePoolSize().getAsInt(),
                                         threadPoolsConfig.getIoMaxPoolSize().getAsInt(),
                                         threadPoolsConfig.getIoKeepAlive().getAsLong(), MILLISECONDS,
-                                        queueForBlockingPool,
+                                        // At first, it may seem that a SynchronousQueue is not the best option here since it may
+                                        // block the dispatching thread, which may be a CPU-light.
+                                        // However, the alternatives have some limitations that make them impractical:
+                                        //
+                                        // * Using a LinkedBlockingQueue causes the pool not to grow until the queue is full. This
+                                        // causes unwanted delays in the processing if the core size of the pool is small, or
+                                        // keeping too many idle threads if the core size is large.
+                                        //
+                                        // * Using a custom SynchronizedQueue + RejectedExectuionHandler
+                                        // (https://gist.github.com/elrodro83/96e1ee470237a57fb06376a7e4b04f2b) that addresses the
+                                        // limitations of the other 2 approaches, an improvement is seen in the dispatching of the
+                                        // tasks, but at the cost of a slower task taking, which slows down the processing so much
+                                        // that it greatly outweights the gain in the dispatcher.
+                                        createQueue(threadPoolsConfig.getIoQueueSize().getAsInt()),
                                         new SchedulerThreadFactory(ioGroup),
-                                        queueForBlockingPool.buildHandler(byCallerThreadGroupPolicy.apply(ioGroup.getName())));
+                                        byCallerThreadGroupPolicy.apply(ioGroup.getName()));
     computationExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
                                threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
-                               0, SECONDS, createQueueForCpuPool(threadPoolsConfig.getCpuIntensiveQueueSize().getAsInt()),
+                               0, SECONDS, createQueue(threadPoolsConfig.getCpuIntensiveQueueSize().getAsInt()),
                                new SchedulerThreadFactory(computationGroup),
                                byCallerThreadGroupPolicy.apply(computationGroup.getName()));
 
@@ -203,6 +217,16 @@ public class SchedulerThreadPools {
     } catch (SchedulerException e) {
       throw new LifecycleException(e, this);
     }
+  }
+
+  /**
+   * Create queue using a {@link SynchronousQueue} if size is 0 or a {@link LinkedBlockingQueue} if size > 0.
+   *
+   * @param size queue size
+   * @return new queue instance
+   */
+  private BlockingQueue<Runnable> createQueue(int size) {
+    return size == 0 ? new SynchronousQueue<>() : new LinkedBlockingQueue<>(size);
   }
 
   /**
@@ -395,7 +419,7 @@ public class SchedulerThreadPools {
   public Scheduler createCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, int queueSize) {
     String threadsName = resolveCustomThreadsName(config);
     return doCreateCustomScheduler(config, workers, stopTimeout, resolveCustomSchedulerName(config),
-                                   createQueueForCpuPool(queueSize), threadsName);
+                                   createQueue(queueSize), threadsName);
   }
 
   private Scheduler doCreateCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, String schedulerName,

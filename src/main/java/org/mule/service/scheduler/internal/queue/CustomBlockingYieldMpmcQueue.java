@@ -8,6 +8,7 @@ package org.mule.service.scheduler.internal.queue;
 
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.interrupted;
+import static java.lang.Thread.sleep;
 import static java.lang.Thread.yield;
 
 import org.jctools.queues.MpmcArrayQueue;
@@ -15,6 +16,7 @@ import org.jctools.queues.MpmcArrayQueue;
 import java.util.Collection;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A BlockingQueue implementation built upon Nitsan W's JCTools queues.
@@ -32,12 +34,9 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
   @Override
   public void put(E e) throws InterruptedException {
     while (!offer(e)) {
-      if (interrupted()) {
-        throw new InterruptedException();
-      } else {
-        yield();
-      }
+      checkInterrupt(yieldingFromIn);
     }
+    yieldingFromIn.set(-1);
   }
 
   @Override
@@ -46,14 +45,11 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
       E e = poll();
 
       if (e != null) {
+        yieldingFromOut.set(-1);
         return e;
       }
 
-      if (interrupted()) {
-        throw new InterruptedException();
-      } else {
-        yield();
-      }
+      checkInterrupt(yieldingFromOut);
     }
   }
 
@@ -64,7 +60,7 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
 
   @Override
   public int drainTo(Collection<? super E> c, int maxElements) {
-    throw new UnsupportedOperationException("not implemented");
+    return drain(e -> c.add(e), maxElements);
   }
 
   @Override
@@ -73,14 +69,13 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
 
     boolean offered = offer(e);
     while (nanoTime() - unit.toNanos(timeout) < startNanos && !offered) {
-      if (interrupted()) {
-        throw new InterruptedException();
-      } else {
-        yield();
-      }
+      checkInterrupt(yieldingFromIn);
       offered = offer(e);
     }
 
+    if (offered) {
+      yieldingFromIn.set(-1);
+    }
     return offered;
   }
 
@@ -92,17 +87,36 @@ public class CustomBlockingYieldMpmcQueue<E> extends MpmcArrayQueue<E> implement
       E e = poll();
 
       if (e != null) {
+        yieldingFromOut.set(-1);
         return e;
       }
 
-      if (interrupted()) {
-        throw new InterruptedException();
-      } else {
-        yield();
-      }
+      checkInterrupt(yieldingFromOut);
     }
 
     return null;
+  }
+
+  private AtomicLong yieldingFromIn = new AtomicLong(-1);
+  private AtomicLong yieldingFromOut = new AtomicLong(-1);
+
+  protected void checkInterrupt(AtomicLong yieldingFrom) throws InterruptedException {
+    long now = System.currentTimeMillis();
+
+    // long currentYieldingFrom = yieldingFrom.get();
+    if (yieldingFrom.compareAndSet(-1, now)) {
+      if (interrupted()) {
+        throw new InterruptedException();
+      }
+      yield();
+    } else if (yieldingFrom.get() > now - 1000) {
+      if (interrupted()) {
+        throw new InterruptedException();
+      }
+      yield();
+    } else {
+      sleep(10);
+    }
   }
 
   @Override
