@@ -87,14 +87,14 @@ public class ExecutorServiceCpuLiteQueuesBenchmark extends AbstractExecutorServc
 
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(1)
   @BenchmarkMode({AverageTime, Throughput})
   public long sqExecutorSingleThread(Subjects subjects) throws Exception {
     return executeCpuTask(subjects.sqExecutor);
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(1)
   @BenchmarkMode({AverageTime, Throughput})
   public long abqExecutorSingleThread(Subjects subjects) throws Exception {
@@ -108,14 +108,14 @@ public class ExecutorServiceCpuLiteQueuesBenchmark extends AbstractExecutorServc
     return executeCpuTask(subjects.jcYieldExecutor);
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(MAX)
   @BenchmarkMode({AverageTime, Throughput})
   public long sqExecutorAllThreads(Subjects subjects) throws Exception {
     return executeCpuTask(subjects.sqExecutor);
   }
 
-  @Benchmark
+  // @Benchmark
   @Threads(MAX)
   @BenchmarkMode({AverageTime, Throughput})
   public long abqExecutorAllThreads(Subjects subjects) throws Exception {

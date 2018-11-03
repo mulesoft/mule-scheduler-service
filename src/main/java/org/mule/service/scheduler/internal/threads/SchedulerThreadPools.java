@@ -45,6 +45,7 @@ import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 
+import com.conversantmedia.util.concurrent.DisruptorBlockingQueue;
 import com.google.common.collect.ImmutableList;
 
 import java.util.ArrayList;
@@ -53,7 +54,6 @@ import java.util.List;
 import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -246,7 +246,7 @@ public class SchedulerThreadPools {
    * @return new queue instance
    */
   private BlockingQueue<Runnable> createQueueForCpuPool(int size) {
-    return new CustomBlockingYieldMpmcQueue<>(max(2, size));
+    return new DisruptorBlockingQueue<>(max(2, size));
   }
 
   /**

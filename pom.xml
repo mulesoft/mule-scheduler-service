@@ -72,6 +72,11 @@
             <artifactId>jctools-core</artifactId>
             <version>${jcToolsVersion}</version>
         </dependency>
+        <dependency>
+            <groupId>com.conversantmedia</groupId>
+            <artifactId>disruptor</artifactId>
+            <version>1.2.13</version>
+        </dependency>
 
         <dependency>
             <groupId>org.quartz-scheduler</groupId>
