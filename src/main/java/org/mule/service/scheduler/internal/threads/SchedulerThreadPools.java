@@ -610,7 +610,7 @@ public class SchedulerThreadPools {
     private IllegalThreadStateException doDestroyThreadGroup() {
       IllegalThreadStateException destroyException = null;
 
-      final long stopNanos = nanoTime() + MILLISECONDS.toNanos(shutdownTimeoutMillis.get()) + SECONDS.toNanos(1);
+      final long stopNanos = nanoTime() + MILLISECONDS.toNanos(shutdownTimeoutMillis.get()) + MILLISECONDS.toNanos(200);
       while (nanoTime() <= stopNanos && !threadGroup.isDestroyed()) {
         try {
           threadGroup.destroy();
@@ -623,7 +623,7 @@ public class SchedulerThreadPools {
           destroyException = e;
           try {
             yield();
-            sleep(50);
+            sleep(5);
           } catch (InterruptedException e1) {
             currentThread().interrupt();
             break;
