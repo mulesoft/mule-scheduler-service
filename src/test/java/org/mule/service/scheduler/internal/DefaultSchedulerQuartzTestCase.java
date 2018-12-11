@@ -17,24 +17,14 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.number.IsCloseTo.closeTo;
 import static org.junit.Assert.assertThat;
-import static org.mockito.Matchers.any;
-import static org.mockito.Matchers.argThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mule.service.scheduler.ThreadType.CUSTOM;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SchedulerServiceStory.QUARTZ_TASK_SCHEDULING;
-
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
-
-import org.hamcrest.TypeSafeMatcher;
-import org.junit.Test;
-import org.quartz.CronTrigger;
-import org.quartz.Job;
-import org.quartz.JobDetail;
-import org.quartz.JobExecutionContext;
-import org.quartz.JobExecutionException;
-import org.quartz.SchedulerException;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -47,6 +37,14 @@ import java.util.concurrent.ScheduledFuture;
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Story;
+import org.junit.Test;
+import org.mockito.ArgumentMatcher;
+import org.quartz.CronTrigger;
+import org.quartz.Job;
+import org.quartz.JobDetail;
+import org.quartz.JobExecutionContext;
+import org.quartz.JobExecutionException;
+import org.quartz.SchedulerException;
 
 @Feature(SCHEDULER_SERVICE)
 @Story(QUARTZ_TASK_SCHEDULING)
@@ -236,7 +234,7 @@ public class DefaultSchedulerQuartzTestCase extends BaseDefaultSchedulerTestCase
     }));
   }
 
-  private static final class CronTriggerMatcher extends TypeSafeMatcher<CronTrigger> {
+  private static final class CronTriggerMatcher implements ArgumentMatcher<CronTrigger> {
 
     final String cronExpression;// = "0/2 * * ? * *";
     final TimeZone timeZone;
@@ -251,12 +249,7 @@ public class DefaultSchedulerQuartzTestCase extends BaseDefaultSchedulerTestCase
     }
 
     @Override
-    public void describeTo(org.hamcrest.Description description) {
-      description.appendText("Parameters of scheduleJob call didn't match");
-    }
-
-    @Override
-    protected boolean matchesSafely(CronTrigger item) {
+    public boolean matches(CronTrigger item) {
       return item.getCronExpression().equals(cronExpression) && item.getTimeZone().equals(timeZone);
     }
   }
