@@ -8,6 +8,7 @@ package org.mule.service.scheduler.internal;
 
 import static java.lang.Runtime.getRuntime;
 import static java.lang.Thread.currentThread;
+import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.not;
@@ -26,6 +27,7 @@ import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.core.api.util.IOUtils.toByteArray;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
+import static org.mule.tck.probe.PollingProber.probe;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 import org.mule.runtime.api.exception.MuleException;
@@ -57,6 +59,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -732,6 +735,38 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
     latch.countDown();
     submit.get(5, SECONDS);
+  }
+
+  @Test
+  public void customSchedulerThreadGroupDestroy() throws Exception {
+    AtomicReference<ExecutorService> innerExecutor = new AtomicReference<>();
+    AtomicBoolean innerThreadInterupted = new AtomicBoolean();
+    Scheduler targetScheduler =
+        service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
+
+    targetScheduler.submit(() -> {
+      // threads from innerExecutor will inherit the threadGroup of the custom scheduler...
+      innerExecutor.set(newCachedThreadPool());
+    });
+
+    probe(() -> innerExecutor.get() != null);
+
+    Latch latch = new Latch();
+    innerExecutor.get().submit(() -> {
+      try {
+        return latch.await(getTestTimeoutSecs(), SECONDS);
+      } catch (InterruptedException e) {
+        innerThreadInterupted.set(true);
+        currentThread().interrupt();
+        return false;
+      }
+    });
+
+    targetScheduler.stop();
+
+    latch.countDown();
+
+    probe(5000, 100, () -> innerThreadInterupted.get());
   }
 
   @Test
