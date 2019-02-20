@@ -110,18 +110,18 @@ public class SchedulerThreadPools {
   private ThreadPoolExecutor cpuLightExecutor;
   private ThreadPoolExecutor ioExecutor;
   private ThreadPoolExecutor computationExecutor;
-  private Set<ThreadPoolExecutor> customSchedulersExecutors = new HashSet<>();
+  private final Set<ThreadPoolExecutor> customSchedulersExecutors = new HashSet<>();
   private ScheduledThreadPoolExecutor scheduledExecutor;
   private org.quartz.Scheduler quartzScheduler;
 
-  private ReadWriteLock activeSchedulersLock = new ReentrantReadWriteLock();
-  private Lock activeSchedulersReadLock = activeSchedulersLock.readLock();
-  private Lock activeSchedulersWriteLock = activeSchedulersLock.writeLock();
+  private final ReadWriteLock activeSchedulersLock = new ReentrantReadWriteLock();
+  private final Lock activeSchedulersReadLock = activeSchedulersLock.readLock();
+  private final Lock activeSchedulersWriteLock = activeSchedulersLock.writeLock();
 
-  private List<Scheduler> activeCpuLightSchedulers = new ArrayList<>();
-  private List<Scheduler> activeIoSchedulers = new ArrayList<>();
-  private List<Scheduler> activeCpuIntensiveSchedulers = new ArrayList<>();
-  private List<Scheduler> activeCustomSchedulers = new ArrayList<>();
+  private final List<Scheduler> activeCpuLightSchedulers = new ArrayList<>();
+  private final List<Scheduler> activeIoSchedulers = new ArrayList<>();
+  private final List<Scheduler> activeCpuIntensiveSchedulers = new ArrayList<>();
+  private final List<Scheduler> activeCustomSchedulers = new ArrayList<>();
 
   public SchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig) {
     this.name = name;
@@ -524,6 +524,8 @@ public class SchedulerThreadPools {
 
   private static class CustomScheduler extends DefaultScheduler {
 
+    private static final float THREADS_IN_GROUP_SIZE_MARGIN = 1.5f;
+
     private final ExecutorService executor;
     private final ThreadGroup threadGroup;
 
@@ -588,10 +590,16 @@ public class SchedulerThreadPools {
       tryTerminate();
 
       if (destroyException != null) {
-        Thread[] threads = new Thread[threadGroup.activeCount()];
+        // Create the array larger in case new threads are created after the enumeration
+        Thread[] threads = new Thread[(int) (threadGroup.activeCount() * THREADS_IN_GROUP_SIZE_MARGIN)];
         threadGroup.enumerate(threads, true);
         StringBuilder threadNamesBuilder = new StringBuilder();
         for (Thread thread : threads) {
+          // Account for the extra slots added to the array
+          if (thread == null) {
+            continue;
+          }
+
           threadNamesBuilder.append("\t* " + thread.getName() + lineSeparator());
 
           if (logger.isDebugEnabled()) {
