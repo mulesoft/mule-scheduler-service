@@ -524,6 +524,8 @@ public class SchedulerThreadPools {
 
   private static class CustomScheduler extends DefaultScheduler {
 
+    private static final float THREADS_IN_GROUP_SIZE_MARGIN = 1.5f;
+
     private final ExecutorService executor;
     private final ThreadGroup threadGroup;
 
@@ -589,7 +591,7 @@ public class SchedulerThreadPools {
 
       if (destroyException != null) {
         // Create the array larger in case new threads are created after the enumeration
-        Thread[] threads = new Thread[(int) (threadGroup.activeCount() * 1.5)];
+        Thread[] threads = new Thread[(int) (threadGroup.activeCount() * THREADS_IN_GROUP_SIZE_MARGIN)];
         threadGroup.enumerate(threads, true);
         StringBuilder threadNamesBuilder = new StringBuilder();
         for (Thread thread : threads) {
