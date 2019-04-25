@@ -8,8 +8,6 @@ package org.mule.service.scheduler.internal;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
-import org.slf4j.Logger;
-
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.RunnableFuture;
@@ -18,17 +16,20 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import org.slf4j.Logger;
+
 /**
  * Decorates a {@link RunnableFuture} in order to do hook behavior before the execution of the decorated {@link RunnableFuture} so
  * a consistent state is maintained in the owner {@link DefaultScheduler}.
  *
  * @since 1.0
  */
-class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorator<V> {
+class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorator<V> implements RepeatableTaskWrapper {
 
   private static final Logger logger = getLogger(RunnableRepeatableFutureDecorator.class);
 
   private final Supplier<RunnableFuture<V>> taskSupplier;
+  private final Runnable command;
   private final Consumer<RunnableRepeatableFutureDecorator<V>> wrapUpCallback;
 
   private final DefaultScheduler scheduler;
@@ -43,6 +44,7 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
    * Decorates the given {@code task}
    *
    * @param taskSupplier the supplier for tasks to be decorated
+   * @param command the actual command that was given to the Scheduler
    * @param wrapUpCallback the callback to execute after the task is done
    * @param classLoader the context {@link ClassLoader} on which the {@code task} should be executed
    * @param scheduler the owner {@link Executor} of this task
@@ -50,10 +52,12 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
    * @param id a unique it for this task.
    */
   RunnableRepeatableFutureDecorator(Supplier<RunnableFuture<V>> taskSupplier,
+                                    Runnable command,
                                     Consumer<RunnableRepeatableFutureDecorator<V>> wrapUpCallback,
                                     ClassLoader classLoader, DefaultScheduler scheduler, String taskAsString, int id) {
     super(id, classLoader);
     this.taskSupplier = taskSupplier;
+    this.command = command;
     this.wrapUpCallback = wrapUpCallback;
     this.scheduler = scheduler;
     this.taskAsString = taskAsString;
@@ -140,6 +144,11 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
     } else {
       return null;
     }
+  }
+
+  @Override
+  public Runnable getCommand() {
+    return command;
   }
 
   @Override

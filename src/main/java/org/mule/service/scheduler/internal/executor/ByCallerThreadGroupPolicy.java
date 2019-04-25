@@ -6,7 +6,6 @@
  */
 package org.mule.service.scheduler.internal.executor;
 
-import static java.lang.System.currentTimeMillis;
 import static java.lang.Thread.currentThread;
 import static org.apache.commons.lang3.StringUtils.rightPad;
 import static org.mule.service.scheduler.internal.DefaultSchedulerService.USAGE_TRACE_INTERVAL_SECS;
@@ -15,17 +14,18 @@ import static org.mule.service.scheduler.internal.DefaultSchedulerService.traceL
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerBusyException;
 import org.mule.runtime.api.scheduler.SchedulerService;
+import org.mule.service.scheduler.internal.RepeatableTaskWrapper;
+import org.mule.service.scheduler.internal.logging.SuppressingLogger;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadFactory;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Set;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor.AbortPolicy;
 import java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy;
-import java.util.concurrent.atomic.AtomicLong;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Dynamically determines the {@link RejectedExecutionHandler} implementation to use according to the {@link ThreadGroup} of the
@@ -45,32 +45,23 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
 
     private final String schedulerName;
 
-    private AtomicLong lastRejectionLog = new AtomicLong(-1);
+    private final SuppressingLogger suppressionLogger;
 
     public AbortBusyPolicy(String schedulerName) {
       this.schedulerName = schedulerName;
+      this.suppressionLogger =
+          new SuppressingLogger(LOGGER, 5000, "Similar log entries will be suppressed for the following 5 seconds for scheduler '"
+              + schedulerName + "'.");
     }
 
     @Override
     public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
       String msg = "Task '" + r.toString() + "' rejected from Scheduler '" + schedulerName + "' ('"
           + executor.toString() + "')";
-      if (!executor.isShutdown()) {
-        if (LOGGER.isDebugEnabled()) {
-          LOGGER.warn(msg);
-        } else {
-          lastRejectionLog.updateAndGet(t -> {
-            long now = currentTimeMillis();
-            if (t < now - 5000) {
-              LOGGER.warn(msg + ". Similar log entries will be suppressed for the following 5 seconds for scheduler '"
-                  + schedulerName + "'.");
 
-              return now;
-            } else {
-              return t;
-            }
-          });
-        }
+      // The case for repeatable tasks is already handled in DefaultScheduler#scheduleableTask.
+      if (!executor.isShutdown() && !(r instanceof RepeatableTaskWrapper)) {
+        suppressionLogger.log(msg);
       }
       throw new SchedulerBusyException(msg);
     }
