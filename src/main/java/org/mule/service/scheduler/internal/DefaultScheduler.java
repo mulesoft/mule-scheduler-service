@@ -379,7 +379,6 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
       currentThread().interrupt();
     } finally {
       stopFinally();
-      shutdownTimeoutMillis = null;
     }
   }
 
