@@ -12,12 +12,12 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class RunnableRepeatableFutureDecoratorTestCase extends BaseDefaultSchedulerTestCase {
 
@@ -43,10 +43,11 @@ public class RunnableRepeatableFutureDecoratorTestCase extends BaseDefaultSchedu
   @Test
   public void exceptionInWrapUpCallbackCompletesWrapUp() {
     final ClassLoader taskClassloader = mock(ClassLoader.class);
+
+    Runnable command = () -> {
+    };
     taskDecorator =
-        new RunnableRepeatableFutureDecorator<>(() -> new FutureTask<>(() -> {
-          return null;
-        }), d -> {
+        new RunnableRepeatableFutureDecorator<>(() -> new FutureTask<>(command, null), command, d -> {
           throw new WrapUpException();
         }, taskClassloader, scheduler, "testTask", -1);
 
@@ -60,11 +61,11 @@ public class RunnableRepeatableFutureDecoratorTestCase extends BaseDefaultSchedu
   public void repeatableSecondRunBeforeFirstWrapUp() {
     final AtomicInteger runCount = new AtomicInteger(0);
 
+    Runnable command = () -> {
+      runCount.incrementAndGet();
+    };
     taskDecorator =
-        new RunnableRepeatableFutureDecorator<>(() -> new FutureTask<>(() -> {
-          runCount.incrementAndGet();
-          return null;
-        }), d -> {
+        new RunnableRepeatableFutureDecorator<>(() -> new FutureTask<>(command, null), command, d -> {
           if (runCount.get() < 2) {
             taskDecorator.run();
           }

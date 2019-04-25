@@ -8,7 +8,6 @@ package org.mule.service.scheduler.internal;
 
 import static java.lang.Integer.toHexString;
 import static java.lang.Runtime.getRuntime;
-import static java.lang.System.currentTimeMillis;
 import static java.lang.System.lineSeparator;
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
@@ -21,9 +20,11 @@ import static org.quartz.CronScheduleBuilder.cronSchedule;
 import static org.quartz.JobBuilder.newJob;
 import static org.quartz.TriggerBuilder.newTrigger;
 import static org.slf4j.LoggerFactory.getLogger;
+
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.service.scheduler.ThreadType;
+import org.mule.service.scheduler.internal.logging.SuppressingLogger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,7 +42,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -86,7 +86,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   private final CountDownLatch terminationLatch = new CountDownLatch(1);
 
   private static final ScheduledFuture<?> NULL_SCHEDULED_FUTURE = NullScheduledFuture.INSTANCE;
-  private Map<RunnableFuture<?>, ScheduledFuture<?>> scheduledTasks;
+  private final Map<RunnableFuture<?>, ScheduledFuture<?>> scheduledTasks;
 
   private volatile boolean shutdown = false;
 
@@ -118,6 +118,10 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     this.threadType = threadsType;
     this.shutdownTimeoutMillis = shutdownTimeoutMillis;
     this.shutdownCallback = shutdownCallback;
+
+    this.schedulableSuppressionLogger =
+        new SuppressingLogger(LOGGER, 5000, "Similar log entries will be suppressed for the following 5 seconds for scheduler '"
+            + getName() + "'");
   }
 
   @Override
@@ -152,7 +156,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     checkShutdown();
     requireNonNull(command);
 
-    final RunnableFuture<?> task = new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), t -> {
+    final RunnableFuture<?> task = new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), command, t -> {
       if (t.isCancelled()) {
         taskFinished(t);
       }
@@ -172,7 +176,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     checkShutdown();
     requireNonNull(command);
 
-    final RunnableFuture<?> task = new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), t -> {
+    final RunnableFuture<?> task = new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), command, t -> {
       fixedDelayWrapUp(t, delay, unit);
     }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement());
 
@@ -201,7 +205,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     checkShutdown();
     requireNonNull(command);
 
-    final RunnableFuture<?> task = new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), t -> {
+    final RunnableFuture<?> task = new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), command, t -> {
       if (t.isCancelled()) {
         taskFinished(t);
       }
@@ -226,7 +230,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     return scheduled;
   }
 
-  private AtomicLong lastSchedulableRejectionLog = new AtomicLong(-1);
+  private final SuppressingLogger schedulableSuppressionLogger;
 
   private <T> Runnable schedulableTask(RunnableFuture<T> task, Runnable rejectionCallback) {
     return () -> {
@@ -234,29 +238,23 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
         executor.execute(task);
       } catch (RejectedExecutionException e) {
         if (!executor.isShutdown()) {
-          // Just log. Do not rethrow so the periodic job is not cancelled
-          if (LOGGER.isDebugEnabled()) {
-            LOGGER.warn("{} scheduling next execution of task {}. Message was: {}", e.getClass().getName(), task.toString(),
-                        e.getMessage());
-          } else {
-            lastSchedulableRejectionLog.updateAndGet(t -> {
-              long now = currentTimeMillis();
-              if (t < now - 5000) {
-                LOGGER
-                    .warn("{} scheduling next execution of task {}. Message was: {}. Similar log entries will be suppressed for the following 5 seconds for scheduler '{}'.",
-                          e.getClass().getName(), task.toString(), e.getMessage(), getName());
-
-                return now;
-              } else {
-                return t;
-              }
-            });
+          if (!recurrentTaskAlreadyRunning(task)) {
+            // Just log. Do not rethrow so the periodic job is not cancelled
+            schedulableSuppressionLogger.log(e.getClass().getName() + " scheduling next execution of task " + task.toString()
+                + ". Message was: " + e.getMessage());
           }
 
           rejectionCallback.run();
         }
       }
     };
+  }
+
+  private <T> boolean recurrentTaskAlreadyRunning(RunnableFuture<T> task) {
+    return task instanceof RepeatableTaskWrapper && scheduledTasks.keySet()
+        .stream()
+        .anyMatch(st -> st instanceof RepeatableTaskWrapper && ((RepeatableTaskWrapper) st)
+            .getCommand() == ((RepeatableTaskWrapper) task).getCommand());
   }
 
   public void setJobClass(Class<? extends QuartzCronJob> jobClass) {
