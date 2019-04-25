@@ -41,12 +41,6 @@ import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-
 import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
 import java.util.ArrayList;
@@ -62,6 +56,12 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
@@ -371,9 +371,14 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
-  public void customSchedulerShutdownFromWithin() throws InterruptedException, ExecutionException, TimeoutException {
+  public void customSchedulerShutdownFromWithin() throws Exception {
     Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L);
-    Future<?> stopSubmit = scheduler.submit(() -> scheduler.stop());
+    AtomicReference<ThreadGroup> customThreadGroup = new AtomicReference<>();
+
+    Future<?> stopSubmit = scheduler.submit(() -> {
+      customThreadGroup.set(currentThread().getThreadGroup());
+      scheduler.stop();
+    });
 
     expected.expect(CancellationException.class);
     try {
@@ -382,6 +387,41 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
       new PollingProber().check(new JUnitLambdaProbe(() -> {
         assertThat("Shutdown", scheduler.isShutdown(), is(true));
         assertThat("Terminated", scheduler.isTerminated(), is(true));
+        assertThat("Destroyed", customThreadGroup.get().isDestroyed(), is(true));
+        return true;
+      }));
+    }
+  }
+
+  @Test
+  public void customSchedulerShutdownFromWithinDelayed() throws Exception {
+    Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(2), 2, () -> 1000L);
+    AtomicReference<ThreadGroup> customThreadGroup = new AtomicReference<>();
+    AtomicBoolean cancelled = new AtomicBoolean(false);
+
+    Future<?> hangSubmit = scheduler.submit(() -> {
+      while (!cancelled.get()) {
+        try {
+          Thread.sleep(100);
+        } catch (InterruptedException e) {
+          currentThread().interrupt();
+        }
+      }
+    });
+    Future<?> stopSubmit = scheduler.submit(() -> {
+      customThreadGroup.set(currentThread().getThreadGroup());
+      scheduler.stop();
+    });
+
+    expected.expect(CancellationException.class);
+    try {
+      stopSubmit.get(10, SECONDS);
+    } finally {
+      cancelled.set(true);
+      new PollingProber().check(new JUnitLambdaProbe(() -> {
+        assertThat("Shutdown", scheduler.isShutdown(), is(true));
+        assertThat("Terminated", scheduler.isTerminated(), is(true));
+        assertThat("Destroyed", customThreadGroup.get().isDestroyed(), is(true));
         return true;
       }));
     }
