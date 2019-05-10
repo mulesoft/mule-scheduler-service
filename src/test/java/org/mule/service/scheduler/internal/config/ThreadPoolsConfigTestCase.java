@@ -386,7 +386,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     props.put(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "1");
 
     System.setProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY,
-                       "https://raw.githubusercontent.com/mulesoft/mule-distributions/mule-4.x/standalone/src/main/resources/conf/scheduler-pools.conf");
+                       "https://raw.githubusercontent.com/mulesoft/mule-distributions/mule-4.2.0/standalone/src/main/resources/conf/scheduler-pools.conf");
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
@@ -400,7 +400,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     props.put(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "1");
 
     System.setProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY,
-                       "https://raw.githubusercontent.com/mulesoft/mule-distributions/mule-4.x/standalone/src/main/resources/conf/scheduler-pools.conf");
+                       "https://raw.githubusercontent.com/mulesoft/mule-distributions/mule-4.2.0/standalone/src/main/resources/conf/scheduler-pools.conf");
     System.setProperty("org.mule.runtime.scheduler.io.threadPool.maxSize",
                        "100");
 
