@@ -33,17 +33,17 @@ import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.junit4.rule.SystemProperty;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Properties;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Properties;
 
 import io.qameta.allure.Description;
 
@@ -365,7 +365,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
   @Description("Tests that the mule.schedulerPools.configFile property is honored if present")
   public void overrideConfigFile() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
-    props.put(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "1");
+    props.put(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "100");
 
     File overrideConfigFile = new File(tempOtherDir.getRoot(), "overriding.conf");
     props.store(new FileOutputStream(overrideConfigFile), "defaultConfig");
@@ -373,7 +373,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is(1));
+    assertThat(config.getIoMaxPoolSize().getAsInt(), is(100));
   }
 
 }
