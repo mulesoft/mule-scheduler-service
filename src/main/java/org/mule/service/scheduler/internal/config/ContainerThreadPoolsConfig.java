@@ -262,7 +262,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
   @Override
   public OptionalInt getIoMaxPoolSize() {
-    return OptionalInt.of(ioMaxPoolSize);
+    return OptionalInt.of(max(ioCorePoolSize, ioMaxPoolSize));
   }
 
   private void setIoMaxPoolSize(int ioMaxPoolSize) {
