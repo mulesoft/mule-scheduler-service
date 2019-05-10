@@ -33,17 +33,17 @@ import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.junit4.rule.SystemProperty;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.Properties;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Properties;
 
 import io.qameta.allure.Description;
 
@@ -54,6 +54,9 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
   @Rule
   public SystemProperty configFile = new SystemProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY, null);
+
+  @Rule
+  public SystemProperty configOverrideFile = new SystemProperty("org.mule.runtime.scheduler.io.threadPool.maxSize", null);
 
   @Rule
   public TemporaryFolder tempMuleHome = new TemporaryFolder();
@@ -370,6 +373,36 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     File overrideConfigFile = new File(tempOtherDir.getRoot(), "overriding.conf");
     props.store(new FileOutputStream(overrideConfigFile), "defaultConfig");
     System.setProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY, overrideConfigFile.getPath());
+
+    final SchedulerPoolsConfig config = loadThreadPoolsConfig();
+
+    assertThat(config.getIoMaxPoolSize().getAsInt(), is(100));
+  }
+
+  @Test
+  @Description("Tests that the mule.schedulerPools.configFile pointing to an external url property is honored if present")
+  public void overrideConfigFileWithUrl() throws IOException, MuleException {
+    final Properties props = buildDefaultConfigProps();
+    props.put(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "1");
+
+    System.setProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY,
+                       "https://raw.githubusercontent.com/mulesoft/mule-distributions/mule-4.2.0/standalone/src/main/resources/conf/scheduler-pools.conf");
+
+    final SchedulerPoolsConfig config = loadThreadPoolsConfig();
+
+    assertThat(config.getIoCorePoolSize().getAsInt(), is(cores));
+  }
+
+  @Test
+  @Description("Tests that system properties overriding the config from the file are honored if present")
+  public void overrideConfigWithIndividualProperty() throws IOException, MuleException {
+    final Properties props = buildDefaultConfigProps();
+    props.put(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "1");
+
+    System.setProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY,
+                       "https://raw.githubusercontent.com/mulesoft/mule-distributions/mule-4.2.0/standalone/src/main/resources/conf/scheduler-pools.conf");
+    System.setProperty("org.mule.runtime.scheduler.io.threadPool.maxSize",
+                       "100");
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 

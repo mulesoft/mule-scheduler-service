@@ -8,6 +8,7 @@ package org.mule.service.scheduler.internal;
 
 import static java.lang.Runtime.getRuntime;
 import static java.lang.Thread.currentThread;
+import static java.lang.Thread.sleep;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -732,6 +733,74 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     expected.expect(ExecutionException.class);
     expected.expectCause(instanceOf(SchedulerBusyException.class));
     submit.get(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
+  }
+
+  @Test
+  @Description("Tests that tasks scheduled from a Custom scheduler thread are skipped of triggered when the scheduler is busy.")
+  public void rejectionPolicyCustomScheduleAtFixedRate()
+      throws MuleException, InterruptedException, ExecutionException, TimeoutException {
+    Scheduler sourceScheduler =
+        service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
+    Scheduler targetScheduler =
+        service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
+
+    Latch latch = new Latch();
+
+    Future<Object> submit = sourceScheduler.submit(threadsConsumer(targetScheduler, latch));
+
+    expected.expect(ExecutionException.class);
+    expected.expectCause(instanceOf(SchedulerBusyException.class));
+
+    try {
+      submit.get(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
+    } finally {
+      AtomicBoolean scheduledExecuted = new AtomicBoolean();
+
+      targetScheduler.scheduleAtFixedRate(() -> {
+        scheduledExecuted.set(true);
+      }, 0, 5, SECONDS);
+
+      sleep(1000);
+      assertThat(scheduledExecuted.get(), is(false));
+
+      latch.countDown();
+
+      probe(6000, 500, () -> scheduledExecuted.get());
+    }
+  }
+
+  @Test
+  @Description("Tests that tasks scheduled from a Custom scheduler thread are skipped of triggered when the scheduler is busy.")
+  public void rejectionPolicyCustomScheduleWithFixedDelay()
+      throws MuleException, InterruptedException, ExecutionException, TimeoutException {
+    Scheduler sourceScheduler =
+        service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
+    Scheduler targetScheduler =
+        service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
+
+    Latch latch = new Latch();
+
+    Future<Object> submit = sourceScheduler.submit(threadsConsumer(targetScheduler, latch));
+
+    expected.expect(ExecutionException.class);
+    expected.expectCause(instanceOf(SchedulerBusyException.class));
+
+    try {
+      submit.get(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
+    } finally {
+      AtomicBoolean scheduledExecuted = new AtomicBoolean();
+
+      targetScheduler.scheduleWithFixedDelay(() -> {
+        scheduledExecuted.set(true);
+      }, 0, 5, SECONDS);
+
+      sleep(1000);
+      assertThat(scheduledExecuted.get(), is(false));
+
+      latch.countDown();
+
+      probe(6000, 500, () -> scheduledExecuted.get());
+    }
   }
 
   @Test
