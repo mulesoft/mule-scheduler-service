@@ -18,6 +18,7 @@ import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
 import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
 import static org.mule.service.scheduler.ThreadType.IO;
 import static org.slf4j.LoggerFactory.getLogger;
+
 import org.mule.runtime.api.exception.DefaultMuleException;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
@@ -26,6 +27,8 @@ import org.mule.runtime.core.api.config.ConfigurationException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Properties;
@@ -84,11 +87,23 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     if (overriddenConfigFileName != null) {
       File overriddenConfigFile = new File(overriddenConfigFileName);
 
-      if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("Loading thread pools configuration from " + overriddenConfigFile.getPath());
-      }
+      if (overriddenConfigFile.exists()) {
+        if (LOGGER.isDebugEnabled()) {
+          LOGGER.debug("Loading thread pools configuration from " + overriddenConfigFile.getPath());
+        }
 
-      return loadProperties(config, overriddenConfigFile);
+        try (final FileInputStream configIs = new FileInputStream(overriddenConfigFile)) {
+          return loadProperties(config, configIs);
+        } catch (IOException e) {
+          throw new DefaultMuleException(e);
+        }
+      } else {
+        try (final InputStream configIs = new URL(overriddenConfigFileName).openStream();) {
+          return loadProperties(config, configIs);
+        } catch (IOException e) {
+          throw new DefaultMuleException(e);
+        }
+      }
     }
 
     File muleHome =
@@ -109,13 +124,17 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
       LOGGER.debug("Loading thread pools configuration from " + defaultConfigFile.getPath());
     }
 
-    return loadProperties(config, defaultConfigFile);
+    try (final FileInputStream configIs = new FileInputStream(defaultConfigFile)) {
+      return loadProperties(config, configIs);
+    } catch (IOException e) {
+      throw new DefaultMuleException(e);
+    }
   }
 
-  private static ContainerThreadPoolsConfig loadProperties(final ContainerThreadPoolsConfig config, File configFile)
+  private static ContainerThreadPoolsConfig loadProperties(final ContainerThreadPoolsConfig config, InputStream configIs)
       throws DefaultMuleException, ConfigurationException, MuleException {
     final Properties properties = new Properties();
-    try (final FileInputStream configIs = new FileInputStream(configFile)) {
+    try {
       properties.load(configIs);
     } catch (IOException e) {
       throw new DefaultMuleException(e);
@@ -175,12 +194,22 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
                                                ContainerThreadPoolsConfig threadPoolsConfig,
                                                ScriptEngine engine, boolean allowZero)
       throws MuleException {
-    if (!properties.containsKey(propName)) {
+    String property = null;
+
+    final String sysPropOverride = System.getProperty(propName);
+    if (sysPropOverride != null) {
+      LOGGER.debug("Found system property override for '{}' with value '{}'", propName, sysPropOverride);
+
+      property = sysPropOverride.trim().toLowerCase();
+    } else if (properties.containsKey(propName)) {
+      property = properties.getProperty(propName).trim().toLowerCase();
+    }
+
+    if (property == null) {
       LOGGER.warn("No property '{}' found in config file. Using default value.", propName);
       return OptionalInt.empty();
     }
 
-    String property = properties.getProperty(propName).trim().toLowerCase();
     if (!POOLSIZE_PATTERN.matcher(property).matches()) {
       throw new DefaultMuleException(propName + ": Expression not valid");
     }
