@@ -8,6 +8,7 @@ package org.mule.service.scheduler.internal;
 
 import static java.lang.Runtime.getRuntime;
 import static java.lang.Thread.currentThread;
+import static java.lang.Thread.sleep;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
