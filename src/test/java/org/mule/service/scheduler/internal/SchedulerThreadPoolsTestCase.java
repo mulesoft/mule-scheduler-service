@@ -32,8 +32,10 @@ import static org.mule.tck.probe.PollingProber.probe;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 import org.mule.runtime.api.exception.MuleException;
+import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerBusyException;
+import org.mule.runtime.api.scheduler.SchedulerConfig;
 import org.mule.runtime.api.util.concurrent.Latch;
 import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
@@ -80,10 +82,24 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   private ContainerThreadPoolsConfig threadPoolsConfig;
   private SchedulerThreadPools service;
 
+  private long prestarCallbackSleepTime = 0L;
+
   @Before
   public void before() throws MuleException {
     threadPoolsConfig = loadThreadPoolsConfig();
-    service = new SchedulerThreadPools(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig);
+    service = new SchedulerThreadPools(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig) {
+
+      @Override
+      protected void prestartCallback(CountDownLatch prestartLatch) {
+        super.prestartCallback(prestartLatch);
+        try {
+          sleep(prestarCallbackSleepTime);
+        } catch (InterruptedException e) {
+          currentThread().interrupt();
+          throw new MuleRuntimeException(e);
+        }
+      }
+    };
     service.start();
   }
 
@@ -369,6 +385,39 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
           references.forEach(ref -> assertThat(ref.toString(), ref.isEnqueued(), is(true)));
           return true;
         }, "A hard reference is being mantained to the scheduler threads/thread group."));
+  }
+
+  @Test
+  public void customSchedulerPrestarted() throws Exception {
+    prestarCallbackSleepTime = 1000L;
+
+    // Need a CPU bound scheduler to force rejection exception instead of retry
+    final Scheduler cpuBoundScheduler = service.createCpuIntensiveScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L);
+
+    cpuBoundScheduler.submit(() -> {
+      final SchedulerConfig bigPoolConfig = config().withMaxConcurrentTasks(1);
+      Scheduler scheduler;
+
+      for (int i = 0; i < 10; ++i) {
+        final CountDownLatch latch = new CountDownLatch(1);
+        scheduler = service.createCustomScheduler(bigPoolConfig, 1, () -> 0L);
+
+        try {
+          // asserting that tasks can be submitted right after the scheduler is returned.
+          scheduler.submit(() -> {
+            latch.countDown();
+          });
+          try {
+            latch.await(5, SECONDS);
+          } catch (InterruptedException e) {
+            currentThread().interrupt();
+            return;
+          }
+        } finally {
+          scheduler.stop();
+        }
+      }
+    }).get();
   }
 
   @Test
