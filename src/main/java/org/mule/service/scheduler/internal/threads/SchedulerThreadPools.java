@@ -18,6 +18,7 @@ import static java.lang.Thread.yield;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.core.api.config.MuleProperties.SYSTEM_PROPERTY_PREFIX;
 import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
 import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
@@ -38,12 +39,6 @@ import org.mule.service.scheduler.internal.ThrottledScheduler;
 import org.mule.service.scheduler.internal.executor.ByCallerThreadGroupPolicy;
 import org.mule.service.scheduler.internal.executor.ByCallerThrottlingPolicy;
 
-import org.quartz.SchedulerException;
-import org.quartz.impl.StdSchedulerFactory;
-import org.slf4j.Logger;
-
-import com.google.common.collect.ImmutableList;
-
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -52,13 +47,17 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -66,6 +65,12 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+
+import org.quartz.SchedulerException;
+import org.quartz.impl.StdSchedulerFactory;
+import org.slf4j.Logger;
+
+import com.google.common.collect.ImmutableList;
 
 /**
  * {@link Scheduler}s provided by this implementation of {@link SchedulerService} use a shared single-threaded
@@ -437,15 +442,60 @@ public class SchedulerThreadPools {
    * @param corePoolSize the number of threads to start in e=the {@code executor}
    */
   private void prestartCoreThreads(final ThreadPoolExecutor executor, int corePoolSize) {
+    // This latch is to ensure that the required executions are active at the same time
+    CountDownLatch prestartWaitLatch = new CountDownLatch(1);
+    // This latch is to validate that the required executions have actually run
     CountDownLatch prestartLatch = new CountDownLatch(corePoolSize);
+    // The futures are kept to ensure that the prestart tasks are done before continuing
+    List<Future<?>> prestartFutures = new ArrayList<>(corePoolSize);
+
+    final String executorAsString = executor.toString();
+
     for (int i = 0; i < corePoolSize; ++i) {
-      executor.execute(() -> prestartLatch.countDown());
+      try {
+        prestartFutures.add(executor.submit(() -> {
+          try {
+            prestartWaitLatch.await();
+          } catch (InterruptedException e) {
+            currentThread().interrupt();
+            throw new MuleRuntimeException(e);
+          }
+          prestartCallback(prestartLatch);
+        }));
+      } catch (RejectedExecutionException ree) {
+        executor.shutdownNow();
+        throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
+            + executorAsString));
+      }
     }
+
+    prestartWaitLatch.countDown();
     try {
-      prestartLatch.await(30, SECONDS);
+      if (!prestartLatch.await(30, SECONDS)) {
+        executor.shutdownNow();
+        throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
+            + executorAsString));
+      }
+
+      try {
+        for (Future<?> future : prestartFutures) {
+          future.get(30, SECONDS);
+        }
+      } catch (ExecutionException e) {
+        throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
+            + executorAsString), e.getCause());
+      } catch (TimeoutException e) {
+        throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
+            + executorAsString), e);
+      }
     } catch (InterruptedException e) {
+      currentThread().interrupt();
       throw new MuleRuntimeException(e);
     }
+  }
+
+  protected void prestartCallback(CountDownLatch prestartLatch) {
+    prestartLatch.countDown();
   }
 
   private ThreadGroup resolveThreadGroupForCustomScheduler(SchedulerConfig config) {
