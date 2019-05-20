@@ -93,9 +93,9 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
       protected void prestartCallback(CountDownLatch prestartLatch) {
         super.prestartCallback(prestartLatch);
         try {
-          Thread.sleep(prestarCallbackSleepTime);
+          sleep(prestarCallbackSleepTime);
         } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
+          currentThread().interrupt();
           throw new MuleRuntimeException(e);
         }
       }
@@ -410,7 +410,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
           try {
             latch.await(5, SECONDS);
           } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            currentThread().interrupt();
             return;
           }
         } finally {
