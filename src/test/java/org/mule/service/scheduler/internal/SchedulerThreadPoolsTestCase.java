@@ -138,6 +138,11 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     final Scheduler custom =
         service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
 
+    // this will execute immediately
+    custom.execute(() -> {
+      awaitLatch(latch);
+    });
+    // this will be queued
     custom.execute(() -> {
       awaitLatch(latch);
     });

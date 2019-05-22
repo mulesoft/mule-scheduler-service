@@ -394,7 +394,9 @@ public class SchedulerThreadPools {
   public Scheduler createCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
     String threadsName = resolveCustomThreadsName(config);
     return doCreateCustomScheduler(config, workers, stopTimeout, resolveCustomSchedulerName(config),
-                                   new SynchronousQueue<>(), threadsName);
+                                   // SynchronousQueue may reject tasks early right after creation/finish of the previous task
+                                   createQueue(config.getMaxConcurrentTasks()),
+                                   threadsName);
   }
 
   public Scheduler createCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, int queueSize) {
