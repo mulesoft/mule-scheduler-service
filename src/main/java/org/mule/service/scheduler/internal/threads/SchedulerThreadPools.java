@@ -132,7 +132,14 @@ public class SchedulerThreadPools {
     this.name = name;
     this.threadPoolsConfig = threadPoolsConfig;
 
-    schedulerGroup = new ThreadGroup(name);
+    schedulerGroup = new ThreadGroup(name) {
+
+      @Override
+      public void uncaughtException(Thread t, Throwable e) {
+        // This case happens if some rogue code stops our threads.
+        logger.error("Thread '" + t.getName() + "' stopped.", e);
+      }
+    };
     cpuLightGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + CPU_LIGHT_THREADS_NAME);
     ioGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + IO_THREADS_NAME);
     computationGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + COMPUTATION_THREADS_NAME);
