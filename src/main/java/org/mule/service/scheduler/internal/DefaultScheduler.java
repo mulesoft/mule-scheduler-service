@@ -360,14 +360,15 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
               + MILLISECONDS.toString() + ".");
         } else {
           if (!cancelledJobs.isEmpty()) {
-            LOGGER.warn("Scheduler " + this.toString() + " terminated.");
+            LOGGER.warn("Scheduler " + this.toString()
+                + " terminated, but it still had pending jobs after its graceful shutdown timeout.");
           }
         }
 
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("The jobs " + cancelledJobs + " were cancelled.");
         } else {
-          LOGGER.info(cancelledJobs.size() + " jobs were cancelled.");
+          LOGGER.info(cancelledJobs.size() + " jobs were cancelled for this Scheduler.");
         }
       }
     } catch (InterruptedException ie) {
