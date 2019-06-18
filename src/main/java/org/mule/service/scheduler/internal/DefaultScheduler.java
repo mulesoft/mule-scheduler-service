@@ -337,14 +337,14 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   public void stop() {
     if (shutdown) {
       if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("{} is already stopped", this.toString());
+        LOGGER.debug("{} is already stopped", this);
       }
 
       return;
     }
 
     if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Stopping {}", this.toString());
+      LOGGER.debug("Stopping {}", this);
     }
     // Disable new tasks from being submitted
     doShutdown();
@@ -357,18 +357,18 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
         // Wait a while for tasks to respond to being cancelled
         if (!awaitTermination(FORCEFUL_SHUTDOWN_TIMEOUT_SECS, SECONDS)) {
           LOGGER.warn("Scheduler {} did not shutdown gracefully after {} {}.",
-                      this.toString(), timeout, MILLISECONDS.toString());
+                      this, timeout, MILLISECONDS);
         } else {
           if (!cancelledJobs.isEmpty()) {
             LOGGER.warn("Scheduler {} terminated, but it still had pending jobs after its graceful shutdown timeout.",
-                        this.toString());
+                        this);
           }
         }
 
         if (LOGGER.isDebugEnabled()) {
           LOGGER.debug("The jobs {} were cancelled.", cancelledJobs);
         } else {
-          LOGGER.info(cancelledJobs.size() + " jobs were cancelled for this Scheduler.");
+          LOGGER.info("{} jobs were cancelled for this Scheduler.", cancelledJobs.size());
         }
       }
     } catch (InterruptedException ie) {
