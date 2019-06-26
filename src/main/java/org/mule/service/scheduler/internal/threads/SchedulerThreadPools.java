@@ -606,7 +606,7 @@ public class SchedulerThreadPools {
       logger.debug("Shutting down " + this.toString());
       doShutdown();
       executor.shutdown();
-      shutdownWrapUp();
+      shutdownCallback.accept(this);
     }
 
     @Override

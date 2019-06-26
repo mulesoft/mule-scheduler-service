@@ -334,19 +334,6 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
-  public void threadGroupOfCustomSchedulerNotLeakedAfterShutdown()
-      throws InterruptedException, ExecutionException, TimeoutException {
-    Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L);
-
-    List<PhantomReference> references = recordReferences(scheduler);
-
-    scheduler.shutdown();
-    scheduler = null;
-
-    assertNoThreadGroupReferenceHeld(references);
-  }
-
-  @Test
   public void threadGroupOfCustomSchedulerNotLeakedAfterShutdownNow()
       throws InterruptedException, ExecutionException, TimeoutException {
     Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L);
