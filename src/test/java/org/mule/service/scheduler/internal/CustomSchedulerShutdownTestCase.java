@@ -79,7 +79,7 @@ public class CustomSchedulerShutdownTestCase extends AbstractMuleTestCase {
   public void shutdownDoesntDestroyThreadGroup() throws InterruptedException, ExecutionException {
     final Scheduler customScheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(2), 2, () -> 10L);
 
-    CountDownLatch latch = new Latch();
+    Latch latch = new Latch();
     AtomicReference<Thread> executedThread = new AtomicReference<>();
     final Future<Boolean> interrupted = customScheduler.submit(() -> {
       executedThread.set(currentThread());
@@ -95,7 +95,7 @@ public class CustomSchedulerShutdownTestCase extends AbstractMuleTestCase {
     customScheduler.shutdown();
 
     Thread.sleep(5000);
-    latch.countDown();
+    latch.release();
 
     assertThat(interrupted.get(), is(false));
   }
@@ -104,7 +104,7 @@ public class CustomSchedulerShutdownTestCase extends AbstractMuleTestCase {
   public void shutdownNowDestroysThreadGroup() throws InterruptedException, ExecutionException {
     final Scheduler customScheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(2), 2, () -> 10L);
 
-    CountDownLatch latch = new Latch();
+    Latch latch = new Latch();
     AtomicReference<Thread> executedThread = new AtomicReference<>();
     final Future<Boolean> interrupted = customScheduler.submit(() -> {
       executedThread.set(currentThread());
