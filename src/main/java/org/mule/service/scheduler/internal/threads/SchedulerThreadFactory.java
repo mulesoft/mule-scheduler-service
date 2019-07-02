@@ -23,11 +23,11 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class SchedulerThreadFactory implements java.util.concurrent.ThreadFactory {
 
+  private static final AccessControlContext ACCESS_CONTROL_CTX = getContext();
+
   private final ThreadGroup group;
   private final String nameFormat;
   private final AtomicLong counter;
-
-  private AccessControlContext acc = getContext();
 
   public SchedulerThreadFactory(ThreadGroup group) {
     this(group, "%s.%02d");
@@ -44,10 +44,10 @@ public class SchedulerThreadFactory implements java.util.concurrent.ThreadFactor
     return withContextClassLoader(this.getClass().getClassLoader(), () -> {
       // Avoid the created thread to inherit the security context of the caller thread's stack.
       // If the thread creation is triggered by a deployable artifact classloader, a reference to it would be kept by the created
-      // thread without this doProvileged call.
+      // thread without this doPrivileged call.
       return doPrivileged((PrivilegedAction<Thread>) () -> new Thread(group, runnable, format(nameFormat, group.getName(),
                                                                                               counter.getAndIncrement())),
-                          acc);
+                          ACCESS_CONTROL_CTX);
 
     });
   }

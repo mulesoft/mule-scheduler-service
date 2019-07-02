@@ -259,7 +259,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
-  @Description("Tests that a scheduler Executor thread doesn't hold a reference to an artifact classloader through the inheritedAccessControlContext.")
+  @Description("Tests that a scheduler Executor thread doesn't hold a reference to an artifact classloader through the `inheritedAccessControlContext` when executing.")
   public void threadsDontReferenceClassLoaderFromAccessControlContext() throws Exception {
     Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L);
 
@@ -269,6 +269,24 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
     delegator.accept(() -> scheduler.execute(() -> {
     }));
+
+    delegator = null;
+    delegatorClassLoader = null;
+
+    assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
+  }
+
+  @Test
+  @Description("Tests that a scheduler Executor thread doesn't hold a reference to an artifact classloader through the `inheritedAccessControlContext` when created.")
+  public void threadsDontReferenceClassLoaderFromAccessControlContextWhenCreated() throws Exception {
+    ClassLoader delegatorClassLoader = createDelegatorClassLoader();
+    PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
+
+    AtomicReference<Scheduler> schedulerRef = new AtomicReference<>();
+    Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
+    delegator.accept(() -> {
+      schedulerRef.set(service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L));
+    });
 
     delegator = null;
     delegatorClassLoader = null;
