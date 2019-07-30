@@ -457,9 +457,14 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   @Override
   public String toString() {
-    return getThreadType() + " - " + getName() + "{" + lineSeparator()
-        + "  executor: " + executor.toString() + lineSeparator()
-        + "  shutdown: " + shutdown + lineSeparator()
-        + "}";
+    if (LOGGER.isDebugEnabled()) {
+      return getThreadType() + " - " + getName() + "{" + lineSeparator()
+          + "  executor: " + executor.toString() + lineSeparator()
+          + "  shutdown: " + shutdown + lineSeparator()
+          + "}";
+    } else {
+      return getThreadType() + " - " + getName() + "{shutdown: " + shutdown + "}";
+    }
+
   }
 }
