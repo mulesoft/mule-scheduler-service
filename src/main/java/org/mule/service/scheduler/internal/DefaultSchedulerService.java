@@ -16,17 +16,19 @@ import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.api.scheduler.SchedulerContainerPoolsConfig.getInstance;
 import static org.mule.runtime.core.api.config.MuleProperties.OBJECT_SCHEDULER_BASE_CONFIG;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.slf4j.LoggerFactory.getLogger;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lifecycle.Startable;
 import org.mule.runtime.api.lifecycle.Stoppable;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
-import org.mule.runtime.api.scheduler.SchedulerContainerPoolsConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfigFactory;
 import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.api.scheduler.SchedulerView;
@@ -46,6 +48,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -80,6 +83,8 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   private ScheduledFuture<?> poolsMaintenanceTask;
   private ScheduledFuture<?> usageReportingTask;
   private volatile boolean started = false;
+  private com.github.benmanes.caffeine.cache.LoadingCache<Thread, Boolean> cpuWorkCache = Caffeine.newBuilder().weakKeys()
+      .build(t -> poolsByConfig.get(getInstance()).isCurrentThreadForCpuWork());
 
   @Override
   public String getName() {
@@ -92,7 +97,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     final SchedulerConfig config = config();
     pollsReadLock.lock();
     try {
-      return poolsByConfig.get(SchedulerContainerPoolsConfig.getInstance())
+      return poolsByConfig.get(getInstance())
           .createCpuLightScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
     } catch (ExecutionException e) {
       throw new MuleRuntimeException(e.getCause());
@@ -107,7 +112,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     final SchedulerConfig config = config();
     pollsReadLock.lock();
     try {
-      return poolsByConfig.get(SchedulerContainerPoolsConfig.getInstance())
+      return poolsByConfig.get(getInstance())
           .createIoScheduler(config, ioBoundWorkers(), resolveStopTimeout(config));
     } catch (ExecutionException e) {
       throw new MuleRuntimeException(e.getCause());
@@ -122,7 +127,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     final SchedulerConfig config = config();
     pollsReadLock.lock();
     try {
-      return poolsByConfig.get(SchedulerContainerPoolsConfig.getInstance())
+      return poolsByConfig.get(getInstance())
           .createCpuIntensiveScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
     } catch (ExecutionException e) {
       throw new MuleRuntimeException(e.getCause());
@@ -136,7 +141,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     checkStarted();
     pollsReadLock.lock();
     try {
-      return poolsByConfig.get(SchedulerContainerPoolsConfig.getInstance())
+      return poolsByConfig.get(getInstance())
           .createCpuLightScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
     } catch (ExecutionException e) {
       throw new MuleRuntimeException(e.getCause());
@@ -150,7 +155,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     checkStarted();
     pollsReadLock.lock();
     try {
-      return poolsByConfig.get(SchedulerContainerPoolsConfig.getInstance())
+      return poolsByConfig.get(getInstance())
           .createIoScheduler(config, ioBoundWorkers(), resolveStopTimeout(config));
     } catch (ExecutionException e) {
       throw new MuleRuntimeException(e.getCause());
@@ -164,7 +169,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     checkStarted();
     pollsReadLock.lock();
     try {
-      return poolsByConfig.get(SchedulerContainerPoolsConfig.getInstance())
+      return poolsByConfig.get(getInstance())
           .createCpuIntensiveScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
     } catch (ExecutionException e) {
       throw new MuleRuntimeException(e.getCause());
@@ -235,7 +240,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     checkStarted();
     pollsReadLock.lock();
     try {
-      return poolsByConfig.get(SchedulerContainerPoolsConfig.getInstance())
+      return poolsByConfig.get(getInstance())
           .createCustomScheduler(config, CORES, resolveStopTimeout(config));
     } catch (ExecutionException e) {
       throw new MuleRuntimeException(e.getCause());
@@ -250,7 +255,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     checkStarted();
     pollsReadLock.lock();
     try {
-      return poolsByConfig.get(SchedulerContainerPoolsConfig.getInstance())
+      return poolsByConfig.get(getInstance())
           .createCustomScheduler(config, CORES, resolveStopTimeout(config), queueSize);
     } catch (ExecutionException e) {
       throw new MuleRuntimeException(e.getCause());
@@ -272,14 +277,19 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   @Override
   public boolean isCurrentThreadForCpuWork() {
-    checkStarted();
-    pollsReadLock.lock();
-    try {
-      return poolsByConfig.get(SchedulerContainerPoolsConfig.getInstance()).isCurrentThreadForCpuWork();
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
-    } finally {
-      pollsReadLock.unlock();
+    Boolean isForCpuWork = cpuWorkCache.getIfPresent(currentThread());
+    if (isForCpuWork != null) {
+      return isForCpuWork;
+    } else {
+      checkStarted();
+      pollsReadLock.lock();
+      try {
+        return poolsByConfig.get(getInstance()).isCurrentThreadForCpuWork();
+      } catch (ExecutionException e) {
+        throw new MuleRuntimeException(e.getCause());
+      } finally {
+        pollsReadLock.unlock();
+      }
     }
   }
 
