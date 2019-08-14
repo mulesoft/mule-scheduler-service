@@ -21,7 +21,6 @@ import static org.mule.runtime.core.api.config.MuleProperties.OBJECT_SCHEDULER_B
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.slf4j.LoggerFactory.getLogger;
 
-import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
@@ -48,7 +47,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -84,7 +82,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   private ScheduledFuture<?> usageReportingTask;
   private volatile boolean started = false;
   private com.github.benmanes.caffeine.cache.LoadingCache<Thread, Boolean> cpuWorkCache = Caffeine.newBuilder().weakKeys()
-      .build(t -> poolsByConfig.get(getInstance()).isCurrentThreadForCpuWork());
+      .build(t -> getCurrentThreadForCpuWorkFromPoolsByConfig());
 
   @Override
   public String getName() {
@@ -277,19 +275,18 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   @Override
   public boolean isCurrentThreadForCpuWork() {
-    Boolean isForCpuWork = cpuWorkCache.getIfPresent(currentThread());
-    if (isForCpuWork != null) {
-      return isForCpuWork;
-    } else {
-      checkStarted();
-      pollsReadLock.lock();
-      try {
-        return poolsByConfig.get(getInstance()).isCurrentThreadForCpuWork();
-      } catch (ExecutionException e) {
-        throw new MuleRuntimeException(e.getCause());
-      } finally {
-        pollsReadLock.unlock();
-      }
+    return cpuWorkCache.get(currentThread());
+  }
+
+  private boolean getCurrentThreadForCpuWorkFromPoolsByConfig() {
+    checkStarted();
+    pollsReadLock.lock();
+    try {
+      return poolsByConfig.get(getInstance()).isCurrentThreadForCpuWork();
+    } catch (ExecutionException e) {
+      throw new MuleRuntimeException(e.getCause());
+    } finally {
+      pollsReadLock.unlock();
     }
   }
 
