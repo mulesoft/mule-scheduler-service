@@ -20,7 +20,7 @@
         <!-- TODO MULE-14667 Upgrade to reactor 3.2.0 -->
         <projectReactorVersion>3.2.0.M1-MULE-001</projectReactorVersion>
 
-        <quartzVersion>2.2.3</quartzVersion>
+        <quartzVersion>2.3.1</quartzVersion>
         <c3p0Version>0.9.5.4</c3p0Version>
     </properties>
 
