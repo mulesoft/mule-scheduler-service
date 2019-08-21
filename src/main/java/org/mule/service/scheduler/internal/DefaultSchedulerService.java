@@ -82,7 +82,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   private ScheduledFuture<?> usageReportingTask;
   private volatile boolean started = false;
   private com.github.benmanes.caffeine.cache.LoadingCache<Thread, Boolean> cpuWorkCache = Caffeine.newBuilder().weakKeys()
-      .build(t -> getCurrentThreadForCpuWorkFromPoolsByConfig());
+      .build(this::cacheLoader);
 
   @Override
   public String getName() {
@@ -278,20 +278,11 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     return cpuWorkCache.get(currentThread());
   }
 
-  private boolean getCurrentThreadForCpuWorkFromPoolsByConfig() {
-    checkStarted();
-    pollsReadLock.lock();
-    try {
-      return poolsByConfig.get(getInstance()).isCurrentThreadForCpuWork();
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
-    } finally {
-      pollsReadLock.unlock();
-    }
+  private boolean cacheLoader(Thread t) {
+    return isCurrentThreadForCpuWork(getInstance());
   }
 
   @Override
-  @Inject
   public boolean isCurrentThreadForCpuWork(SchedulerPoolsConfigFactory poolsConfigFactory) {
     checkStarted();
     pollsReadLock.lock();
