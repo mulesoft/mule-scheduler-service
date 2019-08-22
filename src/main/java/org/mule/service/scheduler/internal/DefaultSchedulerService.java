@@ -283,6 +283,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   }
 
   @Override
+  @Inject
   public boolean isCurrentThreadForCpuWork(SchedulerPoolsConfigFactory poolsConfigFactory) {
     checkStarted();
     pollsReadLock.lock();
