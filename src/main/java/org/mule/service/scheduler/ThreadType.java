@@ -22,7 +22,7 @@ public enum ThreadType {
   IO("io"),
 
   /**
-   * The type for {@link Thread}s managed by {@link Scheduler}s obtained with {@link SchedulerService#computationScheduler()}.
+   * The type for {@link Thread}s managed by {@link Scheduler}s obtained with {@link SchedulerService#cpuIntensiveScheduler()}.
    */
   CPU_INTENSIVE("cpuIntensive"),
 
