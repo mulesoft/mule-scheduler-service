@@ -9,7 +9,6 @@ package org.mule.service.scheduler.internal.executor;
 import static java.lang.Thread.currentThread;
 import static org.apache.commons.lang3.StringUtils.rightPad;
 import static org.mule.service.scheduler.internal.DefaultSchedulerService.USAGE_TRACE_INTERVAL_SECS;
-import static org.mule.service.scheduler.internal.DefaultSchedulerService.traceLogger;
 
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerBusyException;
@@ -72,6 +71,7 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
   private final AbortPolicy abort;
   private final WaitPolicy wait;
   private final CallerRunsPolicy callerRuns = new CallerRunsPolicy();
+  private final Logger traceLogger;
 
   private volatile long rejectedCount;
 
@@ -87,12 +87,17 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
    * @param parentGroup the {@link SchedulerService} parent {@link ThreadGroup}
    * @param schedulerName the name of the target {@link Scheduler}
    */
-  public ByCallerThreadGroupPolicy(Set<ThreadGroup> waitGroups, Set<ThreadGroup> runCpuLightWhenTargetBusyGroups,
-                                   ThreadGroup cpuLightGroup, ThreadGroup parentGroup, String schedulerName) {
+  public ByCallerThreadGroupPolicy(Set<ThreadGroup> waitGroups,
+                                   Set<ThreadGroup> runCpuLightWhenTargetBusyGroups,
+                                   ThreadGroup cpuLightGroup,
+                                   ThreadGroup parentGroup,
+                                   String schedulerName,
+                                   Logger traceLogger) {
     super(waitGroups, runCpuLightWhenTargetBusyGroups, parentGroup);
     this.abort = new AbortBusyPolicy(schedulerName);
     this.wait = new WaitPolicy(abort, schedulerName);
     this.cpuLightGroup = cpuLightGroup;
+    this.traceLogger = traceLogger;
   }
 
   @Override

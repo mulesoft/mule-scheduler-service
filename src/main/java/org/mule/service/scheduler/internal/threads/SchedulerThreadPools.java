@@ -19,7 +19,7 @@ import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
-import static org.mule.runtime.core.api.config.MuleProperties.SYSTEM_PROPERTY_PREFIX;
+import static org.mule.runtime.api.util.MuleSystemProperties.SYSTEM_PROPERTY_PREFIX;
 import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
 import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
 import static org.mule.service.scheduler.ThreadType.CUSTOM;
@@ -66,11 +66,10 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import com.google.common.collect.ImmutableList;
 import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
-
-import com.google.common.collect.ImmutableList;
 
 /**
  * {@link Scheduler}s provided by this implementation of {@link SchedulerService} use a shared single-threaded
@@ -81,7 +80,59 @@ import com.google.common.collect.ImmutableList;
  */
 public class SchedulerThreadPools {
 
-  private static final Logger logger = getLogger(SchedulerThreadPools.class);
+  private static final Logger LOGGER = getLogger(SchedulerThreadPools.class);
+
+
+  public static class Builder {
+
+    private String name;
+    private SchedulerPoolsConfig threadPoolsConfig;
+    private boolean preStartCpuLight = true;
+    private boolean preStartIO = true;
+    private boolean preStartCpuIntensive = true;
+    private Logger traceLogger = LOGGER;
+
+    private Builder() {
+    }
+
+    public Builder setName(String name) {
+      this.name = name;
+      return this;
+    }
+
+    public Builder setThreadPoolsConfig(SchedulerPoolsConfig threadPoolsConfig) {
+      this.threadPoolsConfig = threadPoolsConfig;
+      return this;
+    }
+
+    public Builder preStartCpuLight(boolean prestart) {
+      preStartCpuLight = prestart;
+      return this;
+    }
+
+    public Builder preStartCpuIntensive(boolean prestart) {
+      preStartCpuIntensive = prestart;
+      return this;
+    }
+
+    public Builder preStartIO(boolean prestart) {
+      preStartIO = prestart;
+      return this;
+    }
+
+    public Builder setTraceLogger(Logger traceLogger) {
+      this.traceLogger = traceLogger;
+      return this;
+    }
+
+    public SchedulerThreadPools build() {
+      return new SchedulerThreadPools(name, threadPoolsConfig, preStartCpuLight, preStartIO, preStartCpuIntensive, traceLogger);
+    }
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
 
   private static final String CPU_LIGHT_THREADS_NAME = CPU_LIGHT.getName();
   private static final String IO_THREADS_NAME = IO.getName();
@@ -96,8 +147,12 @@ public class SchedulerThreadPools {
   private static final boolean ALWAYS_SHOW_SCHEDULER_CREATION_LOCATION =
       getProperties().containsKey(SYSTEM_PROPERTY_PREFIX + "scheduler.alwaysShowSchedulerCreationLocation");
 
-  private String name;
-  private SchedulerPoolsConfig threadPoolsConfig;
+  private final String name;
+  private final SchedulerPoolsConfig threadPoolsConfig;
+  private final boolean preStartCpuLight;
+  private final boolean preStartIO;
+  private final boolean preStartCpuIntensive;
+  private final Logger traceLogger;
 
   private final ThreadGroup schedulerGroup;
   private final ThreadGroup cpuLightGroup;
@@ -128,16 +183,25 @@ public class SchedulerThreadPools {
   private final List<Scheduler> activeCpuIntensiveSchedulers = new ArrayList<>();
   private final List<Scheduler> activeCustomSchedulers = new ArrayList<>();
 
-  public SchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig) {
+  private SchedulerThreadPools(String name,
+                               SchedulerPoolsConfig threadPoolsConfig,
+                               boolean preStartCpuLight,
+                               boolean preStartIO,
+                               boolean preStartCpuIntensive,
+                               Logger traceLogger) {
     this.name = name;
     this.threadPoolsConfig = threadPoolsConfig;
+    this.preStartCpuLight = preStartCpuLight;
+    this.preStartIO = preStartIO;
+    this.preStartCpuIntensive = preStartCpuIntensive;
+    this.traceLogger = traceLogger;
 
     schedulerGroup = new ThreadGroup(name) {
 
       @Override
       public void uncaughtException(Thread t, Throwable e) {
         // This case happens if some rogue code stops our threads.
-        logger.error("Thread '" + t.getName() + "' stopped.", e);
+        LOGGER.error("Thread '" + t.getName() + "' stopped.", e);
       }
     };
     cpuLightGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + CPU_LIGHT_THREADS_NAME);
@@ -157,7 +221,8 @@ public class SchedulerThreadPools {
                                                                                                     computationGroup,
                                                                                                     customCallerRunsGroup,
                                                                                                     customCallerRunsAnsWaitGroup)),
-                                                                               cpuLightGroup, schedulerGroup, schedulerName);
+                                                                               cpuLightGroup, schedulerGroup, schedulerName,
+                                                                               traceLogger);
 
     cpuWorkChecker = threadGroup -> {
       if (threadGroup != null) {
@@ -209,9 +274,17 @@ public class SchedulerThreadPools {
                                new SchedulerThreadFactory(computationGroup),
                                byCallerThreadGroupPolicy.apply(computationGroup.getName()));
 
-    prestartCoreThreads(cpuLightExecutor, threadPoolsConfig.getCpuLightPoolSize().getAsInt());
-    prestartCoreThreads(ioExecutor, threadPoolsConfig.getIoCorePoolSize().getAsInt());
-    prestartCoreThreads(computationExecutor, threadPoolsConfig.getCpuIntensivePoolSize().getAsInt());
+    if (preStartCpuLight) {
+      prestartCoreThreads(cpuLightExecutor, threadPoolsConfig.getCpuLightPoolSize().getAsInt());
+    }
+
+    if (preStartIO) {
+      prestartCoreThreads(ioExecutor, threadPoolsConfig.getIoCorePoolSize().getAsInt());
+    }
+
+    if (preStartCpuIntensive) {
+      prestartCoreThreads(computationExecutor, threadPoolsConfig.getCpuIntensivePoolSize().getAsInt());
+    }
 
     scheduledExecutor = new ScheduledThreadPoolExecutor(1, new SchedulerThreadFactory(timerGroup, "%s"));
     scheduledExecutor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
@@ -294,13 +367,13 @@ public class SchedulerThreadPools {
         .awaitTermination(threadPoolsConfig.getGracefulShutdownTimeout().getAsLong() - (currentTimeMillis() - startMillis),
                           MILLISECONDS)) {
       final List<Runnable> cancelledJobs = executor.shutdownNow();
-      logger.warn("'" + executorLabel + "' " + executor.toString() + " did not shutdown gracefully after "
-          + threadPoolsConfig.getGracefulShutdownTimeout() + " milliseconds.");
+      LOGGER.warn("'" + executorLabel + "' " + executor.toString() + " did not shutdown gracefully after "
+                      + threadPoolsConfig.getGracefulShutdownTimeout() + " milliseconds.");
 
-      if (logger.isDebugEnabled()) {
-        logger.debug("The jobs " + cancelledJobs + " were cancelled.");
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("The jobs " + cancelledJobs + " were cancelled.");
       } else {
-        logger.info(cancelledJobs.size() + " jobs were cancelled.");
+        LOGGER.info(cancelledJobs.size() + " jobs were cancelled.");
       }
     }
   }
@@ -415,7 +488,8 @@ public class SchedulerThreadPools {
   private Scheduler doCreateCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, String schedulerName,
                                             BlockingQueue<Runnable> workQueue, String threadsName) {
     if (config.getMaxConcurrentTasks() == null) {
-      throw new IllegalArgumentException("Custom schedulers must define a thread pool size bi calling `config.withMaxConcurrentTasks()`");
+      throw new IllegalArgumentException(
+          "Custom schedulers must define a thread pool size bi calling `config.withMaxConcurrentTasks()`");
     }
 
     final ThreadGroup customChildGroup = new ThreadGroup(resolveThreadGroupForCustomScheduler(config), threadsName);
@@ -447,7 +521,7 @@ public class SchedulerThreadPools {
    * <p>
    * In that case, the threads are prestarted by dispatching work to the executor as a workaround, which avoids the issue.
    *
-   * @param executor the executor to prestart the threads for
+   * @param executor     the executor to prestart the threads for
    * @param corePoolSize the number of threads to start in e=the {@code executor}
    */
   private void prestartCoreThreads(final ThreadPoolExecutor executor, int corePoolSize) {
@@ -474,7 +548,7 @@ public class SchedulerThreadPools {
       } catch (RejectedExecutionException ree) {
         executor.shutdownNow();
         throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
-            + executorAsString));
+                                                               + executorAsString));
       }
     }
 
@@ -483,7 +557,7 @@ public class SchedulerThreadPools {
       if (!prestartLatch.await(30, SECONDS)) {
         executor.shutdownNow();
         throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
-            + executorAsString));
+                                                               + executorAsString));
       }
 
       try {
@@ -492,10 +566,10 @@ public class SchedulerThreadPools {
         }
       } catch (ExecutionException e) {
         throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
-            + executorAsString), e.getCause());
+                                                               + executorAsString), e.getCause());
       } catch (TimeoutException e) {
         throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
-            + executorAsString), e);
+                                                               + executorAsString), e);
       }
     } catch (InterruptedException e) {
       currentThread().interrupt();
@@ -603,7 +677,7 @@ public class SchedulerThreadPools {
 
     @Override
     public void shutdown() {
-      logger.debug("Shutting down " + this.toString());
+      LOGGER.debug("Shutting down " + this.toString());
       doShutdown();
       executor.shutdown();
       shutdownCallback.accept(this);
@@ -611,7 +685,7 @@ public class SchedulerThreadPools {
 
     @Override
     public List<Runnable> shutdownNow() {
-      logger.debug("Shutting down NOW " + this.toString());
+      LOGGER.debug("Shutting down NOW " + this.toString());
       try {
         List<Runnable> cancelledTasks = doShutdownNow();
         executor.shutdownNow();
@@ -661,7 +735,7 @@ public class SchedulerThreadPools {
 
           threadNamesBuilder.append("\t* " + thread.getName() + lineSeparator());
 
-          if (logger.isDebugEnabled()) {
+          if (LOGGER.isDebugEnabled()) {
             final StackTraceElement[] stackTrace = thread.getStackTrace();
             for (int i = 1; i < stackTrace.length; i++) {
               threadNamesBuilder.append("\t\tat ").append(stackTrace[i]).append(lineSeparator());
@@ -669,8 +743,9 @@ public class SchedulerThreadPools {
           }
         }
 
-        logger.error("Unable to destroy ThreadGroup '{}' of Scheduler '{}' ({}). Remaining threads in the group are:"
-            + lineSeparator() + "{}", threadGroup.getName(), this.getName(), destroyException.toString(), threadNamesBuilder);
+        LOGGER.error("Unable to destroy ThreadGroup '{}' of Scheduler '{}' ({}). Remaining threads in the group are:"
+                         + lineSeparator() + "{}", threadGroup.getName(), this.getName(), destroyException.toString(),
+                     threadNamesBuilder);
       }
     }
 
@@ -777,7 +852,7 @@ public class SchedulerThreadPools {
                        cpuLightActiveCount,
                        cpuLightExecutor.getQueue().size(),
                        cpuLightRejected > 0 ? 100.0 * (cpuLightRejected / (cpuLightTaskCount + cpuLightRejected)) : 0)
-            + lineSeparator());
+                    + lineSeparator());
     threadPoolsReportBuilder
         .append(format("IO            | %10d | %12d | %12d | %12d | ~ %9.2f",
                        schedulersIo,
@@ -785,7 +860,7 @@ public class SchedulerThreadPools {
                        ioActiveCount,
                        ioExecutor.getQueue().size(),
                        ioRejected > 0 ? 100.0 * (ioRejected / (ioTaskCount + ioRejected)) : 0)
-            + lineSeparator());
+                    + lineSeparator());
     threadPoolsReportBuilder
         .append(format("CPU Intensive | %10d | %12d | %12d | %12d | ~ %9.2f",
                        schedulersCpuIntensive,
@@ -794,7 +869,7 @@ public class SchedulerThreadPools {
                        computationExecutor.getQueue().size(),
                        cpuIntensiveRejected > 0 ? 100.0 * (cpuIntensiveRejected / (cpuIntensiveTaskCount + cpuIntensiveRejected))
                            : 0)
-            + lineSeparator());
+                    + lineSeparator());
     threadPoolsReportBuilder
         .append(format("Custom        | %10d | %12d | %12d | %12d | ~ %9.2f",
                        schedulersCustom,
@@ -802,10 +877,10 @@ public class SchedulerThreadPools {
                        customActiveCount,
                        customQueued,
                        customRejected > 0 ? 100.0 * (customRejected / (customTaskCount + customRejected)) : 0)
-            + lineSeparator());
+                    + lineSeparator());
     threadPoolsReportBuilder
         .append("--------------------------------------------------------------------------------------" + lineSeparator()
-            + lineSeparator());
+                    + lineSeparator());
 
     return threadPoolsReportBuilder.toString();
   }
