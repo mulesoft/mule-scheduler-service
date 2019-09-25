@@ -9,7 +9,7 @@ package org.mule.service.scheduler.provider;
 import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.runtime.api.service.ServiceDefinition;
 import org.mule.runtime.api.service.ServiceProvider;
-import org.mule.service.scheduler.internal.DefaultSchedulerService;
+import org.mule.service.scheduler.internal.SinglePoolSchedulerService;
 
 /**
  * Provides a definition for {@link SchedulerService}.
@@ -19,7 +19,7 @@ import org.mule.service.scheduler.internal.DefaultSchedulerService;
 public class SchedulerServiceProvider implements ServiceProvider {
 
   private final ServiceDefinition serviceDefinition =
-      new ServiceDefinition(SchedulerService.class, new DefaultSchedulerService());
+      new ServiceDefinition(SchedulerService.class, new SinglePoolSchedulerService());
 
   @Override
   public ServiceDefinition getServiceDefinition() {
