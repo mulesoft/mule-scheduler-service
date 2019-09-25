@@ -10,9 +10,7 @@ import static org.mule.runtime.core.api.config.MuleProperties.OBJECT_SCHEDULER_B
 
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
-import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfigFactory;
-import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -54,15 +52,13 @@ public class SingleIOPoolSchedulerService extends DefaultSchedulerService {
   }
 
   @Override
-  protected SchedulerThreadPools createSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig) {
-    return SchedulerThreadPools.builder()
-        .setName(name)
-        .setThreadPoolsConfig(threadPoolsConfig)
-        .setTraceLogger(traceLogger)
-        .preStartCpuLight(false)
-        .preStartIO(true)
-        .preStartCpuIntensive(false)
-        .build();
+  protected boolean preStartsCpuIntensivePool() {
+    return false;
+  }
+
+  @Override
+  protected boolean preStartsCpuLightPool() {
+    return false;
   }
 
   @Override

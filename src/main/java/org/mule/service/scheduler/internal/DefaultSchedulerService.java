@@ -349,15 +349,27 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     }
   }
 
-  protected SchedulerThreadPools createSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig) {
+  private SchedulerThreadPools createSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig) {
     return SchedulerThreadPools.builder()
         .setName(name)
         .setThreadPoolsConfig(threadPoolsConfig)
         .setTraceLogger(traceLogger)
-        .preStartCpuLight(true)
-        .preStartIO(true)
-        .preStartCpuIntensive(true)
+        .preStartCpuLight(preStartsCpuLightPool())
+        .preStartIO(preStartsIOPool())
+        .preStartCpuIntensive(preStartsCpuIntensivePool())
         .build();
+  }
+
+  protected boolean preStartsCpuLightPool() {
+    return true;
+  }
+
+  protected boolean preStartsIOPool() {
+    return true;
+  }
+
+  protected boolean preStartsCpuIntensivePool() {
+    return true;
   }
 
   @Override
