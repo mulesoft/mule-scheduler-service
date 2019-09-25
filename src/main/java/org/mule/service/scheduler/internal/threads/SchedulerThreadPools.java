@@ -82,7 +82,6 @@ public class SchedulerThreadPools {
 
   private static final Logger LOGGER = getLogger(SchedulerThreadPools.class);
 
-
   public static class Builder {
 
     private String name;
