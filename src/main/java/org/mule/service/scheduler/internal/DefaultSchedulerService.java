@@ -23,8 +23,6 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
-import org.mule.runtime.api.lifecycle.Startable;
-import org.mule.runtime.api.lifecycle.Stoppable;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
@@ -60,7 +58,7 @@ import org.slf4j.Logger;
  *
  * @since 1.0
  */
-public class DefaultSchedulerService implements SchedulerService, Startable, Stoppable {
+public class DefaultSchedulerService implements SchedulerServiceAdapter {
 
   protected static final long DEFAULT_SHUTDOWN_TIMEOUT_MILLIS = 5000;
   protected static final int CORES = getRuntime().availableProcessors();
@@ -350,9 +348,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   }
 
   private SchedulerThreadPools createSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig) {
-    return SchedulerThreadPools.builder()
-        .setName(name)
-        .setThreadPoolsConfig(threadPoolsConfig)
+    return SchedulerThreadPools.builder(name, threadPoolsConfig)
         .setTraceLogger(traceLogger)
         .preStartCpuLight(preStartsCpuLightPool())
         .preStartIO(preStartsIOPool())
@@ -404,6 +400,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     return unmodifiableList(schedulers);
   }
 
+  @Override
   public Collection<SchedulerThreadPools> getPools() {
     pollsReadLock.lock();
     try {

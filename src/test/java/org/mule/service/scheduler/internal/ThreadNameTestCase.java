@@ -30,14 +30,6 @@ import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
 
-import org.hamcrest.Matcher;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import org.junit.runners.Parameterized.Parameters;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Optional;
@@ -47,6 +39,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import io.qameta.allure.Feature;
+import org.hamcrest.Matcher;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameters;
 
 /**
  * The names of the threads managed by the {@link SchedulerService} consist of some parts to aid in the monitoring and
@@ -118,7 +117,7 @@ public class ThreadNameTestCase extends AbstractMuleTestCase {
   @Before
   public void before() throws MuleException {
     threadPoolsConfig = loadThreadPoolsConfig();
-    service = new SchedulerThreadPools(ThreadNameTestCase.class.getName(), threadPoolsConfig);
+    service = SchedulerThreadPools.builder(ThreadNameTestCase.class.getName(), threadPoolsConfig).build();
     service.start();
 
     scheduler = schedulerFactory.apply(service);

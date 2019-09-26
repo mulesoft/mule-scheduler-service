@@ -87,19 +87,17 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Before
   public void before() throws MuleException {
     threadPoolsConfig = loadThreadPoolsConfig();
-    service = new SchedulerThreadPools(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig) {
+    service = SchedulerThreadPools.builder(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig)
+        .setPreStartCallback(executor -> {
+          try {
+            sleep(prestarCallbackSleepTime);
+          } catch (InterruptedException e) {
+            currentThread().interrupt();
+            throw new MuleRuntimeException(e);
+          }
+        })
+        .build();
 
-      @Override
-      protected void prestartCallback(CountDownLatch prestartLatch) {
-        super.prestartCallback(prestartLatch);
-        try {
-          sleep(prestarCallbackSleepTime);
-        } catch (InterruptedException e) {
-          currentThread().interrupt();
-          throw new MuleRuntimeException(e);
-        }
-      }
-    };
     service.start();
   }
 

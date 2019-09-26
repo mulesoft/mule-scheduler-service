@@ -15,7 +15,7 @@ import org.mule.runtime.api.scheduler.SchedulerPoolsConfigFactory;
 import javax.inject.Inject;
 import javax.inject.Named;
 
-public class SingleIOPoolSchedulerService extends DefaultSchedulerService {
+public class SinglePoolSchedulerService extends DefaultSchedulerService {
 
   @Override
   public Scheduler cpuLightScheduler() {
@@ -62,10 +62,8 @@ public class SingleIOPoolSchedulerService extends DefaultSchedulerService {
   }
 
   @Override
-  protected void describeCpuLightPoolForSplash(StringBuilder splashMessage) {
-  }
+  protected void describeCpuLightPoolForSplash(StringBuilder splashMessage) {}
 
   @Override
-  protected void describeCpuIntensivePoolForSplash(StringBuilder splashMessage) {
-  }
+  protected void describeCpuIntensivePoolForSplash(StringBuilder splashMessage) {}
 }

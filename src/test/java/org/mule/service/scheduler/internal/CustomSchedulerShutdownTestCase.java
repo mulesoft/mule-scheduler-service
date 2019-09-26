@@ -24,17 +24,15 @@ import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 
 import java.util.ArrayList;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicReference;
 
+import io.qameta.allure.Feature;
+import io.qameta.allure.Story;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import io.qameta.allure.Feature;
-import io.qameta.allure.Story;
 
 @Feature(SCHEDULER_SERVICE)
 @Story(SHUTDOWN)
@@ -48,19 +46,17 @@ public class CustomSchedulerShutdownTestCase extends AbstractMuleTestCase {
   @Before
   public void before() throws MuleException {
     threadPoolsConfig = loadThreadPoolsConfig();
-    service = new SchedulerThreadPools(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig) {
+    service = SchedulerThreadPools.builder(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig)
+        .setPreStartCallback(executor -> {
+          try {
+            sleep(prestarCallbackSleepTime);
+          } catch (InterruptedException e) {
+            currentThread().interrupt();
+            throw new MuleRuntimeException(e);
+          }
+        })
+        .build();
 
-      @Override
-      protected void prestartCallback(CountDownLatch prestartLatch) {
-        super.prestartCallback(prestartLatch);
-        try {
-          sleep(prestarCallbackSleepTime);
-        } catch (InterruptedException e) {
-          currentThread().interrupt();
-          throw new MuleRuntimeException(e);
-        }
-      }
-    };
     service.start();
   }
 
