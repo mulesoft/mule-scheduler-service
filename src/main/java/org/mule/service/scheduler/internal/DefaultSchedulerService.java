@@ -350,22 +350,8 @@ public class DefaultSchedulerService implements SchedulerServiceAdapter {
   private SchedulerThreadPools createSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig) {
     return SchedulerThreadPools.builder(name, threadPoolsConfig)
         .setTraceLogger(traceLogger)
-        .preStartCpuLight(preStartsCpuLightPool())
-        .preStartIO(preStartsIOPool())
-        .preStartCpuIntensive(preStartsCpuIntensivePool())
+        .preStartThreads(true)
         .build();
-  }
-
-  protected boolean preStartsCpuLightPool() {
-    return true;
-  }
-
-  protected boolean preStartsIOPool() {
-    return true;
-  }
-
-  protected boolean preStartsCpuIntensivePool() {
-    return true;
   }
 
   @Override
