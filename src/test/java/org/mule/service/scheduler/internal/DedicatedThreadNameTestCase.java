@@ -17,6 +17,7 @@ import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
@@ -80,7 +81,7 @@ import org.junit.runners.Parameterized.Parameters;
  */
 @Feature(SCHEDULER_SERVICE)
 @RunWith(Parameterized.class)
-public class ThreadNameTestCase extends AbstractMuleTestCase {
+public class DedicatedThreadNameTestCase extends AbstractMuleTestCase {
 
   private ContainerThreadPoolsConfig threadPoolsConfig;
   private SchedulerThreadPools service;
@@ -94,22 +95,24 @@ public class ThreadNameTestCase extends AbstractMuleTestCase {
   public static Collection<Object[]> data() {
     return asList(new Object[][] {
         {(Function<SchedulerThreadPools, Scheduler>) service -> service
-            .createCpuLightScheduler(config().withName(ThreadNameTestCase.class.getSimpleName()), 1, () -> 1000L),
+            .createCpuLightScheduler(config().withName(DedicatedThreadNameTestCase.class.getSimpleName()), 1, () -> 1000L),
             (Function<Scheduler, Matcher<String>>) scheduler -> allOf(startsWith("[MuleRuntime].cpuLight"),
-                                                                      endsWith(ThreadNameTestCase.class.getSimpleName() + " @"
+                                                                      endsWith(DedicatedThreadNameTestCase.class.getSimpleName()
+                                                                          + " @"
                                                                           + toHexString(scheduler.hashCode())))},
         {(Function<SchedulerThreadPools, Scheduler>) service -> service.createCustomScheduler(config().withPrefix("owner")
-            .withMaxConcurrentTasks(1).withName(ThreadNameTestCase.class.getSimpleName()), 1, () -> 1000L),
+            .withMaxConcurrentTasks(1).withName(DedicatedThreadNameTestCase.class.getSimpleName()), 1, () -> 1000L),
             (Function<Scheduler, Matcher<String>>) scheduler -> allOf(startsWith("[owner]."
-                + ThreadNameTestCase.class.getSimpleName()))},
+                + DedicatedThreadNameTestCase.class.getSimpleName()))},
         {(Function<SchedulerThreadPools, Scheduler>) service -> service.createCustomScheduler(config().withMaxConcurrentTasks(1)
-            .withName(ThreadNameTestCase.class.getSimpleName()), 1, () -> 1000L),
-            (Function<Scheduler, Matcher<String>>) scheduler -> allOf(startsWith(ThreadNameTestCase.class.getSimpleName()))}
+            .withName(DedicatedThreadNameTestCase.class.getSimpleName()), 1, () -> 1000L),
+            (Function<Scheduler, Matcher<String>>) scheduler -> allOf(startsWith(DedicatedThreadNameTestCase.class
+                .getSimpleName()))}
     });
   }
 
-  public ThreadNameTestCase(Function<SchedulerThreadPools, Scheduler> schedulerFactory,
-                            Function<Scheduler, Matcher<String>> prefixMatcher) {
+  public DedicatedThreadNameTestCase(Function<SchedulerThreadPools, Scheduler> schedulerFactory,
+                                     Function<Scheduler, Matcher<String>> prefixMatcher) {
     this.schedulerFactory = schedulerFactory;
     this.prefixMatcher = prefixMatcher;
   }
@@ -117,7 +120,8 @@ public class ThreadNameTestCase extends AbstractMuleTestCase {
   @Before
   public void before() throws MuleException {
     threadPoolsConfig = loadThreadPoolsConfig();
-    service = SchedulerThreadPools.builder(ThreadNameTestCase.class.getName(), threadPoolsConfig).build();
+    threadPoolsConfig.setSchedulerPoolStrategy(DEDICATED, true);
+    service = SchedulerThreadPools.builder(DedicatedThreadNameTestCase.class.getName(), threadPoolsConfig).build();
     service.start();
 
     scheduler = schedulerFactory.apply(service);

@@ -111,7 +111,7 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
   @Override
   public Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate, Supplier<Long> stopTimeout) {
     validateCustomSchedulerOnlyConfigNotChanged(config);
-    final String schedulerName = resolveCpuLightSchedulerName(config);
+    final String schedulerName = resolveSchedulerName(config, CPU_LIGHT_THREADS_NAME);
     Scheduler scheduler;
     if (shouldThrottle(config, threadPoolsConfig.getCpuLightPoolSize())) {
       scheduler =
@@ -135,7 +135,7 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
   @Override
   public Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
     validateCustomSchedulerOnlyConfigNotChanged(config);
-    final String schedulerName = resolveIoSchedulerName(config);
+    final String schedulerName = resolveSchedulerName(config, IO_THREADS_NAME);
     Scheduler scheduler;
     if (shouldThrottle(config, threadPoolsConfig.getIoMaxPoolSize())) {
       scheduler =
@@ -157,7 +157,7 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
   @Override
   public Scheduler createCpuIntensiveScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
     validateCustomSchedulerOnlyConfigNotChanged(config);
-    final String schedulerName = resolveComputationSchedulerName(config);
+    final String schedulerName = resolveSchedulerName(config, COMPUTATION_THREADS_NAME);
     Scheduler scheduler;
     if (shouldThrottle(config, threadPoolsConfig.getCpuIntensivePoolSize())) {
       scheduler =
@@ -178,8 +178,7 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
 
 
   @Override
-  protected void
-  createCustomThreadGroups() {
+  protected void createCustomThreadGroups() {
     cpuLightGroup = new ThreadGroup(parentGroup, threadPoolsConfig.getThreadNamePrefix() + CPU_LIGHT_THREADS_NAME);
     ioGroup = new ThreadGroup(parentGroup, threadPoolsConfig.getThreadNamePrefix() + IO_THREADS_NAME);
     computationGroup = new ThreadGroup(parentGroup, threadPoolsConfig.getThreadNamePrefix() + COMPUTATION_THREADS_NAME);
@@ -228,7 +227,8 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
 
   @Override
   protected void waitForExecutorTermination(long shutdownStartMillis) throws InterruptedException {
-    waitForExecutorTermination(shutdownStartMillis, cpuLightExecutor, threadPoolsConfig.getThreadNamePrefix() + CPU_LIGHT_THREADS_NAME);
+    waitForExecutorTermination(shutdownStartMillis, cpuLightExecutor,
+                               threadPoolsConfig.getThreadNamePrefix() + CPU_LIGHT_THREADS_NAME);
     waitForExecutorTermination(shutdownStartMillis, ioExecutor, threadPoolsConfig.getThreadNamePrefix() + IO_THREADS_NAME);
     waitForExecutorTermination(shutdownStartMillis, computationExecutor,
                                threadPoolsConfig.getThreadNamePrefix() + COMPUTATION_THREADS_NAME);
@@ -244,21 +244,6 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
   @Override
   public boolean isCurrentThreadForCpuWork() {
     return cpuWorkChecker.test(currentThread().getThreadGroup());
-  }
-
-  @Override
-  protected String resolveCpuLightSchedulerName(SchedulerConfig config) {
-    return resolveSchedulerName(config, CPU_LIGHT_THREADS_NAME);
-  }
-
-  @Override
-  protected String resolveIoSchedulerName(SchedulerConfig config) {
-    return resolveSchedulerName(config, IO_THREADS_NAME);
-  }
-
-  @Override
-  protected String resolveComputationSchedulerName(SchedulerConfig config) {
-    return resolveSchedulerName(config, COMPUTATION_THREADS_NAME);
   }
 
   @Override
@@ -328,7 +313,7 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
                        cpuLightActiveCount,
                        cpuLightExecutor.getQueue().size(),
                        cpuLightRejected > 0 ? 100.0 * (cpuLightRejected / (cpuLightTaskCount + cpuLightRejected)) : 0)
-                    + lineSeparator());
+            + lineSeparator());
     threadPoolsReportBuilder
         .append(format("IO            | %10d | %12d | %12d | %12d | ~ %9.2f",
                        schedulersIo,
@@ -336,7 +321,7 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
                        ioActiveCount,
                        ioExecutor.getQueue().size(),
                        ioRejected > 0 ? 100.0 * (ioRejected / (ioTaskCount + ioRejected)) : 0)
-                    + lineSeparator());
+            + lineSeparator());
     threadPoolsReportBuilder
         .append(format("CPU Intensive | %10d | %12d | %12d | %12d | ~ %9.2f",
                        schedulersCpuIntensive,
@@ -345,7 +330,7 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
                        computationExecutor.getQueue().size(),
                        cpuIntensiveRejected > 0 ? 100.0 * (cpuIntensiveRejected / (cpuIntensiveTaskCount + cpuIntensiveRejected))
                            : 0)
-                    + lineSeparator());
+            + lineSeparator());
     threadPoolsReportBuilder
         .append(format("Custom        | %10d | %12d | %12d | %12d | ~ %9.2f",
                        schedulersCustom,
@@ -353,10 +338,10 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
                        customActiveCount,
                        customQueued,
                        customRejected > 0 ? 100.0 * (customRejected / (customTaskCount + customRejected)) : 0)
-                    + lineSeparator());
+            + lineSeparator());
     threadPoolsReportBuilder
         .append("--------------------------------------------------------------------------------------" + lineSeparator()
-                    + lineSeparator());
+            + lineSeparator());
 
     return threadPoolsReportBuilder.toString();
   }

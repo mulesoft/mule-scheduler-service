@@ -285,7 +285,7 @@ public abstract class SchedulerThreadPools {
                           MILLISECONDS)) {
       final List<Runnable> cancelledJobs = executor.shutdownNow();
       LOGGER.warn("'" + executorLabel + "' " + executor.toString() + " did not shutdown gracefully after "
-                      + threadPoolsConfig.getGracefulShutdownTimeout() + " milliseconds.");
+          + threadPoolsConfig.getGracefulShutdownTimeout() + " milliseconds.");
 
       if (LOGGER.isDebugEnabled()) {
         LOGGER.debug("The jobs " + cancelledJobs + " were cancelled.");
@@ -354,7 +354,7 @@ public abstract class SchedulerThreadPools {
                                             BlockingQueue<Runnable> workQueue, String threadsName) {
     if (config.getMaxConcurrentTasks() == null) {
       throw new IllegalArgumentException(
-          "Custom schedulers must define a thread pool size bi calling `config.withMaxConcurrentTasks()`");
+                                         "Custom schedulers must define a thread pool size bi calling `config.withMaxConcurrentTasks()`");
     }
 
     final ThreadGroup customChildGroup = new ThreadGroup(resolveThreadGroupForCustomScheduler(config), threadsName);
@@ -416,7 +416,7 @@ public abstract class SchedulerThreadPools {
       } catch (RejectedExecutionException ree) {
         executor.shutdownNow();
         throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
-                                                               + executorAsString));
+            + executorAsString));
       }
     }
 
@@ -425,7 +425,7 @@ public abstract class SchedulerThreadPools {
       if (!prestartLatch.await(30, SECONDS)) {
         executor.shutdownNow();
         throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
-                                                               + executorAsString));
+            + executorAsString));
       }
 
       try {
@@ -434,10 +434,10 @@ public abstract class SchedulerThreadPools {
         }
       } catch (ExecutionException e) {
         throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
-                                                               + executorAsString), e.getCause());
+            + executorAsString), e.getCause());
       } catch (TimeoutException e) {
         throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
-                                                               + executorAsString), e);
+            + executorAsString), e);
       }
     } catch (InterruptedException e) {
       currentThread().interrupt();
@@ -456,12 +456,6 @@ public abstract class SchedulerThreadPools {
       return customGroup;
     }
   }
-
-  protected abstract String resolveCpuLightSchedulerName(SchedulerConfig config);
-
-  protected abstract String resolveIoSchedulerName(SchedulerConfig config);
-
-  protected abstract String resolveComputationSchedulerName(SchedulerConfig config);
 
   private String resolveCustomSchedulerName(SchedulerConfig config) {
     return resolveSchedulerName(config, CUSTOM_THREADS_NAME);
@@ -600,7 +594,7 @@ public abstract class SchedulerThreadPools {
         }
 
         LOGGER.error("Unable to destroy ThreadGroup '{}' of Scheduler '{}' ({}). Remaining threads in the group are:"
-                         + lineSeparator() + "{}", threadGroup.getName(), this.getName(), destroyException.toString(),
+            + lineSeparator() + "{}", threadGroup.getName(), this.getName(), destroyException.toString(),
                      threadNamesBuilder);
       }
     }

@@ -15,6 +15,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 
 import org.mule.runtime.api.scheduler.Scheduler;
@@ -56,6 +57,8 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
     outerExecutor = newSingleThreadExecutor();
 
     threadPoolsConfig = loadThreadPoolsConfig();
+    threadPoolsConfig.setSchedulerPoolStrategy(DEDICATED, true);
+
     service = SchedulerThreadPools.builder(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig).build();
     service.start();
   }

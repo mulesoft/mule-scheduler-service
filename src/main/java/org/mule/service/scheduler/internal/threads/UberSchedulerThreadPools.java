@@ -51,9 +51,9 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
   @Override
   protected void doStart(boolean preStartThreads) throws MuleException {
     // TODO (elrodro83) MULE-14203 Make IO thread pool have an optimal core size
-    uberExecutor = new ThreadPoolExecutor(threadPoolsConfig.getIoCorePoolSize().getAsInt(),
-                                          threadPoolsConfig.getIoMaxPoolSize().getAsInt(),
-                                          threadPoolsConfig.getIoKeepAlive().getAsLong(), MILLISECONDS,
+    uberExecutor = new ThreadPoolExecutor(threadPoolsConfig.getUberCorePoolSize().getAsInt(),
+                                          threadPoolsConfig.getUberMaxPoolSize().getAsInt(),
+                                          threadPoolsConfig.getUberKeepAlive().getAsLong(), MILLISECONDS,
                                           // At first, it may seem that a SynchronousQueue is not the best option here since it may
                                           // block the dispatching thread, which may be a CPU-light.
                                           // However, the alternatives have some limitations that make them impractical:
@@ -67,12 +67,12 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
                                           // limitations of the other 2 approaches, an improvement is seen in the dispatching of the
                                           // tasks, but at the cost of a slower task taking, which slows down the processing so much
                                           // that it greatly outweights the gain in the dispatcher.
-                                          createQueue(threadPoolsConfig.getIoQueueSize().getAsInt()),
+                                          createQueue(threadPoolsConfig.getUberQueueSize().getAsInt()),
                                           new SchedulerThreadFactory(uberGroup),
                                           byCallerThreadGroupPolicy.apply(uberGroup.getName()));
 
     if (preStartThreads) {
-      prestartCoreThreads(uberExecutor, threadPoolsConfig.getIoCorePoolSize().getAsInt());
+      prestartCoreThreads(uberExecutor, threadPoolsConfig.getUberCorePoolSize().getAsInt());
     }
   }
 
@@ -84,9 +84,9 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
   @Override
   public Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
     validateCustomSchedulerOnlyConfigNotChanged(config);
-    final String schedulerName = resolveIoSchedulerName(config);
+    final String schedulerName = resolveSchedulerName(config, UBER_THREADS_NAME);
     Scheduler scheduler;
-    if (shouldThrottle(config, threadPoolsConfig.getIoMaxPoolSize())) {
+    if (shouldThrottle(config, threadPoolsConfig.getUberMaxPoolSize())) {
       scheduler =
           new ThrottledScheduler(schedulerName, uberExecutor, workers, scheduledExecutor, quartzScheduler, IO,
                                  new ByCallerThrottlingPolicy(config.getMaxConcurrentTasks(),
@@ -149,25 +149,6 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
   }
 
   @Override
-  protected String resolveCpuLightSchedulerName(SchedulerConfig config) {
-    return doResolveSchedulerName(config);
-  }
-
-  @Override
-  protected String resolveIoSchedulerName(SchedulerConfig config) {
-    return doResolveSchedulerName(config);
-  }
-
-  @Override
-  protected String resolveComputationSchedulerName(SchedulerConfig config) {
-    return doResolveSchedulerName(config);
-  }
-
-  private String doResolveSchedulerName(SchedulerConfig config) {
-    return resolveSchedulerName(config, UBER_THREADS_NAME);
-  }
-
-  @Override
   protected List<Scheduler> getOwnSchedulers() {
     return new ArrayList<>(activeSchedulers);
   }
@@ -218,7 +199,7 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
                        activeCount,
                        uberExecutor.getQueue().size(),
                        rejectedCount > 0 ? 100.0 * (rejectedCount / (taskCount + rejectedCount)) : 0)
-                    + lineSeparator());
+            + lineSeparator());
     threadPoolsReportBuilder
         .append(format("Custom        | %10d | %12d | %12d | %12d | ~ %9.2f",
                        schedulersCustom,
@@ -226,10 +207,10 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
                        customActiveCount,
                        customQueued,
                        customRejected > 0 ? 100.0 * (customRejected / (customTaskCount + customRejected)) : 0)
-                    + lineSeparator());
+            + lineSeparator());
     threadPoolsReportBuilder
         .append("--------------------------------------------------------------------------------------" + lineSeparator()
-                    + lineSeparator());
+            + lineSeparator());
 
     return threadPoolsReportBuilder.toString();
   }

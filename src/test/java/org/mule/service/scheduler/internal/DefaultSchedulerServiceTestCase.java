@@ -6,7 +6,14 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static org.mockito.Mockito.when;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
+
+import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
+
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 
 import io.qameta.allure.Feature;
 
@@ -14,7 +21,16 @@ import io.qameta.allure.Feature;
 public class DefaultSchedulerServiceTestCase extends SchedulerServiceContractTestCase {
 
   @Override
-  protected SchedulerServiceAdapter createSchedulerService() {
-    return new DefaultSchedulerService();
+  protected void configure(SchedulerPoolsConfig config) {
+    when(config.getSchedulerPoolStrategy()).thenReturn(DEDICATED);
+    when(config.getCpuLightPoolSize()).thenReturn(OptionalInt.of(1));
+    when(config.getCpuLightQueueSize()).thenReturn(OptionalInt.of(1));
+    when(config.getCpuIntensiveQueueSize()).thenReturn(OptionalInt.of(1));
+    when(config.getIoCorePoolSize()).thenReturn(OptionalInt.of(1));
+    when(config.getIoMaxPoolSize()).thenReturn(OptionalInt.of(1));
+    when(config.getIoQueueSize()).thenReturn(OptionalInt.of(0));
+    when(config.getIoKeepAlive()).thenReturn(OptionalLong.of(30000L));
+    when(config.getCpuIntensivePoolSize()).thenReturn(OptionalInt.of(1));
+    when(config.getCpuIntensiveQueueSize()).thenReturn(OptionalInt.of(1));
   }
 }

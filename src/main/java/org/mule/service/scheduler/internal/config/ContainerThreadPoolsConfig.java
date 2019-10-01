@@ -57,44 +57,43 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
   public static final String PROP_PREFIX = "org.mule.runtime.scheduler.";
 
-  private static final String STRATEGY_PROPERTY_NAME = PROP_PREFIX + SchedulerPoolStrategy.class.getSimpleName();
-  private static final String CPU_LIGHT_PREFIX = PROP_PREFIX + CPU_LIGHT.getName();
-  private static final String IO_PREFIX = PROP_PREFIX + IO.getName();
-  private static final String CPU_INTENSIVE_PREFIX = PROP_PREFIX + CPU_INTENSIVE.getName();
-  private static final String UBER_PREFIX = PROP_PREFIX + "uber";
-  private static final String THREAD_POOL = "threadPool";
-  private static final String THREAD_POOL_SIZE = THREAD_POOL + ".size";
-  private static final String CPU_INTENSIVE_THREAD_POOL_SIZE = CPU_INTENSIVE_PREFIX + "." + THREAD_POOL_SIZE;
-  private static final String CPU_LIGHT_THREAD_POOL_SIZE = CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE;
-  private static final String THREAD_POOL_SIZE_MAX = THREAD_POOL + ".maxSize";
-  private static final String UBER_THREAD_POOL_SIZE_MAX = UBER_PREFIX + "." + THREAD_POOL_SIZE_MAX;
-  private static final String IO_THREAD_POOL_SIZE_MAX = IO_PREFIX + "." + THREAD_POOL_SIZE_MAX;
-  private static final String THREAD_POOL_SIZE_CORE = THREAD_POOL + ".coreSize";
-  private static final String UBER_THREAD_POOL_SIZE_CORE = UBER_PREFIX + "." + THREAD_POOL_SIZE_CORE;
-  private static final String IO_THREAD_POOL_SIZE = IO_PREFIX + "." + THREAD_POOL_SIZE_CORE;
-  private static final String THREAD_POOL_KEEP_ALIVE = THREAD_POOL + ".threadKeepAlive";
-  private static final String UBER_THREAD_POOL_KEEP_ALIVE = UBER_PREFIX + "." + THREAD_POOL_KEEP_ALIVE;
-  private static final String IO_THERAD_POOL_KEEP_ALIVE = IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE;
-  private static final String WORK_QUEUE = "workQueue";
-  private static final String WORK_QUEUE_SIZE = WORK_QUEUE + ".size";
-  private static final String UBER_QUEUE_SIZE = UBER_PREFIX + "." + WORK_QUEUE_SIZE;
-  private static final String CPU_INTENSIVE_WORK_QUEUE_SIZE = CPU_INTENSIVE_PREFIX + "." + WORK_QUEUE_SIZE;
-  private static final String IO_WORK_QUEUE_SIZE = IO_PREFIX + "." + WORK_QUEUE_SIZE;
-  private static final String CPU_LIGHT_WORK_QUEUE_SIZE = CPU_LIGHT_PREFIX + "." + WORK_QUEUE_SIZE;
-
   private static final Pattern MAX_MIN_PATTERN = compile("(max|min)");
   private static final String NUMBER_OR_VAR_REGEXP = "([0-9]+(\\.[0-9]+)?)|cores|mem";
   private static final String FORMULA_FUNCTION_PARAM =
       "(" + NUMBER_OR_VAR_REGEXP + ")?(\\s*[-+\\/*\\(\\)]\\s*(" + NUMBER_OR_VAR_REGEXP + ")?)*";
   private static final Pattern POOLSIZE_PATTERN =
       compile("^" + FORMULA_FUNCTION_PARAM
-                  + "|max\\s*\\(\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*,\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*\\)"
-                  + "|min\\s*\\(\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*,\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*\\)$");
+          + "|max\\s*\\(\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*,\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*\\)"
+          + "|min\\s*\\(\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*,\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*\\)$");
 
 
 
   public static final String SCHEDULER_POOLS_CONFIG_FILE_PROPERTY = "mule.schedulerPools.configFile";
   public static final String CONF_FILE_NAME = "conf" + separator + "scheduler-pools.conf";
+  public static final String STRATEGY_PROPERTY_NAME = PROP_PREFIX + SchedulerPoolStrategy.class.getSimpleName();
+  public static final String CPU_LIGHT_PREFIX = PROP_PREFIX + CPU_LIGHT.getName();
+  public static final String IO_PREFIX = PROP_PREFIX + IO.getName();
+  public static final String CPU_INTENSIVE_PREFIX = PROP_PREFIX + CPU_INTENSIVE.getName();
+  public static final String UBER_PREFIX = PROP_PREFIX + "uber";
+  public static final String THREAD_POOL = "threadPool";
+  public static final String THREAD_POOL_SIZE = THREAD_POOL + ".size";
+  public static final String CPU_INTENSIVE_THREAD_POOL_SIZE = CPU_INTENSIVE_PREFIX + "." + THREAD_POOL_SIZE;
+  public static final String CPU_LIGHT_THREAD_POOL_SIZE = CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE;
+  public static final String THREAD_POOL_SIZE_MAX = THREAD_POOL + ".maxSize";
+  public static final String UBER_THREAD_POOL_SIZE_MAX = UBER_PREFIX + "." + THREAD_POOL_SIZE_MAX;
+  public static final String IO_THREAD_POOL_SIZE_MAX = IO_PREFIX + "." + THREAD_POOL_SIZE_MAX;
+  public static final String THREAD_POOL_SIZE_CORE = THREAD_POOL + ".coreSize";
+  public static final String UBER_THREAD_POOL_SIZE_CORE = UBER_PREFIX + "." + THREAD_POOL_SIZE_CORE;
+  public static final String IO_THREAD_POOL_SIZE = IO_PREFIX + "." + THREAD_POOL_SIZE_CORE;
+  public static final String THREAD_POOL_KEEP_ALIVE = THREAD_POOL + ".threadKeepAlive";
+  public static final String UBER_THREAD_POOL_KEEP_ALIVE = UBER_PREFIX + "." + THREAD_POOL_KEEP_ALIVE;
+  public static final String IO_THERAD_POOL_KEEP_ALIVE = IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE;
+  public static final String WORK_QUEUE = "workQueue";
+  public static final String WORK_QUEUE_SIZE = WORK_QUEUE + ".size";
+  public static final String UBER_QUEUE_SIZE = UBER_PREFIX + "." + WORK_QUEUE_SIZE;
+  public static final String CPU_INTENSIVE_WORK_QUEUE_SIZE = CPU_INTENSIVE_PREFIX + "." + WORK_QUEUE_SIZE;
+  public static final String IO_WORK_QUEUE_SIZE = IO_PREFIX + "." + WORK_QUEUE_SIZE;
+  public static final String CPU_LIGHT_WORK_QUEUE_SIZE = CPU_LIGHT_PREFIX + "." + WORK_QUEUE_SIZE;
 
   /**
    * Loads the configuration from the {@code &#123;mule.home&#125;/conf/scheduler-pools.conf} file.
@@ -167,59 +166,61 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     ScriptEngine engine = manager.getEngineByName("js");
     if (engine == null) {
       throw new ConfigurationException(
-          createStaticMessage("No 'js' script engine found. It is required to parse the config in 'conf/scheduler-pools.conf'"));
+                                       createStaticMessage("No 'js' script engine found. It is required to parse the config in 'conf/scheduler-pools.conf'"));
     }
     engine.put("cores", CORES);
     engine.put("mem", MEM);
 
-    config.setSchedulerPoolStrategy(resolveSchedulerPoolStrategy(properties));
+    config.setSchedulerPoolStrategy(resolveSchedulerPoolStrategy(properties), true);
 
     resolveNumber(properties, PROP_PREFIX + "gracefulShutdownTimeout", true)
         .ifPresent(v -> config.setGracefulShutdownTimeout(v));
 
-    resolveExpression(properties, UBER_THREAD_POOL_SIZE_CORE, config, engine, false)
+    resolveExpression(properties, UBER_THREAD_POOL_SIZE_CORE, engine, false)
         .ifPresent(v -> config.setUberCorePoolSize(v));
-    resolveExpression(properties, UBER_THREAD_POOL_SIZE_MAX, config, engine, false)
+    resolveExpression(properties, UBER_THREAD_POOL_SIZE_MAX, engine, false)
         .ifPresent(v -> config.setUberMaxPoolSize(v));
-    resolveExpression(properties, UBER_QUEUE_SIZE, config, engine, true)
+    resolveExpression(properties, UBER_QUEUE_SIZE, engine, true)
         .ifPresent(v -> config.setUberQueueSize(v));
     resolveNumber(properties, UBER_THREAD_POOL_KEEP_ALIVE, true)
         .ifPresent(v -> config.setUberKeepAlive(v));
 
-    resolveExpression(properties, CPU_LIGHT_THREAD_POOL_SIZE, config, engine, false)
+    resolveExpression(properties, CPU_LIGHT_THREAD_POOL_SIZE, engine, false)
         .ifPresent(v -> config.setCpuLightPoolSize(v));
-    resolveExpression(properties, CPU_LIGHT_WORK_QUEUE_SIZE, config, engine, true)
+    resolveExpression(properties, CPU_LIGHT_WORK_QUEUE_SIZE, engine, true)
         .ifPresent(v -> config.setCpuLightQueueSize(v));
 
-    resolveExpression(properties, IO_THREAD_POOL_SIZE, config, engine, false)
+    resolveExpression(properties, IO_THREAD_POOL_SIZE, engine, false)
         .ifPresent(v -> config.setIoCorePoolSize(v));
-    resolveExpression(properties, IO_THREAD_POOL_SIZE_MAX, config, engine, false)
+    resolveExpression(properties, IO_THREAD_POOL_SIZE_MAX, engine, false)
         .ifPresent(v -> config.setIoMaxPoolSize(v));
-    resolveExpression(properties, IO_WORK_QUEUE_SIZE, config, engine, true)
+    resolveExpression(properties, IO_WORK_QUEUE_SIZE, engine, true)
         .ifPresent(v -> config.setIoQueueSize(v));
     resolveNumber(properties, IO_THERAD_POOL_KEEP_ALIVE, true)
         .ifPresent(v -> config.setIoKeepAlive(v));
 
-    resolveExpression(properties, CPU_INTENSIVE_THREAD_POOL_SIZE, config, engine, false)
+    resolveExpression(properties, CPU_INTENSIVE_THREAD_POOL_SIZE, engine, false)
         .ifPresent(v -> config.setCpuIntensivePoolSize(v));
-    resolveExpression(properties, CPU_INTENSIVE_WORK_QUEUE_SIZE, config, engine, true)
+    resolveExpression(properties, CPU_INTENSIVE_WORK_QUEUE_SIZE, engine, true)
         .ifPresent(v -> config.setCpuIntensiveQueueSize(v));
 
     return config;
   }
 
   private static SchedulerPoolStrategy resolveSchedulerPoolStrategy(Properties properties) throws ConfigurationException {
-    String strategyName = properties.getProperty(STRATEGY_PROPERTY_NAME);
+    String strategyName = resolvePropertyValue(properties, STRATEGY_PROPERTY_NAME);
     if (strategyName == null) {
       throw new ConfigurationException(
-          createStaticMessage(format("Property '%s' was not specified in file '%s'", STRATEGY_PROPERTY_NAME, CONF_FILE_NAME)));
+                                       createStaticMessage(format("Property '%s' was not specified in file '%s'",
+                                                                  STRATEGY_PROPERTY_NAME, CONF_FILE_NAME)));
     }
 
     try {
-      return SchedulerPoolStrategy.valueOf(strategyName);
+      return SchedulerPoolStrategy.valueOf(strategyName.toUpperCase());
     } catch (IllegalArgumentException e) {
       throw new ConfigurationException(createStaticMessage(
-          format("There's no %s named '%s'", SchedulerPoolStrategy.class.getSimpleName(), strategyName)));
+                                                           format("There's no %s named '%s'",
+                                                                  SchedulerPoolStrategy.class.getSimpleName(), strategyName)));
     }
   }
 
@@ -240,20 +241,13 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     }
   }
 
-  private static OptionalInt resolveExpression(Properties properties, String propName,
-                                               ContainerThreadPoolsConfig threadPoolsConfig,
-                                               ScriptEngine engine, boolean allowZero)
+  private static OptionalInt resolveExpression(Properties properties,
+                                               String propName,
+                                               ScriptEngine engine,
+                                               boolean allowZero)
       throws MuleException {
-    String property = null;
 
-    final String sysPropOverride = System.getProperty(propName);
-    if (sysPropOverride != null) {
-      LOGGER.debug("Found system property override for '{}' with value '{}'", propName, sysPropOverride);
-
-      property = sysPropOverride.trim().toLowerCase();
-    } else if (properties.containsKey(propName)) {
-      property = properties.getProperty(propName).trim().toLowerCase();
-    }
+    String property = resolvePropertyValue(properties, propName);
 
     if (property == null) {
       LOGGER.warn("No property '{}' found in config file. Using default value.", propName);
@@ -274,6 +268,20 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     } catch (ScriptException e) {
       throw new DefaultMuleException(propName + ": " + e.getMessage(), e);
     }
+  }
+
+  private static String resolvePropertyValue(Properties properties, String propName) {
+    String property = null;
+
+    final String sysPropOverride = getProperty(propName);
+    if (sysPropOverride != null) {
+      LOGGER.debug("Found system property override for '{}' with value '{}'", propName, sysPropOverride);
+
+      property = sysPropOverride.trim().toLowerCase();
+    } else if (properties.containsKey(propName)) {
+      property = properties.getProperty(propName).trim().toLowerCase();
+    }
+    return property;
   }
 
   private static void validateNumber(String propName, long result, boolean allowZero) throws MuleException {
@@ -307,12 +315,11 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
   private Integer cpuIntensiveQueueSize = null;
   private Integer cpuIntensivePoolSize = null;
 
-  private ContainerThreadPoolsConfig() {
-  }
+  private ContainerThreadPoolsConfig() {}
 
   @Override
   public OptionalLong getGracefulShutdownTimeout() {
-    return ofNullable(gracefulShutdownTimeout);
+    return OptionalLong.of(gracefulShutdownTimeout);
   }
 
   private void setGracefulShutdownTimeout(long gracefulShutdownTimeout) {
@@ -325,7 +332,36 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
   }
 
   public void setSchedulerPoolStrategy(SchedulerPoolStrategy schedulerPoolStrategy) {
+    setSchedulerPoolStrategy(schedulerPoolStrategy, false);
+  }
+
+  public void setSchedulerPoolStrategy(SchedulerPoolStrategy schedulerPoolStrategy, boolean initDefaults) {
     this.schedulerPoolStrategy = schedulerPoolStrategy;
+    if (initDefaults) {
+      if (schedulerPoolStrategy == DEDICATED) {
+        cpuLightQueueSize = 0;
+        cpuLightPoolSize = 2 * CORES;
+        ioQueueSize = 0;
+        ioCorePoolSize = CORES;
+        ioMaxPoolSize = (int) max(2, CORES + ((MEM - 245760) / 5120));
+        ioKeepAlive = 30000L;
+        cpuIntensiveQueueSize = 2 * CORES;
+        cpuIntensivePoolSize = 2 * CORES;
+
+        uberCorePoolSize = uberMaxPoolSize = uberQueueSize = null;
+        uberKeepAlive = null;
+      } else {
+        uberQueueSize = 0;
+        uberCorePoolSize = CORES;
+        uberMaxPoolSize = (int) max(2, CORES + ((MEM - 245760) / 5120));
+        uberKeepAlive = 30000L;
+
+        cpuLightQueueSize = cpuLightPoolSize = null;
+        ioQueueSize = ioCorePoolSize = ioMaxPoolSize = null;
+        ioKeepAlive = null;
+        cpuIntensiveQueueSize = cpuIntensivePoolSize = null;
+      }
+    }
   }
 
   @Override
@@ -340,7 +376,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
   @Override
   public OptionalInt getUberMaxPoolSize() {
-    return ofNullable(uberMaxPoolSize);
+    return nullableMax(uberCorePoolSize, uberMaxPoolSize);
   }
 
   public void setUberMaxPoolSize(Integer uberMaxPoolSize) {
@@ -400,7 +436,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
   @Override
   public OptionalInt getIoMaxPoolSize() {
-    return ofNullable(max(ioCorePoolSize, ioMaxPoolSize));
+    return nullableMax(ioCorePoolSize, ioMaxPoolSize);
   }
 
   private void setIoMaxPoolSize(int ioMaxPoolSize) {
@@ -453,6 +489,18 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     return "[MuleRuntime].";
   }
 
+  private OptionalInt nullableMax(Integer a, Integer b) {
+    if (a == null && b == null) {
+      return OptionalInt.empty();
+    } else if (a == null && b != null) {
+      return OptionalInt.of(b);
+    } else if (a != null && b == null) {
+      return OptionalInt.of(a);
+    } else {
+      return OptionalInt.of(max(a, b));
+    }
+  }
+
   private OptionalInt ofNullable(Integer value) {
     return value != null ? OptionalInt.of(value) : OptionalInt.empty();
   }
@@ -472,11 +520,11 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
   private void assertStrategy(SchedulerPoolStrategy expected, String propertyName) {
     if (schedulerPoolStrategy != expected) {
       throw new IllegalStateException(new ConfigurationException(createStaticMessage(format(
-          "Property '%s' can only be set when '%s' is '%s'. Current value is '%s'",
-          propertyName,
-          STRATEGY_PROPERTY_NAME,
-          expected,
-          schedulerPoolStrategy))));
+                                                                                            "Property '%s' can only be set when '%s' is '%s'. Current value is '%s'",
+                                                                                            propertyName,
+                                                                                            STRATEGY_PROPERTY_NAME,
+                                                                                            expected,
+                                                                                            schedulerPoolStrategy))));
     }
   }
 }
