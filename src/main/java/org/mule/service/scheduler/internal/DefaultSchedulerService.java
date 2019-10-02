@@ -6,7 +6,6 @@
  */
 package org.mule.service.scheduler.internal;
 
-import static com.google.common.cache.CacheBuilder.newBuilder;
 import static java.lang.Long.getLong;
 import static java.lang.Runtime.getRuntime;
 import static java.lang.System.lineSeparator;
@@ -17,7 +16,9 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.runtime.api.scheduler.SchedulerContainerPoolsConfig.getInstance;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
 import static org.mule.runtime.core.api.config.MuleProperties.OBJECT_SCHEDULER_BASE_CONFIG;
+import static org.mule.runtime.core.internal.util.rx.ImmediateScheduler.IMMEDIATE_SCHEDULER;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -38,7 +39,6 @@ import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -49,10 +49,9 @@ import javax.inject.Inject;
 import javax.inject.Named;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.google.common.cache.CacheLoader;
-import com.google.common.cache.LoadingCache;
-import com.google.common.cache.RemovalListener;
-import com.google.common.cache.RemovalNotification;
+import com.github.benmanes.caffeine.cache.LoadingCache;
+import com.github.benmanes.caffeine.cache.RemovalCause;
+import com.github.benmanes.caffeine.cache.RemovalListener;
 import org.slf4j.Logger;
 
 /**
@@ -62,26 +61,26 @@ import org.slf4j.Logger;
  */
 public class DefaultSchedulerService implements SchedulerService, Startable, Stoppable {
 
-  protected static final long DEFAULT_SHUTDOWN_TIMEOUT_MILLIS = 5000;
-  protected static final int CORES = getRuntime().availableProcessors();
-  protected static final String USAGE_TRACE_INTERVAL_SECS_PROPERTY = "mule.scheduler.usageTraceIntervalSecs";
-
+  private static final String USAGE_TRACE_INTERVAL_SECS_PROPERTY = "mule.scheduler.usageTraceIntervalSecs";
   public static final Long USAGE_TRACE_INTERVAL_SECS = getLong(USAGE_TRACE_INTERVAL_SECS_PROPERTY);
 
-  protected final Logger logger = getLogger(getClass());
-  protected final Logger traceLogger = getLogger("org.mule.service.scheduler.trace");
+  private static final Logger LOGGER = getLogger(DefaultSchedulerService.class);
+  public static final Logger TRACE_LOGGER = getLogger("org.mule.service.scheduler.trace");
 
-  protected ReadWriteLock pollsLock = new ReentrantReadWriteLock();
-  protected Lock pollsReadLock = pollsLock.readLock();
-  protected Lock pollsWriteLock = pollsLock.writeLock();
+  private static final long DEFAULT_SHUTDOWN_TIMEOUT_MILLIS = 5000;
+  private static final int CORES = getRuntime().availableProcessors();
 
-  protected ContainerThreadPoolsConfig containerThreadPoolsConfig;
-  protected LoadingCache<SchedulerPoolsConfigFactory, SchedulerThreadPools> poolsByConfig;
-  protected Scheduler poolsMaintenanceScheduler;
-  protected ScheduledFuture<?> poolsMaintenanceTask;
-  protected ScheduledFuture<?> usageReportingTask;
-  protected volatile boolean started = false;
-  protected com.github.benmanes.caffeine.cache.LoadingCache<Thread, Boolean> cpuWorkCache = Caffeine.newBuilder().weakKeys()
+  private ReadWriteLock pollsLock = new ReentrantReadWriteLock();
+  private Lock pollsReadLock = pollsLock.readLock();
+  private Lock pollsWriteLock = pollsLock.writeLock();
+
+  private ContainerThreadPoolsConfig containerThreadPoolsConfig;
+  private LoadingCache<SchedulerPoolsConfigFactory, SchedulerThreadPools> poolsByConfig;
+  private Scheduler poolsMaintenanceScheduler;
+  private ScheduledFuture<?> poolsMaintenanceTask;
+  private ScheduledFuture<?> usageReportingTask;
+  private volatile boolean started = false;
+  private LoadingCache<Thread, Boolean> cpuWorkCache = Caffeine.newBuilder().weakKeys()
       .build(t -> isCurrentThreadForCpuWork(getInstance()));
 
   @Override
@@ -97,8 +96,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     try {
       return poolsByConfig.get(getInstance())
           .createCpuLightScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
     } finally {
       pollsReadLock.unlock();
     }
@@ -112,8 +109,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     try {
       return poolsByConfig.get(getInstance())
           .createIoScheduler(config, ioBoundWorkers(), resolveStopTimeout(config));
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
     } finally {
       pollsReadLock.unlock();
     }
@@ -127,8 +122,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     try {
       return poolsByConfig.get(getInstance())
           .createCpuIntensiveScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
     } finally {
       pollsReadLock.unlock();
     }
@@ -141,8 +134,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     try {
       return poolsByConfig.get(getInstance())
           .createCpuLightScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
     } finally {
       pollsReadLock.unlock();
     }
@@ -155,8 +146,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     try {
       return poolsByConfig.get(getInstance())
           .createIoScheduler(config, ioBoundWorkers(), resolveStopTimeout(config));
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
     } finally {
       pollsReadLock.unlock();
     }
@@ -169,8 +158,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     try {
       return poolsByConfig.get(getInstance())
           .createCpuIntensiveScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
     } finally {
       pollsReadLock.unlock();
     }
@@ -185,8 +172,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     try {
       return poolsByConfig.get(poolsConfigFactory)
           .createCpuLightScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
     } finally {
       pollsReadLock.unlock();
     }
@@ -201,8 +186,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     try {
       return poolsByConfig.get(poolsConfigFactory)
           .createIoScheduler(config, ioBoundWorkers(), resolveStopTimeout(config));
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
     } finally {
       pollsReadLock.unlock();
     }
@@ -217,8 +200,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     try {
       return poolsByConfig.get(poolsConfigFactory)
           .createCpuIntensiveScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
     } finally {
       pollsReadLock.unlock();
     }
@@ -240,8 +221,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     try {
       return poolsByConfig.get(getInstance())
           .createCustomScheduler(config, CORES, resolveStopTimeout(config));
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
     } finally {
       pollsReadLock.unlock();
     }
@@ -255,8 +234,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     try {
       return poolsByConfig.get(getInstance())
           .createCustomScheduler(config, CORES, resolveStopTimeout(config), queueSize);
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
     } finally {
       pollsReadLock.unlock();
     }
@@ -285,8 +262,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     pollsReadLock.lock();
     try {
       return poolsByConfig.get(poolsConfigFactory).isCurrentThreadForCpuWork();
-    } catch (ExecutionException e) {
-      throw new MuleRuntimeException(e.getCause());
     } finally {
       pollsReadLock.unlock();
     }
@@ -297,33 +272,30 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     pollsWriteLock.lock();
     try {
       containerThreadPoolsConfig = loadThreadPoolsConfig();
-      poolsByConfig = newBuilder()
+      poolsByConfig = Caffeine.newBuilder()
           .weakKeys()
+          .executor(IMMEDIATE_SCHEDULER)
           .removalListener(new RemovalListener<SchedulerPoolsConfigFactory, SchedulerThreadPools>() {
 
             @Override
-            public void onRemoval(RemovalNotification<SchedulerPoolsConfigFactory, SchedulerThreadPools> notification) {
+            public void onRemoval(SchedulerPoolsConfigFactory key, SchedulerThreadPools value, RemovalCause cause) {
               try {
-                notification.getValue().stop();
-                logger.info("Stopped " + this.toString());
+                value.stop();
+                LOGGER.info("Stopped " + this.toString());
               } catch (InterruptedException e) {
                 currentThread().interrupt();
-                logger.warn("Stop of " + this.toString() + " interrupted", e);
+                LOGGER.warn("Stop of " + this.toString() + " interrupted", e);
               } catch (MuleException e) {
                 throw new MuleRuntimeException(e);
               }
             }
           })
-          .build(new CacheLoader<SchedulerPoolsConfigFactory, SchedulerThreadPools>() {
+          .build(key -> {
+            SchedulerThreadPools containerThreadPools =
+                createSchedulerThreadPools(getName(), key.getConfig().orElse(containerThreadPoolsConfig));
+            containerThreadPools.start();
 
-            @Override
-            public SchedulerThreadPools load(SchedulerPoolsConfigFactory key) throws Exception {
-              SchedulerThreadPools containerThreadPools =
-                  createSchedulerThreadPools(getName(), key.getConfig().orElse(containerThreadPoolsConfig));
-              containerThreadPools.start();
-
-              return containerThreadPools;
-            }
+            return containerThreadPools;
           });
 
       started = true;
@@ -332,14 +304,14 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
       poolsMaintenanceTask = poolsMaintenanceScheduler.scheduleAtFixedRate(() -> poolsByConfig.cleanUp(), 1, 1, MINUTES);
 
       if (USAGE_TRACE_INTERVAL_SECS != null) {
-        traceLogger.info("Usage Trace enabled");
+        TRACE_LOGGER.info("Usage Trace enabled");
         usageReportingTask = poolsMaintenanceScheduler.scheduleAtFixedRate(() -> {
-          traceLogger.warn("************************************************************************");
-          traceLogger.warn("* Schedulers Usage Report                                              *");
-          traceLogger.warn("************************************************************************");
+          TRACE_LOGGER.warn("************************************************************************");
+          TRACE_LOGGER.warn("* Schedulers Usage Report                                              *");
+          TRACE_LOGGER.warn("************************************************************************");
           for (SchedulerThreadPools pool : getPools()) {
-            traceLogger.warn(pool.buildReportString());
-            traceLogger.warn("************************************************************************");
+            TRACE_LOGGER.warn(pool.buildReportString());
+            TRACE_LOGGER.warn("************************************************************************");
           }
         }, USAGE_TRACE_INTERVAL_SECS, USAGE_TRACE_INTERVAL_SECS, SECONDS);
       }
@@ -351,14 +323,14 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   private SchedulerThreadPools createSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig) {
     return SchedulerThreadPools.builder(name, threadPoolsConfig)
-        .setTraceLogger(traceLogger)
+        .setTraceLogger(TRACE_LOGGER)
         .preStartThreads(true)
         .build();
   }
 
   @Override
   public void stop() throws MuleException {
-    logger.info("Stopping " + this.toString() + "...");
+    LOGGER.info("Stopping " + this.toString() + "...");
     pollsWriteLock.lock();
     try {
       started = false;
@@ -404,38 +376,36 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
     splashMessage.append("Resolved configuration values:").append(lineSeparator());
     splashMessage.append("" + lineSeparator());
+    splashMessage.append("Pooling strategy:       ")
+        .append(containerThreadPoolsConfig.getSchedulerPoolStrategy().name()).append(lineSeparator());
     splashMessage.append("gracefulShutdownTimeout:       ")
-        .append(containerThreadPoolsConfig.getGracefulShutdownTimeout().getAsLong() + " ms" + lineSeparator());
+        .append(containerThreadPoolsConfig.getGracefulShutdownTimeout().getAsLong()).append(" ms").append(lineSeparator());
 
-    describeCpuLightPoolForSplash(splashMessage);
-    describeIOPoolForSplash(splashMessage);
-    describeCpuIntensivePoolForSplash(splashMessage);
+    if (containerThreadPoolsConfig.getSchedulerPoolStrategy() == UBER) {
+      splashMessage.append("uber.threadPool.maxSize:         ")
+          .append(containerThreadPoolsConfig.getUberMaxPoolSize().getAsInt() + lineSeparator());
+      splashMessage.append("uber.threadPool.threadKeepAlive: ")
+          .append(containerThreadPoolsConfig.getUberKeepAlive().getAsLong() + " ms" + lineSeparator());
+
+    } else {
+      splashMessage.append("cpuLight.threadPool.size:      ")
+          .append(containerThreadPoolsConfig.getCpuLightPoolSize().getAsInt() + lineSeparator());
+      splashMessage.append("cpuLight.workQueue.size:       ")
+          .append(containerThreadPoolsConfig.getCpuLightQueueSize().getAsInt() + lineSeparator());
+      splashMessage.append("io.threadPool.maxSize:         ")
+          .append(containerThreadPoolsConfig.getIoMaxPoolSize().getAsInt() + lineSeparator());
+      splashMessage.append("io.threadPool.threadKeepAlive: ")
+          .append(containerThreadPoolsConfig.getIoKeepAlive().getAsLong() + " ms" + lineSeparator());
+      splashMessage.append("cpuIntensive.threadPool.size:  ")
+          .append(containerThreadPoolsConfig.getCpuIntensivePoolSize().getAsInt() + lineSeparator());
+      splashMessage.append("cpuIntensive.workQueue.size:   ")
+          .append(containerThreadPoolsConfig.getCpuIntensiveQueueSize().getAsInt() + lineSeparator());
+    }
 
     splashMessage.append("" + lineSeparator());
     splashMessage.append("These can be modified by editing 'conf/scheduler-pools.conf'" + lineSeparator());
 
     return splashMessage.toString();
-  }
-
-  protected void describeCpuIntensivePoolForSplash(StringBuilder splashMessage) {
-    splashMessage.append("cpuIntensive.threadPool.size:  ")
-        .append(containerThreadPoolsConfig.getCpuIntensivePoolSize().getAsInt() + lineSeparator());
-    splashMessage.append("cpuIntensive.workQueue.size:   ")
-        .append(containerThreadPoolsConfig.getCpuIntensiveQueueSize().getAsInt() + lineSeparator());
-  }
-
-  protected void describeIOPoolForSplash(StringBuilder splashMessage) {
-    splashMessage.append("io.threadPool.maxSize:         ")
-        .append(containerThreadPoolsConfig.getIoMaxPoolSize().getAsInt() + lineSeparator());
-    splashMessage.append("io.threadPool.threadKeepAlive: ")
-        .append(containerThreadPoolsConfig.getIoKeepAlive().getAsLong() + " ms" + lineSeparator());
-  }
-
-  protected void describeCpuLightPoolForSplash(StringBuilder splashMessage) {
-    splashMessage.append("cpuLight.threadPool.size:      ")
-        .append(containerThreadPoolsConfig.getCpuLightPoolSize().getAsInt() + lineSeparator());
-    splashMessage.append("cpuLight.workQueue.size:       ")
-        .append(containerThreadPoolsConfig.getCpuLightQueueSize().getAsInt() + lineSeparator());
   }
 
   @Override
