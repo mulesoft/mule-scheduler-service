@@ -18,7 +18,6 @@ import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.runtime.api.scheduler.SchedulerContainerPoolsConfig.getInstance;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
 import static org.mule.runtime.core.api.config.MuleProperties.OBJECT_SCHEDULER_BASE_CONFIG;
-import static org.mule.runtime.core.internal.util.rx.ImmediateScheduler.IMMEDIATE_SCHEDULER;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -274,7 +273,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
       containerThreadPoolsConfig = loadThreadPoolsConfig();
       poolsByConfig = Caffeine.newBuilder()
           .weakKeys()
-          .executor(IMMEDIATE_SCHEDULER)
+          .executor(Runnable::run)
           .removalListener(new RemovalListener<SchedulerPoolsConfigFactory, SchedulerThreadPools>() {
 
             @Override
