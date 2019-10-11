@@ -299,7 +299,8 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
   private static int CORES = getRuntime().availableProcessors();
   private static long MEM = getRuntime().maxMemory() / 1024;
-  private static final int BIG_POOL_DEFAULT_SIZE = (int) max(2, CORES + ((MEM - 245760) / 5120));
+
+  public static final int BIG_POOL_DEFAULT_SIZE = (int) max(2, CORES + ((MEM - 245760) / 5120));
 
   private SchedulerPoolStrategy schedulerPoolStrategy = UBER;
   private long gracefulShutdownTimeout = 15000;
@@ -311,7 +312,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
   private Long ioKeepAlive = null;
   private Integer uberQueueSize = 0;
   private Integer uberCorePoolSize = CORES;
-  private Integer uberMaxPoolSize = (int) max(2, CORES + ((MEM - 245760) / 5120));
+  private Integer uberMaxPoolSize = BIG_POOL_DEFAULT_SIZE;
   private Long uberKeepAlive = 30000L;
   private Integer cpuIntensiveQueueSize = null;
   private Integer cpuIntensivePoolSize = null;
@@ -354,7 +355,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
       } else {
         uberQueueSize = 0;
         uberCorePoolSize = CORES;
-        uberMaxPoolSize = (int) max(2, CORES + ((MEM - 245760) / 5120));
+        uberMaxPoolSize = BIG_POOL_DEFAULT_SIZE;
         uberKeepAlive = 30000L;
 
         cpuLightQueueSize = cpuLightPoolSize = null;

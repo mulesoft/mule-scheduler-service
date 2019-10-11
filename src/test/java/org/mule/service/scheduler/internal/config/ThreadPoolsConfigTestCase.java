@@ -6,7 +6,6 @@
  */
 package org.mule.service.scheduler.internal.config;
 
-import static java.lang.Math.max;
 import static java.lang.Runtime.getRuntime;
 import static java.lang.System.clearProperty;
 import static java.lang.System.setProperty;
@@ -17,6 +16,7 @@ import static org.junit.Assert.assertThat;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
 import static org.mule.runtime.core.api.config.MuleProperties.MULE_HOME_DIRECTORY_PROPERTY;
+import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.BIG_POOL_DEFAULT_SIZE;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.CPU_INTENSIVE_PREFIX;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.CPU_LIGHT_PREFIX;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.IO_PREFIX;
@@ -121,7 +121,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     assertThat(config.getIoKeepAlive().isPresent(), is(false));
 
     assertThat(config.getUberCorePoolSize().getAsInt(), is(CORES));
-    assertThat(config.getUberMaxPoolSize().getAsInt(), is((int) max(2, CORES + ((MEM - 245760) / 5120))));
+    assertThat(config.getUberMaxPoolSize().getAsInt(), is(BIG_POOL_DEFAULT_SIZE));
 
 
     assertThat(config.getUberQueueSize().isPresent(), is(true));
@@ -361,7 +361,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getUberMaxPoolSize().getAsInt(), is((int) max(2, CORES + ((MEM - 245760) / 5120))));
+    assertThat(config.getUberMaxPoolSize().getAsInt(), is(BIG_POOL_DEFAULT_SIZE));
   }
 
   @Test
