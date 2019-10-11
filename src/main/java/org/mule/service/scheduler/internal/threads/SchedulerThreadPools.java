@@ -258,9 +258,9 @@ public abstract class SchedulerThreadPools {
 
     final long startMillis = currentTimeMillis();
 
-    waitForExecutorTermination(startMillis);
     // Stop the scheduled first to avoid it dispatching tasks to an already stopped executor
     waitForExecutorTermination(startMillis, scheduledExecutor, threadPoolsConfig.getThreadNamePrefix() + TIMER_THREADS_NAME);
+    waitForExecutorTermination(startMillis);
 
     // When graceful shutdown timeouts, forceful shutdown will remove the custom scheduler from the list.
     // In that case, not creating a new collection here will cause a ConcurrentModificationException.

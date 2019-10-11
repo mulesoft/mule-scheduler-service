@@ -38,7 +38,7 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 
 /**
- * {@link SchedulerThreadPools} implementation that hold a different thread pool for each type of scheduler.
+ * {@link SchedulerThreadPools} implementation that holds a different thread pool for each type of scheduler.
  *
  * @since 1.3.0
  */

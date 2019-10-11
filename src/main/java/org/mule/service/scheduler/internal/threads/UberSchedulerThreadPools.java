@@ -33,7 +33,7 @@ import java.util.function.Supplier;
 import org.slf4j.Logger;
 
 /**
- * {@link SchedulerThreadPools} implementation that uses one single pool for cpuLight, IO and cpuIntensive pools, while
+ * {@link SchedulerThreadPools} implementation that uses one single pool for cpuLight, IO and cpuIntensive tasks, while
  * maintaining a separate one for the custom ones.
  *
  * @since 1.3.0
