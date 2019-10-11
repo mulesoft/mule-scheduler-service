@@ -37,6 +37,11 @@ import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 
+/**
+ * {@link SchedulerThreadPools} implementation that hold a different thread pool for each type of scheduler.
+ *
+ * @since 1.3.0
+ */
 class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
 
   private static final String CPU_LIGHT_THREADS_NAME = CPU_LIGHT.getName();
@@ -214,7 +219,7 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
   }
 
   @Override
-  protected ThreadPoolExecutor getCustomerSchedulerExecutor() {
+  protected ThreadPoolExecutor getCustomSchedulerDestroyerExecutor() {
     return ioExecutor;
   }
 

@@ -369,14 +369,14 @@ public abstract class SchedulerThreadPools {
 
     final CustomScheduler customScheduler =
         new CustomScheduler(schedulerName, executor, customChildGroup, workers, scheduledExecutor, quartzScheduler,
-                            getCustomerSchedulerExecutor(), CUSTOM, stopTimeout,
+                            getCustomSchedulerDestroyerExecutor(), CUSTOM, stopTimeout,
                             shutdownCallback(activeCustomSchedulers).andThen(s -> executors.remove(executor)));
     executors.add(executor);
     addScheduler(activeCustomSchedulers, customScheduler);
     return customScheduler;
   }
 
-  protected abstract ThreadPoolExecutor getCustomerSchedulerExecutor();
+  protected abstract ThreadPoolExecutor getCustomSchedulerDestroyerExecutor();
 
   /**
    * Workaround to avoid a race condition when a {@link SynchronousQueue} is combined with a call to
