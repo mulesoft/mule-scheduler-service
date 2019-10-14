@@ -7,7 +7,6 @@
 package org.mule.service.scheduler.internal.threads;
 
 import static java.lang.Integer.MAX_VALUE;
-import static java.lang.String.format;
 import static java.lang.System.currentTimeMillis;
 import static java.lang.System.getProperties;
 import static java.lang.System.lineSeparator;
@@ -15,15 +14,13 @@ import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
 import static java.lang.Thread.yield;
-import static java.util.Arrays.asList;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
-import static org.mule.runtime.core.api.config.MuleProperties.SYSTEM_PROPERTY_PREFIX;
-import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
-import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
+import static org.mule.runtime.api.util.MuleSystemProperties.SYSTEM_PROPERTY_PREFIX;
 import static org.mule.service.scheduler.ThreadType.CUSTOM;
-import static org.mule.service.scheduler.ThreadType.IO;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.MuleException;
@@ -35,12 +32,11 @@ import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 import org.mule.runtime.api.scheduler.SchedulerService;
 import org.mule.service.scheduler.ThreadType;
 import org.mule.service.scheduler.internal.DefaultScheduler;
-import org.mule.service.scheduler.internal.ThrottledScheduler;
 import org.mule.service.scheduler.internal.executor.ByCallerThreadGroupPolicy;
-import org.mule.service.scheduler.internal.executor.ByCallerThrottlingPolicy;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.OptionalInt;
 import java.util.Properties;
@@ -63,14 +59,11 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.quartz.SchedulerException;
 import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
-
-import com.google.common.collect.ImmutableList;
 
 /**
  * {@link Scheduler}s provided by this implementation of {@link SchedulerService} use a shared single-threaded
@@ -79,13 +72,64 @@ import com.google.common.collect.ImmutableList;
  *
  * @since 1.0
  */
-public class SchedulerThreadPools {
+public abstract class SchedulerThreadPools {
 
-  private static final Logger logger = getLogger(SchedulerThreadPools.class);
+  private static final Logger LOGGER = getLogger(SchedulerThreadPools.class);
 
-  private static final String CPU_LIGHT_THREADS_NAME = CPU_LIGHT.getName();
-  private static final String IO_THREADS_NAME = IO.getName();
-  private static final String COMPUTATION_THREADS_NAME = CPU_INTENSIVE.getName();
+
+  public static class Builder {
+
+    private String name;
+    private SchedulerPoolsConfig threadPoolsConfig;
+    private boolean preStartThreads = true;
+    private Logger traceLogger = LOGGER;
+    private Consumer<ThreadPoolExecutor> preStartCallback = executor -> {
+    };
+
+    private Builder(String name, SchedulerPoolsConfig threadPoolsConfig) {
+      this.name = name;
+      this.threadPoolsConfig = threadPoolsConfig;
+    }
+
+    public Builder preStartThreads(boolean prestart) {
+      this.preStartThreads = prestart;
+      return this;
+    }
+
+    public Builder setTraceLogger(Logger traceLogger) {
+      this.traceLogger = traceLogger;
+      return this;
+    }
+
+    public Builder setPreStartCallback(Consumer<ThreadPoolExecutor> preStartCallback) {
+      this.preStartCallback = preStartCallback;
+      return this;
+    }
+
+    public SchedulerThreadPools build() {
+      if (threadPoolsConfig.getSchedulerPoolStrategy() == DEDICATED) {
+        return new DedicatedSchedulerThreadPools(name,
+                                                 threadPoolsConfig,
+                                                 preStartThreads,
+                                                 preStartCallback,
+                                                 traceLogger);
+      } else if (threadPoolsConfig.getSchedulerPoolStrategy() == UBER) {
+        return new UberSchedulerThreadPools(name,
+                                            threadPoolsConfig,
+                                            preStartThreads,
+                                            preStartCallback,
+                                            traceLogger);
+      } else {
+        throw new IllegalArgumentException("Unsupported pool strategy type " + threadPoolsConfig.getSchedulerPoolStrategy());
+      }
+    }
+
+  }
+
+  public static Builder builder(String name, SchedulerPoolsConfig config) {
+    return new Builder(name, config);
+  }
+
   private static final String TIMER_THREADS_NAME = "timer";
   private static final String CUSTOM_THREADS_NAME = CUSTOM.getName();
 
@@ -96,122 +140,66 @@ public class SchedulerThreadPools {
   private static final boolean ALWAYS_SHOW_SCHEDULER_CREATION_LOCATION =
       getProperties().containsKey(SYSTEM_PROPERTY_PREFIX + "scheduler.alwaysShowSchedulerCreationLocation");
 
-  private String name;
-  private SchedulerPoolsConfig threadPoolsConfig;
-
-  private final ThreadGroup schedulerGroup;
-  private final ThreadGroup cpuLightGroup;
-  private final ThreadGroup ioGroup;
-  private final ThreadGroup computationGroup;
-  private final ThreadGroup timerGroup;
-  private final ThreadGroup customGroup;
-  private final ThreadGroup customWaitGroup;
-  private final ThreadGroup customCallerRunsGroup;
-  private final ThreadGroup customCallerRunsAnsWaitGroup;
-
-  private final Function<String, RejectedExecutionHandler> byCallerThreadGroupPolicy;
-  private final Predicate<ThreadGroup> cpuWorkChecker;
-
-  private ThreadPoolExecutor cpuLightExecutor;
-  private ThreadPoolExecutor ioExecutor;
-  private ThreadPoolExecutor computationExecutor;
-  private final Set<ThreadPoolExecutor> customSchedulersExecutors = new HashSet<>();
-  private ScheduledThreadPoolExecutor scheduledExecutor;
-  private org.quartz.Scheduler quartzScheduler;
+  private final boolean preStartThreads;
+  private final Consumer<ThreadPoolExecutor> preStartCallback;
 
   private final ReadWriteLock activeSchedulersLock = new ReentrantReadWriteLock();
-  private final Lock activeSchedulersReadLock = activeSchedulersLock.readLock();
-  private final Lock activeSchedulersWriteLock = activeSchedulersLock.writeLock();
 
-  private final List<Scheduler> activeCpuLightSchedulers = new ArrayList<>();
-  private final List<Scheduler> activeIoSchedulers = new ArrayList<>();
-  private final List<Scheduler> activeCpuIntensiveSchedulers = new ArrayList<>();
-  private final List<Scheduler> activeCustomSchedulers = new ArrayList<>();
+  protected final String name;
+  protected final ThreadGroup parentGroup;
+  protected final SchedulerPoolsConfig threadPoolsConfig;
+  protected final ThreadGroup timerGroup;
+  protected final ThreadGroup customGroup;
+  protected final ThreadGroup customWaitGroup;
+  protected final ThreadGroup customCallerRunsGroup;
+  protected final ThreadGroup customCallerRunsAnsWaitGroup;
+  protected final Set<ThreadPoolExecutor> customSchedulersExecutors = new HashSet<>();
+  protected final Function<String, RejectedExecutionHandler> byCallerThreadGroupPolicy;
+  protected final Lock activeSchedulersReadLock = activeSchedulersLock.readLock();
+  protected final List<Scheduler> activeCustomSchedulers = new ArrayList<>();
+  protected final Lock activeSchedulersWriteLock = activeSchedulersLock.writeLock();
+  protected final Logger traceLogger;
 
-  public SchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig) {
+  protected ScheduledThreadPoolExecutor scheduledExecutor;
+  protected org.quartz.Scheduler quartzScheduler;
+
+  protected SchedulerThreadPools(String name,
+                                 SchedulerPoolsConfig threadPoolsConfig,
+                                 boolean preStartThreads,
+                                 Consumer<ThreadPoolExecutor> preStartCallback,
+                                 Logger traceLogger) {
     this.name = name;
     this.threadPoolsConfig = threadPoolsConfig;
+    this.preStartThreads = preStartThreads;
+    this.preStartCallback = preStartCallback;
+    this.traceLogger = traceLogger;
 
-    schedulerGroup = new ThreadGroup(name) {
+    parentGroup = new ThreadGroup(name) {
 
       @Override
       public void uncaughtException(Thread t, Throwable e) {
         // This case happens if some rogue code stops our threads.
-        logger.error("Thread '" + t.getName() + "' stopped.", e);
+        LOGGER.error("Thread '" + t.getName() + "' stopped.", e);
       }
     };
-    cpuLightGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + CPU_LIGHT_THREADS_NAME);
-    ioGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + IO_THREADS_NAME);
-    computationGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + COMPUTATION_THREADS_NAME);
-    timerGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + TIMER_THREADS_NAME);
-    customGroup = new ThreadGroup(schedulerGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
+
+    createCustomThreadGroups();
+
+    timerGroup = new ThreadGroup(parentGroup, threadPoolsConfig.getThreadNamePrefix() + TIMER_THREADS_NAME);
+    customGroup = new ThreadGroup(parentGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
     customWaitGroup = new ThreadGroup(customGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
     customCallerRunsGroup = new ThreadGroup(customGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
     customCallerRunsAnsWaitGroup = new ThreadGroup(customGroup, threadPoolsConfig.getThreadNamePrefix() + CUSTOM_THREADS_NAME);
 
-    final Set<ThreadGroup> waitGroups = new HashSet<>(asList(ioGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
-    final Set<ThreadGroup> cpuWorkGroups = new HashSet<>(asList(cpuLightGroup, computationGroup));
-
-    byCallerThreadGroupPolicy = schedulerName -> new ByCallerThreadGroupPolicy(waitGroups,
-                                                                               new HashSet<>(asList(cpuLightGroup,
-                                                                                                    computationGroup,
-                                                                                                    customCallerRunsGroup,
-                                                                                                    customCallerRunsAnsWaitGroup)),
-                                                                               cpuLightGroup, schedulerGroup, schedulerName);
-
-    cpuWorkChecker = threadGroup -> {
-      if (threadGroup != null) {
-        while (threadGroup.getParent() != null) {
-          if (cpuWorkGroups.contains(threadGroup)) {
-            return true;
-          } else {
-            threadGroup = threadGroup.getParent();
-          }
-        }
-      }
-      return false;
-    };
+    byCallerThreadGroupPolicy = this::createThreadGroupPolicy;
   }
 
-  public void start() throws MuleException {
-    cpuLightExecutor =
-        new ThreadPoolExecutor(threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
-                               threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
-                               0, SECONDS,
-                               createQueue(threadPoolsConfig.getCpuLightQueueSize().getAsInt()),
-                               new SchedulerThreadFactory(cpuLightGroup),
-                               byCallerThreadGroupPolicy.apply(cpuLightGroup.getName()));
+  protected abstract ByCallerThreadGroupPolicy createThreadGroupPolicy(String schedulerName);
 
-    // TODO (elrodro83) MULE-14203 Make IO thread pool have an optimal core size
-    ioExecutor = new ThreadPoolExecutor(threadPoolsConfig.getIoCorePoolSize().getAsInt(),
-                                        threadPoolsConfig.getIoMaxPoolSize().getAsInt(),
-                                        threadPoolsConfig.getIoKeepAlive().getAsLong(), MILLISECONDS,
-                                        // At first, it may seem that a SynchronousQueue is not the best option here since it may
-                                        // block the dispatching thread, which may be a CPU-light.
-                                        // However, the alternatives have some limitations that make them impractical:
-                                        //
-                                        // * Using a LinkedBlockingQueue causes the pool not to grow until the queue is full. This
-                                        // causes unwanted delays in the processing if the core size of the pool is small, or
-                                        // keeping too many idle threads if the core size is large.
-                                        //
-                                        // * Using a custom SynchronizedQueue + RejectedExectuionHandler
-                                        // (https://gist.github.com/elrodro83/96e1ee470237a57fb06376a7e4b04f2b) that addresses the
-                                        // limitations of the other 2 approaches, an improvement is seen in the dispatching of the
-                                        // tasks, but at the cost of a slower task taking, which slows down the processing so much
-                                        // that it greatly outweights the gain in the dispatcher.
-                                        createQueue(threadPoolsConfig.getIoQueueSize().getAsInt()),
-                                        new SchedulerThreadFactory(ioGroup),
-                                        byCallerThreadGroupPolicy.apply(ioGroup.getName()));
-    computationExecutor =
-        new ThreadPoolExecutor(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
-                               threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
-                               0, SECONDS, createQueue(threadPoolsConfig.getCpuIntensiveQueueSize().getAsInt()),
-                               new SchedulerThreadFactory(computationGroup),
-                               byCallerThreadGroupPolicy.apply(computationGroup.getName()));
+  protected abstract void createCustomThreadGroups();
 
-    prestartCoreThreads(cpuLightExecutor, threadPoolsConfig.getCpuLightPoolSize().getAsInt());
-    prestartCoreThreads(ioExecutor, threadPoolsConfig.getIoCorePoolSize().getAsInt());
-    prestartCoreThreads(computationExecutor, threadPoolsConfig.getCpuIntensivePoolSize().getAsInt());
+  public final void start() throws MuleException {
+    doStart(preStartThreads);
 
     scheduledExecutor = new ScheduledThreadPoolExecutor(1, new SchedulerThreadFactory(timerGroup, "%s"));
     scheduledExecutor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
@@ -227,13 +215,15 @@ public class SchedulerThreadPools {
     }
   }
 
+  protected abstract void doStart(boolean preStartThreads) throws MuleException;
+
   /**
    * Create queue using a {@link SynchronousQueue} if size is 0 or a {@link LinkedBlockingQueue} if size > 0.
    *
    * @param size queue size
    * @return new queue instance
    */
-  private BlockingQueue<Runnable> createQueue(int size) {
+  protected BlockingQueue<Runnable> createQueue(int size) {
     return size == 0 ? new SynchronousQueue<>() : new LinkedBlockingQueue<>(size);
   }
 
@@ -251,10 +241,11 @@ public class SchedulerThreadPools {
     return factoryProperties;
   }
 
-  public void stop() throws MuleException, InterruptedException {
-    cpuLightExecutor.shutdown();
-    ioExecutor.shutdown();
-    computationExecutor.shutdown();
+  protected abstract void shutdownPools() throws MuleException, InterruptedException;
+
+  public final void stop() throws MuleException, InterruptedException {
+    shutdownPools();
+
     for (ThreadPoolExecutor customSchedulerExecutor : customSchedulersExecutors) {
       customSchedulerExecutor.shutdown();
     }
@@ -269,10 +260,7 @@ public class SchedulerThreadPools {
 
     // Stop the scheduled first to avoid it dispatching tasks to an already stopped executor
     waitForExecutorTermination(startMillis, scheduledExecutor, threadPoolsConfig.getThreadNamePrefix() + TIMER_THREADS_NAME);
-    waitForExecutorTermination(startMillis, cpuLightExecutor, threadPoolsConfig.getThreadNamePrefix() + CPU_LIGHT_THREADS_NAME);
-    waitForExecutorTermination(startMillis, ioExecutor, threadPoolsConfig.getThreadNamePrefix() + IO_THREADS_NAME);
-    waitForExecutorTermination(startMillis, computationExecutor,
-                               threadPoolsConfig.getThreadNamePrefix() + COMPUTATION_THREADS_NAME);
+    waitForExecutorTermination(startMillis);
 
     // When graceful shutdown timeouts, forceful shutdown will remove the custom scheduler from the list.
     // In that case, not creating a new collection here will cause a ConcurrentModificationException.
@@ -281,12 +269,14 @@ public class SchedulerThreadPools {
                                  ((SchedulerThreadFactory) customSchedulerExecutor.getThreadFactory()).getGroup().getName());
     }
 
-    cpuLightExecutor = null;
-    ioExecutor = null;
-    computationExecutor = null;
+    onStopCompleted();
     scheduledExecutor = null;
     quartzScheduler = null;
   }
+
+  protected abstract void waitForExecutorTermination(long shutdownStartMillis) throws InterruptedException;
+
+  protected abstract void onStopCompleted();
 
   protected void waitForExecutorTermination(final long startMillis, final ExecutorService executor, final String executorLabel)
       throws InterruptedException {
@@ -294,58 +284,23 @@ public class SchedulerThreadPools {
         .awaitTermination(threadPoolsConfig.getGracefulShutdownTimeout().getAsLong() - (currentTimeMillis() - startMillis),
                           MILLISECONDS)) {
       final List<Runnable> cancelledJobs = executor.shutdownNow();
-      logger.warn("'" + executorLabel + "' " + executor.toString() + " did not shutdown gracefully after "
+      LOGGER.warn("'" + executorLabel + "' " + executor.toString() + " did not shutdown gracefully after "
           + threadPoolsConfig.getGracefulShutdownTimeout() + " milliseconds.");
 
-      if (logger.isDebugEnabled()) {
-        logger.debug("The jobs " + cancelledJobs + " were cancelled.");
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("The jobs " + cancelledJobs + " were cancelled.");
       } else {
-        logger.info(cancelledJobs.size() + " jobs were cancelled.");
+        LOGGER.info(cancelledJobs.size() + " jobs were cancelled.");
       }
     }
   }
 
-  public Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate, Supplier<Long> stopTimeout) {
-    validateCustomSchedulerOnlyConfigNotChanged(config);
-    final String schedulerName = resolveCpuLightSchedulerName(config);
-    Scheduler scheduler;
-    if (shouldThrottle(config, threadPoolsConfig.getCpuLightPoolSize())) {
-      scheduler =
-          new ThrottledScheduler(schedulerName, cpuLightExecutor, parallelTasksEstimate, scheduledExecutor, quartzScheduler,
-                                 CPU_LIGHT,
-                                 new ByCallerThrottlingPolicy(config.getMaxConcurrentTasks(),
-                                                              new HashSet<>(asList(ioGroup, customWaitGroup)), schedulerGroup),
-                                 stopTimeout, shutdownCallback(activeCpuLightSchedulers));
-    } else {
-      scheduler = new DefaultScheduler(schedulerName, cpuLightExecutor, parallelTasksEstimate,
-                                       scheduledExecutor, quartzScheduler, CPU_LIGHT,
-                                       stopTimeout, shutdownCallback(activeCpuLightSchedulers));
-    }
+  public abstract Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate,
+                                                    Supplier<Long> stopTimeout);
 
-    addScheduler(activeCpuLightSchedulers, scheduler);
-    return scheduler;
-  }
+  public abstract Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout);
 
-  public Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
-    validateCustomSchedulerOnlyConfigNotChanged(config);
-    final String schedulerName = resolveIoSchedulerName(config);
-    Scheduler scheduler;
-    if (shouldThrottle(config, threadPoolsConfig.getIoMaxPoolSize())) {
-      scheduler =
-          new ThrottledScheduler(schedulerName, ioExecutor, workers, scheduledExecutor, quartzScheduler, IO,
-                                 new ByCallerThrottlingPolicy(config.getMaxConcurrentTasks(),
-                                                              new HashSet<>(asList(ioGroup, customWaitGroup)), schedulerGroup),
-                                 stopTimeout, shutdownCallback(activeIoSchedulers));
-    } else {
-      scheduler = new DefaultScheduler(schedulerName, ioExecutor, workers,
-                                       scheduledExecutor, quartzScheduler, IO,
-                                       stopTimeout, shutdownCallback(activeIoSchedulers));
-    }
-    addScheduler(activeIoSchedulers, scheduler);
-    return scheduler;
-  }
-
-  private boolean addScheduler(List<Scheduler> activeSchedulers, Scheduler scheduler) {
+  protected boolean addScheduler(List<Scheduler> activeSchedulers, Scheduler scheduler) {
     activeSchedulersWriteLock.lock();
     try {
       return activeSchedulers.add(scheduler);
@@ -354,7 +309,9 @@ public class SchedulerThreadPools {
     }
   }
 
-  private Consumer<Scheduler> shutdownCallback(List<Scheduler> activeSchedulers) {
+  public abstract Scheduler createCpuIntensiveScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout);
+
+  protected Consumer<Scheduler> shutdownCallback(List<Scheduler> activeSchedulers) {
     return schr -> {
       activeSchedulersWriteLock.lock();
       try {
@@ -365,26 +322,7 @@ public class SchedulerThreadPools {
     };
   }
 
-  public Scheduler createCpuIntensiveScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
-    validateCustomSchedulerOnlyConfigNotChanged(config);
-    final String schedulerName = resolveComputationSchedulerName(config);
-    Scheduler scheduler;
-    if (shouldThrottle(config, threadPoolsConfig.getCpuIntensivePoolSize())) {
-      scheduler =
-          new ThrottledScheduler(schedulerName, computationExecutor, workers, scheduledExecutor, quartzScheduler, CPU_INTENSIVE,
-                                 new ByCallerThrottlingPolicy(config.getMaxConcurrentTasks(),
-                                                              new HashSet<>(asList(ioGroup, customWaitGroup)), schedulerGroup),
-                                 stopTimeout, shutdownCallback(activeCpuIntensiveSchedulers));
-    } else {
-      scheduler = new DefaultScheduler(schedulerName, computationExecutor, workers, scheduledExecutor,
-                                       quartzScheduler, CPU_INTENSIVE, stopTimeout,
-                                       shutdownCallback(activeCpuIntensiveSchedulers));
-    }
-    addScheduler(activeCpuIntensiveSchedulers, scheduler);
-    return scheduler;
-  }
-
-  private void validateCustomSchedulerOnlyConfigNotChanged(SchedulerConfig config) {
+  protected void validateCustomSchedulerOnlyConfigNotChanged(SchedulerConfig config) {
     if (config.getWaitAllowed().isPresent()) {
       throw new IllegalArgumentException("Only custom schedulers may define 'waitAllowed' behaviour");
     }
@@ -393,7 +331,7 @@ public class SchedulerThreadPools {
     }
   }
 
-  private boolean shouldThrottle(SchedulerConfig config, OptionalInt backingPoolMaxSize) {
+  protected boolean shouldThrottle(SchedulerConfig config, OptionalInt backingPoolMaxSize) {
     // Only throttle if max concurrent tasks is less than total backing pool size
     return config.getMaxConcurrentTasks() != null && config.getMaxConcurrentTasks() < backingPoolMaxSize.orElse(MAX_VALUE);
   }
@@ -415,7 +353,8 @@ public class SchedulerThreadPools {
   private Scheduler doCreateCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, String schedulerName,
                                             BlockingQueue<Runnable> workQueue, String threadsName) {
     if (config.getMaxConcurrentTasks() == null) {
-      throw new IllegalArgumentException("Custom schedulers must define a thread pool size bi calling `config.withMaxConcurrentTasks()`");
+      throw new IllegalArgumentException(
+                                         "Custom schedulers must define a thread pool size bi calling `config.withMaxConcurrentTasks()`");
     }
 
     final ThreadGroup customChildGroup = new ThreadGroup(resolveThreadGroupForCustomScheduler(config), threadsName);
@@ -429,13 +368,15 @@ public class SchedulerThreadPools {
     Set<ThreadPoolExecutor> executors = customSchedulersExecutors;
 
     final CustomScheduler customScheduler =
-        new CustomScheduler(schedulerName, executor, customChildGroup, workers, scheduledExecutor, quartzScheduler, ioExecutor,
-                            CUSTOM, stopTimeout,
+        new CustomScheduler(schedulerName, executor, customChildGroup, workers, scheduledExecutor, quartzScheduler,
+                            getCustomSchedulerDestroyerExecutor(), CUSTOM, stopTimeout,
                             shutdownCallback(activeCustomSchedulers).andThen(s -> executors.remove(executor)));
     executors.add(executor);
     addScheduler(activeCustomSchedulers, customScheduler);
     return customScheduler;
   }
+
+  protected abstract ThreadPoolExecutor getCustomSchedulerDestroyerExecutor();
 
   /**
    * Workaround to avoid a race condition when a {@link SynchronousQueue} is combined with a call to
@@ -447,10 +388,10 @@ public class SchedulerThreadPools {
    * <p>
    * In that case, the threads are prestarted by dispatching work to the executor as a workaround, which avoids the issue.
    *
-   * @param executor the executor to prestart the threads for
+   * @param executor     the executor to prestart the threads for
    * @param corePoolSize the number of threads to start in e=the {@code executor}
    */
-  private void prestartCoreThreads(final ThreadPoolExecutor executor, int corePoolSize) {
+  protected void prestartCoreThreads(final ThreadPoolExecutor executor, int corePoolSize) {
     // This latch is to ensure that the required executions are active at the same time
     CountDownLatch prestartWaitLatch = new CountDownLatch(1);
     // This latch is to validate that the required executions have actually run
@@ -469,7 +410,8 @@ public class SchedulerThreadPools {
             currentThread().interrupt();
             throw new MuleRuntimeException(e);
           }
-          prestartCallback(prestartLatch);
+          prestartLatch.countDown();
+          preStartCallback.accept(executor);
         }));
       } catch (RejectedExecutionException ree) {
         executor.shutdownNow();
@@ -503,10 +445,6 @@ public class SchedulerThreadPools {
     }
   }
 
-  protected void prestartCallback(CountDownLatch prestartLatch) {
-    prestartLatch.countDown();
-  }
-
   private ThreadGroup resolveThreadGroupForCustomScheduler(SchedulerConfig config) {
     if (config.getDirectRunCpuLightWhenTargetBusy().orElse(false) && config.getWaitAllowed().orElse(false)) {
       return customCallerRunsAnsWaitGroup;
@@ -519,23 +457,11 @@ public class SchedulerThreadPools {
     }
   }
 
-  private String resolveCpuLightSchedulerName(SchedulerConfig config) {
-    return resolveSchedulerName(config, CPU_LIGHT_THREADS_NAME);
-  }
-
-  private String resolveIoSchedulerName(SchedulerConfig config) {
-    return resolveSchedulerName(config, IO_THREADS_NAME);
-  }
-
-  private String resolveComputationSchedulerName(SchedulerConfig config) {
-    return resolveSchedulerName(config, COMPUTATION_THREADS_NAME);
-  }
-
   private String resolveCustomSchedulerName(SchedulerConfig config) {
     return resolveSchedulerName(config, CUSTOM_THREADS_NAME);
   }
 
-  private String resolveSchedulerName(SchedulerConfig config, String prefix) {
+  protected String resolveSchedulerName(SchedulerConfig config, String prefix) {
     if (!config.hasName()) {
       config = config.withName(resolveSchedulerCreationLocation(prefix));
       return config.getSchedulerName();
@@ -577,9 +503,7 @@ public class SchedulerThreadPools {
     return !ste.getClassName().contains("$Proxy");
   }
 
-  public boolean isCurrentThreadForCpuWork() {
-    return cpuWorkChecker.test(currentThread().getThreadGroup());
-  }
+  public abstract boolean isCurrentThreadForCpuWork();
 
   private static class CustomScheduler extends DefaultScheduler {
 
@@ -603,7 +527,7 @@ public class SchedulerThreadPools {
 
     @Override
     public void shutdown() {
-      logger.debug("Shutting down " + this.toString());
+      LOGGER.debug("Shutting down " + this.toString());
       doShutdown();
       executor.shutdown();
       shutdownCallback.accept(this);
@@ -611,7 +535,7 @@ public class SchedulerThreadPools {
 
     @Override
     public List<Runnable> shutdownNow() {
-      logger.debug("Shutting down NOW " + this.toString());
+      LOGGER.debug("Shutting down NOW " + this.toString());
       try {
         List<Runnable> cancelledTasks = doShutdownNow();
         executor.shutdownNow();
@@ -661,7 +585,7 @@ public class SchedulerThreadPools {
 
           threadNamesBuilder.append("\t* " + thread.getName() + lineSeparator());
 
-          if (logger.isDebugEnabled()) {
+          if (LOGGER.isDebugEnabled()) {
             final StackTraceElement[] stackTrace = thread.getStackTrace();
             for (int i = 1; i < stackTrace.length; i++) {
               threadNamesBuilder.append("\t\tat ").append(stackTrace[i]).append(lineSeparator());
@@ -669,8 +593,9 @@ public class SchedulerThreadPools {
           }
         }
 
-        logger.error("Unable to destroy ThreadGroup '{}' of Scheduler '{}' ({}). Remaining threads in the group are:"
-            + lineSeparator() + "{}", threadGroup.getName(), this.getName(), destroyException.toString(), threadNamesBuilder);
+        LOGGER.error("Unable to destroy ThreadGroup '{}' of Scheduler '{}' ({}). Remaining threads in the group are:"
+            + lineSeparator() + "{}", threadGroup.getName(), this.getName(), destroyException.toString(),
+                     threadNamesBuilder);
       }
     }
 
@@ -709,104 +634,16 @@ public class SchedulerThreadPools {
   public List<Scheduler> getSchedulers() {
     activeSchedulersReadLock.lock();
     try {
-      return ImmutableList.<Scheduler>builder()
-          .addAll(activeCpuLightSchedulers)
-          .addAll(activeIoSchedulers)
-          .addAll(activeCpuIntensiveSchedulers)
-          .addAll(activeCustomSchedulers)
-          .build();
+      List<Scheduler> schedulers = new LinkedList<>(getOwnSchedulers());
+      schedulers.addAll(activeCustomSchedulers);
+
+      return schedulers;
     } finally {
       activeSchedulersReadLock.unlock();
     }
   }
 
-  public String buildReportString() {
-    final StringBuilder threadPoolsReportBuilder = new StringBuilder();
+  protected abstract List<Scheduler> getOwnSchedulers();
 
-    int schedulersCpuLight;
-    int schedulersIo;
-    int schedulersCpuIntensive;
-    int schedulersCustom;
-
-    activeSchedulersReadLock.lock();
-    try {
-      schedulersCpuLight = activeCpuLightSchedulers.size();
-      schedulersIo = activeIoSchedulers.size();
-      schedulersCpuIntensive = activeCpuIntensiveSchedulers.size();
-      schedulersCustom = activeCustomSchedulers.size();
-    } finally {
-      activeSchedulersReadLock.unlock();
-    }
-
-    final int cpuLightActiveCount = cpuLightExecutor.getActiveCount();
-    final long cpuLightTaskCount = cpuLightExecutor.getTaskCount();
-    final long cpuLightRejected = ((ByCallerThreadGroupPolicy) cpuLightExecutor.getRejectedExecutionHandler()).getRejectedCount();
-    final int ioActiveCount = ioExecutor.getActiveCount();
-    final long ioTaskCount = ioExecutor.getTaskCount();
-    final long ioRejected = ((ByCallerThreadGroupPolicy) ioExecutor.getRejectedExecutionHandler()).getRejectedCount();
-    final int cpuIntensiveActiveCount = computationExecutor.getActiveCount();
-    final long cpuIntensiveTaskCount = computationExecutor.getTaskCount();
-    final long cpuIntensiveRejected =
-        ((ByCallerThreadGroupPolicy) computationExecutor.getRejectedExecutionHandler()).getRejectedCount();
-
-    int customActiveCount = 0;
-    int customUsedCount = 0;
-    int customQueued = 0;
-    long customTaskCount = 0;
-    long customRejected = 0;
-    for (ThreadPoolExecutor customExecutor : customSchedulersExecutors) {
-      final int currentCustomActive = customExecutor.getActiveCount();
-      customActiveCount += currentCustomActive;
-      customUsedCount += customExecutor.getPoolSize() - currentCustomActive;
-      customQueued += customExecutor.getQueue().size();
-      customTaskCount += customExecutor.getTaskCount();
-      customRejected += ((ByCallerThreadGroupPolicy) customExecutor.getRejectedExecutionHandler()).getRejectedCount();
-    }
-
-    threadPoolsReportBuilder.append(lineSeparator() + name + lineSeparator());
-    threadPoolsReportBuilder
-        .append("--------------------------------------------------------------------------------------" + lineSeparator());
-    threadPoolsReportBuilder
-        .append("Pool          | Schedulers | Idle threads | Used threads | Queued tasks | Rejection % " + lineSeparator());
-    threadPoolsReportBuilder
-        .append("--------------------------------------------------------------------------------------" + lineSeparator());
-    threadPoolsReportBuilder
-        .append(format("CPU Light     | %10d | %12d | %12d | %12d | ~ %9.2f",
-                       schedulersCpuLight,
-                       cpuLightExecutor.getPoolSize() - cpuLightActiveCount,
-                       cpuLightActiveCount,
-                       cpuLightExecutor.getQueue().size(),
-                       cpuLightRejected > 0 ? 100.0 * (cpuLightRejected / (cpuLightTaskCount + cpuLightRejected)) : 0)
-            + lineSeparator());
-    threadPoolsReportBuilder
-        .append(format("IO            | %10d | %12d | %12d | %12d | ~ %9.2f",
-                       schedulersIo,
-                       ioExecutor.getPoolSize() - ioActiveCount,
-                       ioActiveCount,
-                       ioExecutor.getQueue().size(),
-                       ioRejected > 0 ? 100.0 * (ioRejected / (ioTaskCount + ioRejected)) : 0)
-            + lineSeparator());
-    threadPoolsReportBuilder
-        .append(format("CPU Intensive | %10d | %12d | %12d | %12d | ~ %9.2f",
-                       schedulersCpuIntensive,
-                       computationExecutor.getPoolSize() - cpuIntensiveActiveCount,
-                       cpuIntensiveActiveCount,
-                       computationExecutor.getQueue().size(),
-                       cpuIntensiveRejected > 0 ? 100.0 * (cpuIntensiveRejected / (cpuIntensiveTaskCount + cpuIntensiveRejected))
-                           : 0)
-            + lineSeparator());
-    threadPoolsReportBuilder
-        .append(format("Custom        | %10d | %12d | %12d | %12d | ~ %9.2f",
-                       schedulersCustom,
-                       customUsedCount,
-                       customActiveCount,
-                       customQueued,
-                       customRejected > 0 ? 100.0 * (customRejected / (customTaskCount + customRejected)) : 0)
-            + lineSeparator());
-    threadPoolsReportBuilder
-        .append("--------------------------------------------------------------------------------------" + lineSeparator()
-            + lineSeparator());
-
-    return threadPoolsReportBuilder.toString();
-  }
+  public abstract String buildReportString();
 }

@@ -10,7 +10,6 @@ import static java.lang.Thread.currentThread;
 import static java.util.Collections.emptySet;
 import static org.apache.commons.lang3.StringUtils.rightPad;
 import static org.mule.service.scheduler.internal.DefaultSchedulerService.USAGE_TRACE_INTERVAL_SECS;
-import static org.mule.service.scheduler.internal.DefaultSchedulerService.traceLogger;
 
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.scheduler.SchedulerService;
@@ -19,6 +18,8 @@ import org.mule.service.scheduler.internal.ThrottledScheduler;
 import java.util.Set;
 import java.util.concurrent.RunnableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.slf4j.Logger;
 
 /**
  * Dynamically determines how to handle a task dispatch when its throttling max value has been reached for a
@@ -33,6 +34,7 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
 
   private final int maxConcurrentTasks;
   private final AtomicInteger runningTasks = new AtomicInteger();
+  private final Logger traceLogger;
 
   private volatile long rejectedCount;
 
@@ -43,10 +45,15 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
    * @param waitGroups the group of threads for which waiting will be applied. For the rest, any task exceeding the throttle value
    *        will be rejected.
    * @param parentGroup the {@link SchedulerService} parent {@link ThreadGroup}
+   * @param traceLogger the logger to be used when tracing is enabled
    */
-  public ByCallerThrottlingPolicy(int maxConcurrentTasks, Set<ThreadGroup> waitGroups, ThreadGroup parentGroup) {
+  public ByCallerThrottlingPolicy(int maxConcurrentTasks,
+                                  Set<ThreadGroup> waitGroups,
+                                  ThreadGroup parentGroup,
+                                  Logger traceLogger) {
     super(waitGroups, emptySet(), parentGroup);
     this.maxConcurrentTasks = maxConcurrentTasks;
+    this.traceLogger = traceLogger;
   }
 
   public void throttle(Runnable throttledCallback, RunnableFuture<?> task, ThrottledScheduler scheduler) {

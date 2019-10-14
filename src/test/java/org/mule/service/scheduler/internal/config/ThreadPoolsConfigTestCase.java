@@ -6,7 +6,6 @@
  */
 package org.mule.service.scheduler.internal.config;
 
-import static java.lang.Math.max;
 import static java.lang.Runtime.getRuntime;
 import static java.lang.System.clearProperty;
 import static java.lang.System.setProperty;
@@ -14,16 +13,24 @@ import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.junit.Assert.assertThat;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
 import static org.mule.runtime.core.api.config.MuleProperties.MULE_HOME_DIRECTORY_PROPERTY;
+import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.BIG_POOL_DEFAULT_SIZE;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.CPU_INTENSIVE_PREFIX;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.CPU_LIGHT_PREFIX;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.IO_PREFIX;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.PROP_PREFIX;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.SCHEDULER_POOLS_CONFIG_FILE_PROPERTY;
+import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.STRATEGY_PROPERTY_NAME;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.THREAD_POOL_KEEP_ALIVE;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.THREAD_POOL_SIZE;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.THREAD_POOL_SIZE_CORE;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.THREAD_POOL_SIZE_MAX;
+import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.UBER_QUEUE_SIZE;
+import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.UBER_THREAD_POOL_KEEP_ALIVE;
+import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.UBER_THREAD_POOL_SIZE_CORE;
+import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.UBER_THREAD_POOL_SIZE_MAX;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.WORK_QUEUE_SIZE;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 
@@ -38,19 +45,19 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Properties;
 
+import io.qameta.allure.Description;
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
 
-import io.qameta.allure.Description;
-
 public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
-  private static int cores = getRuntime().availableProcessors();
-  private static long mem = getRuntime().maxMemory() / 1024;
+  private static int CORES = getRuntime().availableProcessors();
+  private static long MEM = getRuntime().maxMemory() / 1024;
 
   @Rule
   public SystemProperty configFile = new SystemProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY, null);
@@ -85,14 +92,13 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
   protected Properties buildDefaultConfigProps() {
     final Properties props = new Properties();
     props.setProperty(PROP_PREFIX + "gracefulShutdownTimeout", "15000");
-    props.setProperty(CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, "2*cores");
-    props.setProperty(CPU_LIGHT_PREFIX + "." + WORK_QUEUE_SIZE, "mem / (2*3*32)");
-    props.setProperty(IO_PREFIX + "." + THREAD_POOL_SIZE_CORE, "cores");
-    props.setProperty(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "max(2, cores + ((mem - 245760) / 5120))");
-    props.setProperty(IO_PREFIX + "." + WORK_QUEUE_SIZE, "mem / (2*3*32)");
-    props.setProperty(IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE, "30000");
-    props.setProperty(CPU_INTENSIVE_PREFIX + "." + THREAD_POOL_SIZE, "2*cores");
-    props.setProperty(CPU_INTENSIVE_PREFIX + "." + WORK_QUEUE_SIZE, "mem / (2*3*32)");
+
+    props.setProperty(STRATEGY_PROPERTY_NAME, UBER.name());
+    props.setProperty(UBER_THREAD_POOL_SIZE_CORE, "cores");
+    props.setProperty(UBER_THREAD_POOL_SIZE_MAX, "max(2, cores + ((mem - 245760) / 5120))");
+    props.setProperty(UBER_QUEUE_SIZE, "mem / (2*3*32)");
+    props.setProperty(UBER_THREAD_POOL_KEEP_ALIVE, "30000");
+
     return props;
   }
 
@@ -102,30 +108,41 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
+    assertDefaultSettings(config);
+  }
+
+  private void assertDefaultSettings(SchedulerPoolsConfig config) {
     assertThat(config.getGracefulShutdownTimeout().getAsLong(), is(15000l));
-    assertThat(config.getCpuLightPoolSize().getAsInt(), is(2 * cores));
-    assertThat(config.getCpuLightQueueSize().getAsInt(), is(0));
-    assertThat(config.getIoCorePoolSize().getAsInt(), is(cores));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) max(2, cores + ((mem - 245760) / 5120))));
-    assertThat(config.getIoQueueSize().getAsInt(), is(0));
-    assertThat(config.getIoKeepAlive().getAsLong(), is(30000l));
-    assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(2 * cores));
-    assertThat(config.getCpuIntensiveQueueSize().getAsInt(), is(2 * cores));
+    assertThat(config.getSchedulerPoolStrategy(), is(UBER));
+    assertThat(config.getCpuLightPoolSize().isPresent(), is(false));
+    assertThat(config.getCpuLightQueueSize().isPresent(), is(false));
+    assertThat(config.getIoCorePoolSize().isPresent(), is(false));
+    assertThat(config.getIoMaxPoolSize().isPresent(), is(false));
+    assertThat(config.getIoKeepAlive().isPresent(), is(false));
+
+    assertThat(config.getUberCorePoolSize().getAsInt(), is(CORES));
+    assertThat(config.getUberMaxPoolSize().getAsInt(), is(BIG_POOL_DEFAULT_SIZE));
+
+
+    assertThat(config.getUberQueueSize().isPresent(), is(true));
+    int queueSize = config.getUberQueueSize().getAsInt();
+    if (queueSize > 0) {
+      assertThat(queueSize, is((int) MEM / (2 * 3 * 32)));
+    } else {
+      assertThat(queueSize, is(0));
+    }
+
+    assertThat(config.getUberKeepAlive().getAsLong(), is(30000l));
+
+    assertThat(config.getCpuIntensivePoolSize().isPresent(), is(false));
+    assertThat(config.getCpuIntensiveQueueSize().isPresent(), is(false));
   }
 
   @Test
-  public void noConfigFile() throws IOException, MuleException {
+  public void noConfigFile() throws MuleException {
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getGracefulShutdownTimeout().getAsLong(), is(15000l));
-    assertThat(config.getCpuLightPoolSize().getAsInt(), is(2 * cores));
-    assertThat(config.getCpuLightQueueSize().getAsInt(), is(0));
-    assertThat(config.getIoCorePoolSize().getAsInt(), is(cores));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) max(2, cores + ((mem - 245760) / 5120))));
-    assertThat(config.getIoQueueSize().getAsInt(), is(0));
-    assertThat(config.getIoKeepAlive().getAsLong(), is(30000l));
-    assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(2 * cores));
-    assertThat(config.getCpuIntensiveQueueSize().getAsInt(), is(2 * cores));
+    assertDefaultSettings(config);
   }
 
   @Test
@@ -135,20 +152,14 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getGracefulShutdownTimeout().getAsLong(), is(15000l));
-    assertThat(config.getCpuLightPoolSize().getAsInt(), is(2 * cores));
-    assertThat(config.getCpuLightQueueSize().getAsInt(), is((int) (mem / (2 * 3 * 32))));
-    assertThat(config.getIoCorePoolSize().getAsInt(), is(cores));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) max(2, cores + ((mem - 245760) / 5120))));
-    assertThat(config.getIoQueueSize().getAsInt(), is((int) (mem / (2 * 3 * 32))));
-    assertThat(config.getIoKeepAlive().getAsLong(), is(30000l));
-    assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(2 * cores));
-    assertThat(config.getCpuIntensiveQueueSize().getAsInt(), is((int) (mem / (2 * 3 * 32))));
+    assertDefaultSettings(config);
   }
 
   @Test
-  public void defaultConfigSpaced() throws IOException, MuleException {
-    final Properties props = buildDefaultConfigProps();
+  public void dedicatedConfigSpaced() throws IOException, MuleException {
+    final Properties props = new Properties();
+
+    props.setProperty(STRATEGY_PROPERTY_NAME, DEDICATED.name());
     props.setProperty(CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE_CORE, "2 *cores");
     props.setProperty(CPU_LIGHT_PREFIX + "." + WORK_QUEUE_SIZE, "mem/ (2* 3*32 )");
     props.setProperty(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "cores* cores");
@@ -159,90 +170,89 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
+    assertThat(config.getSchedulerPoolStrategy(), is(DEDICATED));
     assertThat(config.getGracefulShutdownTimeout().getAsLong(), is(15000l));
-    assertThat(config.getCpuLightPoolSize().getAsInt(), is(2 * cores));
-    assertThat(config.getCpuLightQueueSize().getAsInt(), is((int) (mem / (2 * 3 * 32))));
-    assertThat(config.getIoCorePoolSize().getAsInt(), is(cores));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is(cores * cores));
-    assertThat(config.getIoQueueSize().getAsInt(), is((int) (mem / (2 * 3 * 32))));
+    assertThat(config.getCpuLightPoolSize().getAsInt(), is(2 * CORES));
+    assertThat(config.getCpuLightQueueSize().getAsInt(), is((int) (MEM / (2 * 3 * 32))));
+    assertThat(config.getIoCorePoolSize().getAsInt(), is(CORES));
+    assertThat(config.getIoMaxPoolSize().getAsInt(), is(CORES * CORES));
+    assertThat(config.getIoQueueSize().getAsInt(), is((int) (MEM / (2 * 3 * 32))));
     assertThat(config.getIoKeepAlive().getAsLong(), is(30000l));
-    assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(2 * cores));
-    assertThat(config.getCpuIntensiveQueueSize().getAsInt(), is((int) (mem / (2 * 3 * 32))));
+    assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(2 * CORES));
+    assertThat(config.getCpuIntensiveQueueSize().getAsInt(), is((int) (MEM / (2 * 3 * 32))));
   }
 
   @Test
   public void withDecimalsConfig() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
-    props.setProperty(CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, "0.5 *cores");
-    props.setProperty(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "mem / (2* 2.5 *32)");
+    props.setProperty(UBER_THREAD_POOL_SIZE_CORE, "0.5 *cores");
+    props.setProperty(UBER_THREAD_POOL_SIZE_MAX, "mem / (2* 2.5 *32)");
     props.store(new FileOutputStream(schedulerConfigFile), "withDecimalsConfig");
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getCpuLightPoolSize().getAsInt(), is(cores / 2));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) (mem / (2 * 2.5 * 32))));
+    assertThat(config.getUberCorePoolSize().getAsInt(), is(CORES / 2));
+    assertThat(config.getUberMaxPoolSize().getAsInt(), is((int) (MEM / (2 * 2.5 * 32))));
   }
 
   @Test
   public void withPlusAndMinusConfig() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
-    props.setProperty(CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, "cores + cores");
-    props.setProperty(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "2 + cores");
-    props.setProperty(CPU_INTENSIVE_PREFIX + "." + THREAD_POOL_SIZE, "cores - 1");
+    props.setProperty(UBER_THREAD_POOL_SIZE_CORE, "cores - 1");
+    props.setProperty(UBER_THREAD_POOL_SIZE_MAX, "cores + cores");
     props.store(new FileOutputStream(schedulerConfigFile), "withPlusAndMinusConfig");
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getCpuLightPoolSize().getAsInt(), is(2 * cores));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is(2 + cores));
-    assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(cores - 1));
+    assertThat(config.getUberCorePoolSize().getAsInt(), is(CORES - 1));
+    assertThat(config.getUberMaxPoolSize().getAsInt(), is(CORES + CORES));
   }
 
   @Test
   public void withMultiplyAndDivisionConfig() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
-    props.setProperty(CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, "cores * 2");
-    props.setProperty(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "cores / 0.5");
+    props.setProperty(UBER_THREAD_POOL_SIZE_CORE, "cores / 0.5");
+    props.setProperty(UBER_THREAD_POOL_SIZE_MAX, "cores * 2");
     props.store(new FileOutputStream(schedulerConfigFile), "withMultiplyAndDivisionConfig");
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getCpuLightPoolSize().getAsInt(), is(2 * cores));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is(2 * cores));
+    assertThat(config.getUberCorePoolSize().getAsInt(), is(2 * CORES));
+    assertThat(config.getUberMaxPoolSize().getAsInt(), is(2 * CORES));
   }
 
   @Test
   public void withParenthesisConfig() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
-    props.setProperty(CPU_LIGHT_PREFIX + "." + WORK_QUEUE_SIZE, "cores * (1+1)");
-    props.setProperty(IO_PREFIX + "." + WORK_QUEUE_SIZE, "(cores + 1) * 2");
+    props.setProperty(UBER_THREAD_POOL_SIZE_CORE, "cores * (1+1)");
+    props.setProperty(UBER_THREAD_POOL_SIZE_MAX, "(cores + 1) * 2");
     props.store(new FileOutputStream(schedulerConfigFile), "withParenthesisConfig");
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getCpuLightQueueSize().getAsInt(), is(2 * cores));
-    assertThat(config.getIoQueueSize().getAsInt(), is(2 * (1 + cores)));
+    assertThat(config.getUberCorePoolSize().getAsInt(), is(2 * CORES));
+    assertThat(config.getUberMaxPoolSize().getAsInt(), is(2 * (1 + CORES)));
   }
 
   @Test
   public void expressionConfigFixed() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
-    props.setProperty(CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, "2");
-    props.setProperty(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "8");
-    props.setProperty(CPU_INTENSIVE_PREFIX + "." + THREAD_POOL_SIZE, "4");
+    props.setProperty(UBER_THREAD_POOL_SIZE_CORE, "2");
+    props.setProperty(UBER_THREAD_POOL_SIZE_MAX, "8");
+    props.setProperty(UBER_QUEUE_SIZE, "4");
     props.store(new FileOutputStream(schedulerConfigFile), "expressionConfigFixed");
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getCpuLightPoolSize().getAsInt(), is(2));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is(8));
-    assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(4));
+    assertThat(config.getUberCorePoolSize().getAsInt(), is(2));
+    assertThat(config.getUberMaxPoolSize().getAsInt(), is(8));
+    assertThat(config.getUberQueueSize().getAsInt(), is(4));
   }
 
   @Test
   public void expressionConfigNegative() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
-    props.setProperty(CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, "cores - " + (cores + 1));
+    props.setProperty(CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, "cores - " + (CORES + 1));
     props.store(new FileOutputStream(schedulerConfigFile), "expressionConfigNegative");
 
     expected.expect(DefaultMuleException.class);
@@ -253,12 +263,12 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
   @Test
   public void zeroWorkQueueSize() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
-    props.setProperty(CPU_LIGHT_PREFIX + "." + WORK_QUEUE_SIZE, "0");
+    props.setProperty(UBER_QUEUE_SIZE, "0");
     props.store(new FileOutputStream(schedulerConfigFile), "expressionConfigNegative");
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getCpuLightQueueSize().getAsInt(), is(0));
+    assertThat(config.getUberQueueSize().getAsInt(), is(0));
   }
 
   @Test
@@ -310,6 +320,8 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
   @Test
   public void negativeShutdownTimeConfig() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
+
+    props.setProperty(STRATEGY_PROPERTY_NAME, UBER.name());
     props.setProperty(PROP_PREFIX + "gracefulShutdownTimeout", "-1");
     props.store(new FileOutputStream(schedulerConfigFile), "negativeShutdownTimeConfig");
 
@@ -344,31 +356,31 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
   @Description("For a missing entry in the config file, the default value is used")
   public void missingExpression() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
-    props.remove(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX);
+    props.remove(UBER_THREAD_POOL_SIZE_MAX);
     props.store(new FileOutputStream(schedulerConfigFile), "defaultConfig");
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is((int) max(2, cores + ((mem - 245760) / 5120))));
+    assertThat(config.getUberMaxPoolSize().getAsInt(), is(BIG_POOL_DEFAULT_SIZE));
   }
 
   @Test
   @Description("For a missing entry in the config file, the default value is used")
   public void missingValue() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
-    props.remove(IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE);
+    props.remove(UBER_THREAD_POOL_KEEP_ALIVE);
     props.store(new FileOutputStream(schedulerConfigFile), "defaultConfig");
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getIoKeepAlive().getAsLong(), is(30000l));
+    assertThat(config.getUberKeepAlive().getAsLong(), is(30000l));
   }
 
   @Test
   @Description("Tests that the mule.schedulerPools.configFile property is honored if present")
   public void overrideConfigFile() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
-    props.put(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "100");
+    props.put(UBER_THREAD_POOL_SIZE_MAX, "100");
 
     File overrideConfigFile = new File(tempOtherDir.getRoot(), "overriding.conf");
     props.store(new FileOutputStream(overrideConfigFile), "defaultConfig");
@@ -376,28 +388,30 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is(100));
+    assertThat(config.getUberMaxPoolSize().getAsInt(), is(100));
   }
 
   @Test
   @Description("Tests that the mule.schedulerPools.configFile pointing to an external url property is honored if present")
+  @Ignore("Uncomment when we actually have a url with the new parameters")
   public void overrideConfigFileWithUrl() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
-    props.put(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "1");
+    props.put(UBER_THREAD_POOL_SIZE_MAX, "1");
 
     System.setProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY,
                        "https://raw.githubusercontent.com/mulesoft/mule-distributions/mule-4.2.0/standalone/src/main/resources/conf/scheduler-pools.conf");
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getIoCorePoolSize().getAsInt(), is(cores));
+    assertThat(config.getIoCorePoolSize().getAsInt(), is(CORES));
   }
 
   @Test
   @Description("Tests that system properties overriding the config from the file are honored if present")
+  @Ignore("Uncomment when we actually have a url with the new paramters")
   public void overrideConfigWithIndividualProperty() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
-    props.put(IO_PREFIX + "." + THREAD_POOL_SIZE_MAX, "1");
+    props.put(UBER_THREAD_POOL_SIZE_MAX, "1");
 
     System.setProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY,
                        "https://raw.githubusercontent.com/mulesoft/mule-distributions/mule-4.2.0/standalone/src/main/resources/conf/scheduler-pools.conf");
@@ -406,7 +420,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is(100));
+    assertThat(config.getUberMaxPoolSize().getAsInt(), is(100));
   }
 
 }

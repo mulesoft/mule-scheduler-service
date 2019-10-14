@@ -9,6 +9,7 @@ package org.mule.service.scheduler.internal;
 import static java.lang.Runtime.getRuntime;
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
+import static java.util.Arrays.asList;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -21,9 +22,12 @@ import static org.hamcrest.core.IsInstanceOf.instanceOf;
 import static org.hamcrest.core.StringStartsWith.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
+import static org.junit.Assume.assumeThat;
 import static org.junit.rules.ExpectedException.none;
 import static org.mockito.Mockito.mock;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.core.api.util.IOUtils.toByteArray;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
@@ -36,6 +40,7 @@ import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerBusyException;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
+import org.mule.runtime.api.scheduler.SchedulerPoolStrategy;
 import org.mule.runtime.api.util.concurrent.Latch;
 import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
@@ -60,21 +65,32 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import io.qameta.allure.Description;
+import io.qameta.allure.Feature;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
 @Feature(SCHEDULER_SERVICE)
+@RunWith(Parameterized.class)
 public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
   private static final int CORES = getRuntime().availableProcessors();
-
   private static final long GC_POLLING_TIMEOUT = 10000;
+
+  @Parameters(name = "{0}")
+  public static List<Object> parameters() {
+    return asList(new Object[] {DEDICATED, UBER});
+  }
+
+  @Parameter
+  public SchedulerPoolStrategy strategy;
 
   @Rule
   public ExpectedException expected = none();
@@ -87,19 +103,19 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Before
   public void before() throws MuleException {
     threadPoolsConfig = loadThreadPoolsConfig();
-    service = new SchedulerThreadPools(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig) {
+    threadPoolsConfig.setSchedulerPoolStrategy(strategy, true);
 
-      @Override
-      protected void prestartCallback(CountDownLatch prestartLatch) {
-        super.prestartCallback(prestartLatch);
-        try {
-          sleep(prestarCallbackSleepTime);
-        } catch (InterruptedException e) {
-          currentThread().interrupt();
-          throw new MuleRuntimeException(e);
-        }
-      }
-    };
+    service = SchedulerThreadPools.builder(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig)
+        .setPreStartCallback(executor -> {
+          try {
+            sleep(prestarCallbackSleepTime);
+          } catch (InterruptedException e) {
+            currentThread().interrupt();
+            throw new MuleRuntimeException(e);
+          }
+        })
+        .build();
+
     service.start();
   }
 
@@ -297,6 +313,8 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that IO threads in excess of the core size don't hold a reference to an artifact classloader through the inheritedAccessControlContext.")
   public void elasticIoThreadsDontReferenceClassLoaderFromAccessControlContext() throws Exception {
+    assumeDedicatedStrategy();
+
     assertThat(threadPoolsConfig.getIoKeepAlive().getAsLong(), greaterThan(GC_POLLING_TIMEOUT));
 
     Scheduler scheduler = service.createIoScheduler(config(), threadPoolsConfig.getIoCorePoolSize().getAsInt() + 1, () -> 1000L);
@@ -532,6 +550,8 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that tasks dispatched from a CPU Light thread to a busy Scheduler are rejected.")
   public void rejectionPolicyCpuLight() throws MuleException, InterruptedException, ExecutionException, TimeoutException {
+    assumeDedicatedStrategy();
+
     Scheduler sourceScheduler = service.createCpuLightScheduler(config(), CORES, () -> 1000L);
     Scheduler targetScheduler =
         service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
@@ -548,6 +568,8 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that tasks dispatched from a CPU Intensive thread to a busy Scheduler are rejected.")
   public void rejectionPolicyCpuIntensive() throws MuleException, InterruptedException, ExecutionException, TimeoutException {
+    assumeDedicatedStrategy();
+
     Scheduler sourceScheduler = service.createCpuIntensiveScheduler(config(), CORES, () -> 1000L);
     Scheduler targetScheduler =
         service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
@@ -585,6 +607,8 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that when the IO pool is full, any task dispatched from IO to IO runs in the caller thread instead of being queued, which can cause a deadlock.")
   public void ioToFullIoDoesntWait() throws InterruptedException, ExecutionException {
+    assumeDedicatedStrategy();
+
     Scheduler ioScheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
 
     Latch outerLatch = new Latch();
@@ -619,6 +643,8 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that when the IO pool is full, any task dispatched from a CUSTOM pool with WAIT rejection action to IO is queued.")
   public void customWaitToFullIoWaits() throws InterruptedException, ExecutionException, TimeoutException {
+    assumeDedicatedStrategy();
+
     Scheduler customScheduler =
         service.createCustomScheduler(config().withMaxConcurrentTasks(1).withWaitAllowed(true), CORES, () -> 1000L);
     Scheduler ioScheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
@@ -650,6 +676,8 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that when the CPU-lite pool is full, any task dispatched from a CUSTOM pool with DirectRunToFullCpuLight falg to CPU-lite is run directlyi in the caller thread.")
   public void customDirectRunToFullCpuLight() throws InterruptedException, ExecutionException, TimeoutException {
+    assumeDedicatedStrategy();
+
     Scheduler customScheduler =
         service.createCustomScheduler(config().withMaxConcurrentTasks(1).withDirectRunCpuLightWhenTargetBusy(true), CORES,
                                       () -> 1000L);
@@ -688,6 +716,8 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that the behavior of combining runCpuLightWhenTargetBusy and waitAllowed depends on the target thread.")
   public void customWaitToFullIoWaitsAndWaitToFullIoWaits() throws InterruptedException, ExecutionException, TimeoutException {
+    assumeDedicatedStrategy();
+
     Scheduler customScheduler = service
         .createCustomScheduler(config().withMaxConcurrentTasks(1).withWaitAllowed(true).withDirectRunCpuLightWhenTargetBusy(true),
                                CORES, () -> 1000L);
@@ -940,6 +970,8 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that ThrottledScheduler is not used for CPU light schedulers unless maxConcurrency is less than backing pool max size.")
   public void maxCpuLightConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
+    assumeDedicatedStrategy();
+
     assertThat(service
         .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()), 1,
                                  () -> 1l),
@@ -954,6 +986,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that ThrottledScheduler is not used for CPU intensive schedulers unless maxConcurrency is less than backing pool max size.")
   public void maxCpuIntensiveConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
+    assumeDedicatedStrategy();
     assertThat(service
         .createCpuIntensiveScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
             .getCpuIntensivePoolSize().getAsInt()), 1,
@@ -969,6 +1002,8 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that ThrottledScheduler is not used for IO schedulers unless maxConcurrency is less than backing pool max size.")
   public void maxIOConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
+    assumeDedicatedStrategy();
+
     assertThat(service
         .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
             .getIoMaxPoolSize().getAsInt()), 1,
@@ -1003,5 +1038,9 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
       currentThread().interrupt();
       return false;
     }
+  }
+
+  private void assumeDedicatedStrategy() {
+    assumeThat(strategy, is(DEDICATED));
   }
 }

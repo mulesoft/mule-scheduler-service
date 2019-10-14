@@ -15,6 +15,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 
 import org.mule.runtime.api.scheduler.Scheduler;
@@ -24,10 +25,6 @@ import org.mule.service.scheduler.internal.executor.SchedulerTaskThrottledExcept
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
@@ -40,6 +37,9 @@ import java.util.concurrent.TimeoutException;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
 @Feature("Scheduler Throttling")
 public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTestCase {
@@ -57,7 +57,9 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
     outerExecutor = newSingleThreadExecutor();
 
     threadPoolsConfig = loadThreadPoolsConfig();
-    service = new SchedulerThreadPools(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig);
+    threadPoolsConfig.setSchedulerPoolStrategy(DEDICATED, true);
+
+    service = SchedulerThreadPools.builder(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig).build();
     service.start();
   }
 

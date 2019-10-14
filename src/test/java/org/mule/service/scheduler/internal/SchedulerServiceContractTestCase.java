@@ -22,21 +22,19 @@ import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
 
+import java.lang.ref.PhantomReference;
+import java.lang.ref.ReferenceQueue;
+import java.util.OptionalLong;
+
+import io.qameta.allure.Feature;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.lang.ref.PhantomReference;
-import java.lang.ref.ReferenceQueue;
-import java.util.OptionalInt;
-import java.util.OptionalLong;
-
-import io.qameta.allure.Feature;
-
 @Feature(SCHEDULER_SERVICE)
-public class SchedulerServiceTestCase extends AbstractMuleTestCase {
+public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestCase {
 
-  private DefaultSchedulerService service;
+  protected DefaultSchedulerService service;
 
   @Before
   public void before() throws MuleException {
@@ -108,17 +106,14 @@ public class SchedulerServiceTestCase extends AbstractMuleTestCase {
 
   private SchedulerPoolsConfig getMockConfig() {
     final SchedulerPoolsConfig config = mock(SchedulerPoolsConfig.class);
+
     when(config.getGracefulShutdownTimeout()).thenReturn(OptionalLong.of(30000L));
-    when(config.getCpuLightPoolSize()).thenReturn(OptionalInt.of(1));
-    when(config.getCpuLightQueueSize()).thenReturn(OptionalInt.of(1));
-    when(config.getCpuIntensiveQueueSize()).thenReturn(OptionalInt.of(1));
-    when(config.getIoCorePoolSize()).thenReturn(OptionalInt.of(1));
-    when(config.getIoMaxPoolSize()).thenReturn(OptionalInt.of(1));
-    when(config.getIoQueueSize()).thenReturn(OptionalInt.of(0));
-    when(config.getIoKeepAlive()).thenReturn(OptionalLong.of(30000L));
-    when(config.getCpuIntensivePoolSize()).thenReturn(OptionalInt.of(1));
-    when(config.getCpuIntensiveQueueSize()).thenReturn(OptionalInt.of(1));
     when(config.getThreadNamePrefix()).thenReturn("test");
+
+    configure(config);
+
     return config;
   }
+
+  protected abstract void configure(SchedulerPoolsConfig config);
 }
