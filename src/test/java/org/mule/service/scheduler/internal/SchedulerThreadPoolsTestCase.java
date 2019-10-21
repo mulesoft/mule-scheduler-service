@@ -12,6 +12,7 @@ import static java.lang.Thread.sleep;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.ForkJoinPool.commonPool;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.sameInstance;
@@ -65,8 +66,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -76,6 +75,9 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
+
+import io.qameta.allure.Description;
+import io.qameta.allure.Feature;
 
 @Feature(SCHEDULER_SERVICE)
 @RunWith(Parameterized.class)
@@ -282,6 +284,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     ClassLoader delegatorClassLoader = createDelegatorClassLoader();
     PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
 
+    @SuppressWarnings("unchecked")
     Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
     delegator.accept(() -> scheduler.execute(() -> {
     }));
@@ -299,6 +302,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
 
     AtomicReference<Scheduler> schedulerRef = new AtomicReference<>();
+    @SuppressWarnings("unchecked")
     Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
     delegator.accept(() -> {
       schedulerRef.set(service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L));
@@ -322,6 +326,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     ClassLoader delegatorClassLoader = createDelegatorClassLoader();
     PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
 
+    @SuppressWarnings("unchecked")
     Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
     for (int i = 0; i < threadPoolsConfig.getIoCorePoolSize().getAsInt() + 1; ++i) {
       delegator.accept(() -> scheduler.execute(() -> {
@@ -332,6 +337,40 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     delegatorClassLoader = null;
 
     assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
+  }
+
+  @Test
+  @Description("Tests that when using a the commonPool from ForkJoinPool, the TCCL of the first invocation is not leaked."
+      + " This test essentially validates the workaround for https://bugs.java.com/bugdatabase/view_bug.do?bug_id=JDK-8172726")
+  public void forkJoinCommonPoolDoesNotLeakFirstClassLoaderUsed()
+      throws InstantiationException, IllegalAccessException, ClassNotFoundException, InterruptedException {
+    commonPool().shutdownNow();
+    Scheduler scheduler = service.createIoScheduler(config(), 1, () -> 1000L);
+
+    AtomicReference<PhantomReference<ClassLoader>> clRefRef = new AtomicReference<>();
+    CountDownLatch latch = new CountDownLatch(CORES + 1);
+
+    scheduler.execute(() -> {
+      ClassLoader delegatorClassLoader = createDelegatorClassLoader();
+      PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
+
+      Thread.currentThread().setContextClassLoader(delegatorClassLoader);
+
+      for (int i = 0; i < CORES; ++i) {
+        commonPool().execute(() -> {
+          // Nothing to do
+          latch.countDown();
+        });
+      }
+
+      clRefRef.set(clRef);
+      delegatorClassLoader = null;
+      latch.countDown();
+    });
+
+    latch.await(5, SECONDS);
+
+    assertNoClassLoaderReferenceHeld(clRefRef.get(), GC_POLLING_TIMEOUT);
   }
 
   private ClassLoader createDelegatorClassLoader() {
