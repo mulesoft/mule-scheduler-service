@@ -30,6 +30,7 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -64,7 +65,7 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
 
   public DedicatedSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig,
                                        boolean preStartThreads,
-                                       Consumer<ThreadPoolExecutor> preStartCallback,
+                                       Consumer<AbstractExecutorService> preStartCallback,
                                        Logger traceLogger) {
     super(name, threadPoolsConfig, preStartThreads, preStartCallback, traceLogger);
   }
@@ -261,6 +262,7 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
     return schedulers;
   }
 
+  @Override
   public String buildReportString() {
     final StringBuilder threadPoolsReportBuilder = new StringBuilder();
 

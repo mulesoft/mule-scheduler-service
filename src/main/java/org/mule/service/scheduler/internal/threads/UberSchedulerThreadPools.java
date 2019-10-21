@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -49,7 +50,7 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
 
   public UberSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig,
                                   boolean preStartThreads,
-                                  Consumer<ThreadPoolExecutor> preStartCallback,
+                                  Consumer<AbstractExecutorService> preStartCallback,
                                   Logger traceLogger) {
     super(name, threadPoolsConfig, preStartThreads, preStartCallback, traceLogger);
   }
@@ -159,6 +160,7 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
     return new ArrayList<>(activeSchedulers);
   }
 
+  @Override
   public String buildReportString() {
     final StringBuilder threadPoolsReportBuilder = new StringBuilder();
 

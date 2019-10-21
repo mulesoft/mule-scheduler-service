@@ -14,8 +14,11 @@ import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
 import static java.lang.Thread.yield;
+import static java.util.concurrent.ForkJoinPool.commonPool;
+import static java.util.concurrent.ForkJoinPool.getCommonPoolParallelism;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.apache.commons.lang3.SystemUtils.IS_JAVA_1_8;
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
@@ -41,6 +44,7 @@ import java.util.List;
 import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -79,11 +83,11 @@ public abstract class SchedulerThreadPools {
 
   public static class Builder {
 
-    private String name;
-    private SchedulerPoolsConfig threadPoolsConfig;
+    private final String name;
+    private final SchedulerPoolsConfig threadPoolsConfig;
     private boolean preStartThreads = true;
     private Logger traceLogger = LOGGER;
-    private Consumer<ThreadPoolExecutor> preStartCallback = executor -> {
+    private Consumer<AbstractExecutorService> preStartCallback = executor -> {
     };
 
     private Builder(String name, SchedulerPoolsConfig threadPoolsConfig) {
@@ -101,7 +105,7 @@ public abstract class SchedulerThreadPools {
       return this;
     }
 
-    public Builder setPreStartCallback(Consumer<ThreadPoolExecutor> preStartCallback) {
+    public Builder setPreStartCallback(Consumer<AbstractExecutorService> preStartCallback) {
       this.preStartCallback = preStartCallback;
       return this;
     }
@@ -141,7 +145,7 @@ public abstract class SchedulerThreadPools {
       getProperties().containsKey(SYSTEM_PROPERTY_PREFIX + "scheduler.alwaysShowSchedulerCreationLocation");
 
   private final boolean preStartThreads;
-  private final Consumer<ThreadPoolExecutor> preStartCallback;
+  private final Consumer<AbstractExecutorService> preStartCallback;
 
   private final ReadWriteLock activeSchedulersLock = new ReentrantReadWriteLock();
 
@@ -166,7 +170,7 @@ public abstract class SchedulerThreadPools {
   protected SchedulerThreadPools(String name,
                                  SchedulerPoolsConfig threadPoolsConfig,
                                  boolean preStartThreads,
-                                 Consumer<ThreadPoolExecutor> preStartCallback,
+                                 Consumer<AbstractExecutorService> preStartCallback,
                                  Logger traceLogger) {
     this.name = name;
     this.threadPoolsConfig = threadPoolsConfig;
@@ -199,6 +203,11 @@ public abstract class SchedulerThreadPools {
   protected abstract void createCustomThreadGroups();
 
   public final void start() throws MuleException {
+    // Workaround to avoid the leak caused by https://bugs.java.com/bugdatabase/view_bug.do?bug_id=JDK-8172726
+    if (IS_JAVA_1_8) {
+      prestartCoreThreads(commonPool(), getCommonPoolParallelism());
+    }
+
     doStart(preStartThreads);
 
     scheduledExecutor = new ScheduledThreadPoolExecutor(1, new SchedulerThreadFactory(timerGroup, "%s"));
@@ -391,7 +400,7 @@ public abstract class SchedulerThreadPools {
    * @param executor     the executor to prestart the threads for
    * @param corePoolSize the number of threads to start in e=the {@code executor}
    */
-  protected void prestartCoreThreads(final ThreadPoolExecutor executor, int corePoolSize) {
+  protected void prestartCoreThreads(final AbstractExecutorService executor, int corePoolSize) {
     // This latch is to ensure that the required executions are active at the same time
     CountDownLatch prestartWaitLatch = new CountDownLatch(1);
     // This latch is to validate that the required executions have actually run
