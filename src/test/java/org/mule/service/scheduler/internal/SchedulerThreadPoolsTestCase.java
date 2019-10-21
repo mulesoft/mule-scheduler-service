@@ -342,7 +342,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that when using a the commonPool from ForkJoinPool, the TCCL of the first invocation is not leaked."
       + " This test essentially validates the workaround for https://bugs.java.com/bugdatabase/view_bug.do?bug_id=JDK-8172726")
-  public void forkJoinCommonPoolDoesNotLeakFirsrClassLoaderUsed()
+  public void forkJoinCommonPoolDoesNotLeakFirstClassLoaderUsed()
       throws InstantiationException, IllegalAccessException, ClassNotFoundException, InterruptedException {
     commonPool().shutdownNow();
     Scheduler scheduler = service.createIoScheduler(config(), 1, () -> 1000L);
