@@ -16,10 +16,13 @@ import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
 import static java.lang.Thread.yield;
 import static java.util.Arrays.asList;
+import static java.util.concurrent.ForkJoinPool.commonPool;
+import static java.util.concurrent.ForkJoinPool.getCommonPoolParallelism;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.apache.commons.lang3.SystemUtils.IS_JAVA_1_8;
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
-import static org.mule.runtime.core.api.config.MuleProperties.SYSTEM_PROPERTY_PREFIX;
+import static org.mule.runtime.api.util.MuleSystemProperties.SYSTEM_PROPERTY_PREFIX;
 import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
 import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
 import static org.mule.service.scheduler.ThreadType.CUSTOM;
@@ -45,6 +48,7 @@ import java.util.List;
 import java.util.OptionalInt;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -96,8 +100,8 @@ public class SchedulerThreadPools {
   private static final boolean ALWAYS_SHOW_SCHEDULER_CREATION_LOCATION =
       getProperties().containsKey(SYSTEM_PROPERTY_PREFIX + "scheduler.alwaysShowSchedulerCreationLocation");
 
-  private String name;
-  private SchedulerPoolsConfig threadPoolsConfig;
+  private final String name;
+  private final SchedulerPoolsConfig threadPoolsConfig;
 
   private final ThreadGroup schedulerGroup;
   private final ThreadGroup cpuLightGroup;
@@ -174,6 +178,11 @@ public class SchedulerThreadPools {
   }
 
   public void start() throws MuleException {
+    // Workaround to avoid the leak caused by https://bugs.java.com/bugdatabase/view_bug.do?bug_id=JDK-8172726
+    if (IS_JAVA_1_8) {
+      prestartCoreThreads(commonPool(), getCommonPoolParallelism());
+    }
+
     cpuLightExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
                                threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
@@ -450,7 +459,7 @@ public class SchedulerThreadPools {
    * @param executor the executor to prestart the threads for
    * @param corePoolSize the number of threads to start in e=the {@code executor}
    */
-  private void prestartCoreThreads(final ThreadPoolExecutor executor, int corePoolSize) {
+  private void prestartCoreThreads(final AbstractExecutorService executor, int corePoolSize) {
     // This latch is to ensure that the required executions are active at the same time
     CountDownLatch prestartWaitLatch = new CountDownLatch(1);
     // This latch is to validate that the required executions have actually run
