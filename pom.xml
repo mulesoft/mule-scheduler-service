@@ -17,7 +17,7 @@
     <properties>
         <formatterConfigPath>formatter.xml</formatterConfigPath>
 
-        <quartzVersion>2.3.1</quartzVersion>
+        <quartzVersion>2.3.2</quartzVersion>
         <caffeineVersion>2.8.0</caffeineVersion>
         <c3p0Version>0.9.5.4</c3p0Version>
     </properties>
