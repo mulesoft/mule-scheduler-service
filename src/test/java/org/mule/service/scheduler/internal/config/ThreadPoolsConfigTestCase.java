@@ -232,7 +232,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
     assertThat(config.getCpuLightPoolSize().getAsInt(), is(2));
-    assertThat(config.getIoMaxPoolSize().getAsInt(), is(8));
+    assertThat(config.getIoMaxPoolSize().getAsInt(), is(max(8, getRuntime().availableProcessors())));
     assertThat(config.getCpuIntensivePoolSize().getAsInt(), is(4));
   }
 
