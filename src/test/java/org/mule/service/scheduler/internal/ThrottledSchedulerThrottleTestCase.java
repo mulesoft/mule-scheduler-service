@@ -12,10 +12,12 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
+import static org.mule.tck.probe.PollingProber.probe;
 
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.util.concurrent.Latch;
@@ -30,6 +32,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -38,8 +41,13 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
 
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
+import io.qameta.allure.Issue;
 
 @Feature("Scheduler Throttling")
 public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTestCase {
@@ -189,6 +197,96 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
     });
 
     submittedTest.get(1, SECONDS);
+  }
+
+  @Test
+  @Description("A deadlock does not happen when dispatching max+2 tasks to a throttled scheduler")
+  @Issue("MULE-17938")
+  public void maxPlusTwoNoDeadlockWaitGroup() throws InterruptedException, ExecutionException, TimeoutException {
+    final ScheduledExecutorService scheduler = service
+        .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE,
+                           () -> 5000L);
+
+    final int totalTasks = SINGLE_TASK_THROTTLE_SIZE + 2;
+    Scheduler waitAllowed = service.createIoScheduler(config(), totalTasks, () -> 5000L);
+
+    final Latch innerLatch = new Latch();
+
+    final List<Future> tasks = new ArrayList<>();
+
+    for (int i = 0; i < totalTasks; ++i) {
+      waitAllowed.execute(() -> {
+        tasks.add(scheduler.submit(() -> {
+          return awaitLatch(innerLatch);
+        }));
+      });
+    }
+
+    sleep(1000);
+    innerLatch.countDown();
+
+    probe(() -> {
+      assertThat(tasks, hasSize(totalTasks));
+      for (Future task : tasks) {
+        assertThat(task.get(1, SECONDS), is(true));
+      }
+      return true;
+    });
+  }
+
+  @Test
+  @Description("A deadlock does not happen when dispatching max+2 tasks to a throttled scheduler")
+  @Issue("MULE-17938")
+  public void maxPlusTwoNoDeadlockNotWaitGroup() throws InterruptedException, ExecutionException, TimeoutException {
+    final ScheduledExecutorService scheduler = service
+        .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE,
+                           () -> 5000L);
+
+    final int totalTasks = SINGLE_TASK_THROTTLE_SIZE + 2;
+    Scheduler notWaitAllowed = service.createCpuLightScheduler(config(), totalTasks, () -> 5000L);
+
+    final Latch innerLatch = new Latch();
+
+    final List<Future> tasks = new ArrayList<>();
+
+    for (int i = 0; i < totalTasks; ++i) {
+      notWaitAllowed.execute(() -> {
+        tasks.add(scheduler.submit(() -> {
+          return awaitLatch(innerLatch);
+        }));
+      });
+    }
+
+    sleep(1000);
+    innerLatch.countDown();
+
+    probe(() -> {
+      assertThat(tasks, hasSize(1));
+      for (Future task : tasks) {
+        assertThat(task.get(1, SECONDS), is(true));
+      }
+      return true;
+    });
+    tasks.clear();
+
+    for (int i = 0; i < totalTasks; ++i) {
+      notWaitAllowed.execute(() -> {
+        tasks.add(scheduler.submit(() -> {
+          return awaitLatch(innerLatch);
+        }));
+      });
+    }
+
+    sleep(1000);
+    innerLatch.countDown();
+
+    probe(() -> {
+      assertThat(tasks, hasSize(1));
+      for (Future task : tasks) {
+        assertThat(task.get(1, SECONDS), is(true));
+      }
+      return true;
+    });
   }
 
 }

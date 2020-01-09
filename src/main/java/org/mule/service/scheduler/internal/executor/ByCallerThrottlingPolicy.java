@@ -57,11 +57,11 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
     if (!isSchedulerThread(currentThreadGroup) || isWaitGroupThread(currentThreadGroup)) {
       try {
         synchronized (runningTasks) {
-          runningTasks.incrementAndGet();
-          while (runningTasks.get() > maxConcurrentTasks) {
+          while (runningTasks.incrementAndGet() > maxConcurrentTasks) {
             if (isLogThrottleEnabled()) {
               logThrottle(task.toString(), "WaitPolicy", scheduler.toString());
             }
+            runningTasks.getAndDecrement();
             runningTasks.wait();
           }
         }
@@ -76,6 +76,7 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
           if (isLogThrottleEnabled()) {
             logThrottle(task.toString(), "AbortPolicy", scheduler.toString());
           }
+          runningTasks.getAndDecrement();
           throw new SchedulerTaskThrottledException("Task '" + task.toString() + "' throttled back from '"
               + scheduler.toString() + "'");
         } else {
