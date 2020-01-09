@@ -87,8 +87,8 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   private static final long GC_POLLING_TIMEOUT = 10000;
 
   @Parameters(name = "{0}")
-  public static List<Object> parameters() {
-    return asList(new Object[] {DEDICATED, UBER});
+  public static List<SchedulerPoolStrategy> parameters() {
+    return asList(DEDICATED, UBER);
   }
 
   @Parameter
