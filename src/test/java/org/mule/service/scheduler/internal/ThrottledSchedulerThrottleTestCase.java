@@ -267,26 +267,12 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
       }
       return true;
     });
-    tasks.clear();
 
-    for (int i = 0; i < totalTasks; ++i) {
-      notWaitAllowed.execute(() -> {
-        tasks.add(scheduler.submit(() -> {
-          return awaitLatch(innerLatch);
-        }));
-      });
-    }
-
-    sleep(1000);
-    innerLatch.countDown();
-
-    probe(() -> {
-      assertThat(tasks, hasSize(1));
-      for (Future task : tasks) {
-        assertThat(task.get(1, SECONDS), is(true));
-      }
-      return true;
-    });
+    notWaitAllowed.submit(() -> {
+      tasks.add(scheduler.submit(() -> {
+        return true;
+      }));
+    }).get(1, SECONDS);
   }
 
 }
