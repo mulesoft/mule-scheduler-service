@@ -821,7 +821,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     Future<Object> submit = sourceScheduler.submit(threadsConsumer(targetScheduler, latch));
 
     try {
-      submit.get(1, SECONDS);
+      submit.get(5, SECONDS);
       fail();
     } catch (ExecutionException e) {
       assertThat(e.getCause(), instanceOf(SchedulerBusyException.class));
