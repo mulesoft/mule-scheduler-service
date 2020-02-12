@@ -52,7 +52,14 @@ public class ThrottledScheduler extends DefaultScheduler {
 
   @Override
   protected void putTask(RunnableFuture<?> task, ScheduledFuture<?> scheduledFuture) {
-    thottlingPolicy.throttle(() -> super.putTask(task, scheduledFuture), task, this);
+    if (scheduledFuture instanceof NullScheduledFuture) {
+      thottlingPolicy.throttle(() -> super.putTask(task, scheduledFuture), task, this);
+    }
+  }
+
+  @Override
+  protected <T> Runnable schedulableTask(RunnableFuture<T> task, Runnable rejectionCallback) {
+    return () -> thottlingPolicy.throttle(() -> super.schedulableTask(task, rejectionCallback).run(), task, this);
   }
 
   @Override

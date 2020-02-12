@@ -232,7 +232,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   private final SuppressingLogger schedulableSuppressionLogger;
 
-  private <T> Runnable schedulableTask(RunnableFuture<T> task, Runnable rejectionCallback) {
+  protected <T> Runnable schedulableTask(RunnableFuture<T> task, Runnable rejectionCallback) {
     return () -> {
       try {
         executor.execute(task);
