@@ -59,11 +59,13 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
   public void throttle(Runnable throttledCallback, RunnableFuture<?> task, ThrottledScheduler scheduler) {
     ThreadGroup currentThreadGroup = currentThread().getThreadGroup();
 
-    ++rejectedCount;
-
     if (!isSchedulerThread(currentThreadGroup) || isWaitGroupThread(currentThreadGroup)) {
       try {
         synchronized (runningTasks) {
+          if (runningTasks.get() + 1 > maxConcurrentTasks) {
+            ++rejectedCount;
+          }
+
           while (runningTasks.incrementAndGet() > maxConcurrentTasks) {
             if (isLogThrottleEnabled()) {
               logThrottle(task.toString(), "WaitPolicy", scheduler.toString());
@@ -80,6 +82,8 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
     } else {
       synchronized (runningTasks) {
         if (runningTasks.incrementAndGet() > maxConcurrentTasks) {
+          ++rejectedCount;
+
           if (isLogThrottleEnabled()) {
             logThrottle(task.toString(), "AbortPolicy", scheduler.toString());
           }
