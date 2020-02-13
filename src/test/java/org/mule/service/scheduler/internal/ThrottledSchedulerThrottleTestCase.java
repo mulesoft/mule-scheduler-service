@@ -275,4 +275,32 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
     }).get(1, SECONDS);
   }
 
+  @Test
+  @Description("A throttled scheduler may accept many scheduled tasks and throttle then when they actually execute.")
+  @Issue("MULE-18053")
+  public void scheduleOnThrottledScheduler() throws InterruptedException, ExecutionException, TimeoutException {
+    final ScheduledExecutorService scheduler = service
+        .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE,
+                           () -> 5000L);
+
+    final int totalTasks = 2;
+    Scheduler waitAllowed = service.createIoScheduler(config(), totalTasks, () -> 5000L);
+
+    final Latch innerLatch = new Latch();
+
+    final List<Future> tasks = new ArrayList<>();
+
+    for (int i = 0; i < totalTasks; ++i) {
+      waitAllowed.execute(() -> {
+        tasks.add(scheduler.schedule(() -> {
+          return awaitLatch(innerLatch);
+        }, 1, SECONDS));
+      });
+    }
+
+    probe(() -> {
+      assertThat(tasks, hasSize(totalTasks));
+      return true;
+    });
+  }
 }
