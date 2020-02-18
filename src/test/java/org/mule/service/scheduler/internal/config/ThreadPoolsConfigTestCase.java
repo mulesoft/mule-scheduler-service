@@ -252,6 +252,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
   @Test
   public void expressionConfigNegative() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
+    props.setProperty(STRATEGY_PROPERTY_NAME, DEDICATED.name());
     props.setProperty(CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, "cores - " + (CORES + 1));
     props.store(new FileOutputStream(schedulerConfigFile), "expressionConfigNegative");
 
@@ -274,6 +275,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
   @Test
   public void invalidExpressionConfig() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
+    props.setProperty(STRATEGY_PROPERTY_NAME, DEDICATED.name());
     props.setProperty(CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, "invalid");
     props.store(new FileOutputStream(schedulerConfigFile), "invalidExpressionConfig");
 
@@ -285,6 +287,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
   @Test
   public void nastyExpressionConfig() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
+    props.setProperty(STRATEGY_PROPERTY_NAME, DEDICATED.name());
     props.setProperty(CPU_LIGHT_PREFIX + "." + THREAD_POOL_SIZE, "; print('aha!')");
     props.store(new FileOutputStream(schedulerConfigFile), "nastyExpressionConfig");
 
@@ -308,6 +311,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
   @Test
   public void invalidIoKeepAliveConfig() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
+    props.setProperty(STRATEGY_PROPERTY_NAME, DEDICATED.name());
     props.setProperty(IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE, "notANumber");
     props.store(new FileOutputStream(schedulerConfigFile), "invalidIoKeepAliveConfig");
 
@@ -333,6 +337,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
   @Test
   public void negativeIoKeepAliveConfig() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
+    props.setProperty(STRATEGY_PROPERTY_NAME, DEDICATED.name());
     props.setProperty(IO_PREFIX + "." + THREAD_POOL_KEEP_ALIVE, "-2");
     props.store(new FileOutputStream(schedulerConfigFile), "negativeIoKeepAliveConfig");
 
@@ -344,6 +349,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
   @Test
   public void unevenParenthesis() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
+    props.setProperty(STRATEGY_PROPERTY_NAME, DEDICATED.name());
     props.setProperty(IO_PREFIX + "." + WORK_QUEUE_SIZE, "(-2");
     props.store(new FileOutputStream(schedulerConfigFile), "unevenParenthesis");
 

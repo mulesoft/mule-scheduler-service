@@ -171,38 +171,42 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     engine.put("cores", CORES);
     engine.put("mem", MEM);
 
-    config.setSchedulerPoolStrategy(resolveSchedulerPoolStrategy(properties), true);
-
+    SchedulerPoolStrategy schedulerPoolStrategy = resolveSchedulerPoolStrategy(properties);
+    config.setSchedulerPoolStrategy(schedulerPoolStrategy, true);
     resolveNumber(properties, PROP_PREFIX + "gracefulShutdownTimeout", true)
         .ifPresent(v -> config.setGracefulShutdownTimeout(v));
 
-    resolveExpression(properties, UBER_THREAD_POOL_SIZE_CORE, engine, false)
-        .ifPresent(v -> config.setUberCorePoolSize(v));
-    resolveExpression(properties, UBER_THREAD_POOL_SIZE_MAX, engine, false)
-        .ifPresent(v -> config.setUberMaxPoolSize(v));
-    resolveExpression(properties, UBER_QUEUE_SIZE, engine, true)
-        .ifPresent(v -> config.setUberQueueSize(v));
-    resolveNumber(properties, UBER_THREAD_POOL_KEEP_ALIVE, true)
-        .ifPresent(v -> config.setUberKeepAlive(v));
+    if (schedulerPoolStrategy == UBER) {
+      resolveExpression(properties, UBER_THREAD_POOL_SIZE_CORE, engine, false)
+          .ifPresent(v -> config.setUberCorePoolSize(v));
+      resolveExpression(properties, UBER_THREAD_POOL_SIZE_MAX, engine, false)
+          .ifPresent(v -> config.setUberMaxPoolSize(v));
+      resolveExpression(properties, UBER_QUEUE_SIZE, engine, true)
+          .ifPresent(v -> config.setUberQueueSize(v));
+      resolveNumber(properties, UBER_THREAD_POOL_KEEP_ALIVE, true)
+          .ifPresent(v -> config.setUberKeepAlive(v));
+    } else if (schedulerPoolStrategy == DEDICATED) {
+      resolveExpression(properties, CPU_LIGHT_THREAD_POOL_SIZE, engine, false)
+          .ifPresent(v -> config.setCpuLightPoolSize(v));
+      resolveExpression(properties, CPU_LIGHT_WORK_QUEUE_SIZE, engine, true)
+          .ifPresent(v -> config.setCpuLightQueueSize(v));
 
-    resolveExpression(properties, CPU_LIGHT_THREAD_POOL_SIZE, engine, false)
-        .ifPresent(v -> config.setCpuLightPoolSize(v));
-    resolveExpression(properties, CPU_LIGHT_WORK_QUEUE_SIZE, engine, true)
-        .ifPresent(v -> config.setCpuLightQueueSize(v));
+      resolveExpression(properties, IO_THREAD_POOL_SIZE, engine, false)
+          .ifPresent(v -> config.setIoCorePoolSize(v));
+      resolveExpression(properties, IO_THREAD_POOL_SIZE_MAX, engine, false)
+          .ifPresent(v -> config.setIoMaxPoolSize(v));
+      resolveExpression(properties, IO_WORK_QUEUE_SIZE, engine, true)
+          .ifPresent(v -> config.setIoQueueSize(v));
+      resolveNumber(properties, IO_THERAD_POOL_KEEP_ALIVE, true)
+          .ifPresent(v -> config.setIoKeepAlive(v));
 
-    resolveExpression(properties, IO_THREAD_POOL_SIZE, engine, false)
-        .ifPresent(v -> config.setIoCorePoolSize(v));
-    resolveExpression(properties, IO_THREAD_POOL_SIZE_MAX, engine, false)
-        .ifPresent(v -> config.setIoMaxPoolSize(v));
-    resolveExpression(properties, IO_WORK_QUEUE_SIZE, engine, true)
-        .ifPresent(v -> config.setIoQueueSize(v));
-    resolveNumber(properties, IO_THERAD_POOL_KEEP_ALIVE, true)
-        .ifPresent(v -> config.setIoKeepAlive(v));
-
-    resolveExpression(properties, CPU_INTENSIVE_THREAD_POOL_SIZE, engine, false)
-        .ifPresent(v -> config.setCpuIntensivePoolSize(v));
-    resolveExpression(properties, CPU_INTENSIVE_WORK_QUEUE_SIZE, engine, true)
-        .ifPresent(v -> config.setCpuIntensiveQueueSize(v));
+      resolveExpression(properties, CPU_INTENSIVE_THREAD_POOL_SIZE, engine, false)
+          .ifPresent(v -> config.setCpuIntensivePoolSize(v));
+      resolveExpression(properties, CPU_INTENSIVE_WORK_QUEUE_SIZE, engine, true)
+          .ifPresent(v -> config.setCpuIntensiveQueueSize(v));
+    } else {
+      throw new IllegalArgumentException("Unknown pool strategy " + schedulerPoolStrategy);
+    }
 
     return config;
   }
