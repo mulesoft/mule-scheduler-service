@@ -29,7 +29,6 @@ import static org.mockito.Mockito.mock;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
-import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.core.api.util.IOUtils.toByteArray;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
@@ -66,6 +65,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import io.qameta.allure.Description;
+import io.qameta.allure.Feature;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -75,9 +76,6 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
 import org.junit.runners.Parameterized.Parameters;
-
-import io.qameta.allure.Description;
-import io.qameta.allure.Feature;
 
 @Feature(SCHEDULER_SERVICE)
 @RunWith(Parameterized.class)
@@ -247,33 +245,28 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that a custom scheduler doesn't hold a reference to the context classloader that was in the context when it was created.")
   public void customPoolThreadsDontReferenceCreatorClassLoader() throws Exception {
-    ClassLoader testClassLoader = new ClassLoader(this.getClass().getClassLoader()) {};
+    ClassLoader testClassLoader = new ClassLoader(this.getClass().getClassLoader()) {
+
+    };
     PhantomReference<ClassLoader> clRef = new PhantomReference<>(testClassLoader, new ReferenceQueue<>());
 
     scheduleToCustomWithClassLoader(testClassLoader);
-
-    testClassLoader = null;
-
     assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
   }
 
   public void scheduleToCustomWithClassLoader(final ClassLoader testClassLoader) throws InterruptedException, ExecutionException {
     final AtomicReference<Scheduler> scheduler = new AtomicReference<>();
-    withContextClassLoader(testClassLoader, () -> {
+    Thread currentThread = currentThread();
+    ClassLoader originalClassLoader = currentThread.getContextClassLoader();
+    currentThread.setContextClassLoader(testClassLoader);
+    try {
       scheduler.set(service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L));
-
-      try {
-        scheduler.get().submit(() -> {
-          assertThat(currentThread().getContextClassLoader(), is(testClassLoader));
-        }).get();
-      } catch (InterruptedException | ExecutionException e) {
-        throw new RuntimeException(e);
-      }
-    });
-
-    scheduler.get().submit(() -> {
-      assertThat(currentThread().getContextClassLoader(), is(testClassLoader.getParent()));
-    }).get();
+      scheduler.get().submit(() -> assertThat(currentThread().getContextClassLoader(), is(testClassLoader))).get();
+    } catch (InterruptedException | ExecutionException e) {
+      throw new RuntimeException(e);
+    } finally {
+      currentThread.setContextClassLoader(originalClassLoader);
+    }
   }
 
   @Test
@@ -1012,13 +1005,14 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     assumeDedicatedStrategy();
 
     assertThat(service
-        .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()), 1,
-                                 () -> 1l),
+                   .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()),
+                                            1,
+                                            () -> 1l),
                not(instanceOf(ThrottledScheduler.class)));
     assertThat(service
-        .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()
-            - 1), 1,
-                                 () -> 1l),
+                   .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()
+                                                                                - 1), 1,
+                                            () -> 1l),
                instanceOf(ThrottledScheduler.class));
   }
 
@@ -1027,14 +1021,15 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   public void maxCpuIntensiveConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
     assumeDedicatedStrategy();
     assertThat(service
-        .createCpuIntensiveScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
-            .getCpuIntensivePoolSize().getAsInt()), 1,
-                                     () -> 1l),
+                   .createCpuIntensiveScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
+                                                                                    .getCpuIntensivePoolSize().getAsInt()), 1,
+                                                () -> 1l),
                not(instanceOf(ThrottledScheduler.class)));
     assertThat(service
-        .createCpuIntensiveScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt()
-            - 1), 1,
-                                     () -> 1l),
+                   .createCpuIntensiveScheduler(
+                       config().withMaxConcurrentTasks(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt()
+                                                           - 1), 1,
+                       () -> 1l),
                instanceOf(ThrottledScheduler.class));
   }
 
@@ -1044,14 +1039,14 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     assumeDedicatedStrategy();
 
     assertThat(service
-        .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
-            .getIoMaxPoolSize().getAsInt()), 1,
-                           () -> 1l),
+                   .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
+                                                                          .getIoMaxPoolSize().getAsInt()), 1,
+                                      () -> 1l),
                not(instanceOf(ThrottledScheduler.class)));
     assertThat(service
-        .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getIoMaxPoolSize().getAsInt()
-            - 1), 1,
-                           () -> 1l),
+                   .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getIoMaxPoolSize().getAsInt()
+                                                                          - 1), 1,
+                                      () -> 1l),
                instanceOf(ThrottledScheduler.class));
   }
 
