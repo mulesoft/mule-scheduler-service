@@ -245,12 +245,14 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Description("Tests that a custom scheduler doesn't hold a reference to the context classloader that was in the context when it was created.")
   public void customPoolThreadsDontReferenceCreatorClassLoader() throws Exception {
-    ClassLoader testClassLoader = new ClassLoader(this.getClass().getClassLoader()) {
-
-    };
+    ClassLoader testClassLoader = new ClassLoader(this.getClass().getClassLoader()) {};
     PhantomReference<ClassLoader> clRef = new PhantomReference<>(testClassLoader, new ReferenceQueue<>());
 
     scheduleToCustomWithClassLoader(testClassLoader);
+
+    // do not remove this, or else the hard reference makes the test fail
+    testClassLoader = null;
+
     assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
   }
 
