@@ -1005,14 +1005,14 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     assumeDedicatedStrategy();
 
     assertThat(service
-                   .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()),
-                                            1,
-                                            () -> 1l),
+        .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()),
+                                 1,
+                                 () -> 1l),
                not(instanceOf(ThrottledScheduler.class)));
     assertThat(service
-                   .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()
-                                                                                - 1), 1,
-                                            () -> 1l),
+        .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()
+            - 1), 1,
+                                 () -> 1l),
                instanceOf(ThrottledScheduler.class));
   }
 
@@ -1021,15 +1021,16 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   public void maxCpuIntensiveConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
     assumeDedicatedStrategy();
     assertThat(service
-                   .createCpuIntensiveScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
-                                                                                    .getCpuIntensivePoolSize().getAsInt()), 1,
-                                                () -> 1l),
+        .createCpuIntensiveScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
+            .getCpuIntensivePoolSize().getAsInt()), 1,
+                                     () -> 1l),
                not(instanceOf(ThrottledScheduler.class)));
     assertThat(service
-                   .createCpuIntensiveScheduler(
-                       config().withMaxConcurrentTasks(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt()
-                                                           - 1), 1,
-                       () -> 1l),
+        .createCpuIntensiveScheduler(
+                                     config().withMaxConcurrentTasks(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt()
+                                         - 1),
+                                     1,
+                                     () -> 1l),
                instanceOf(ThrottledScheduler.class));
   }
 
@@ -1039,14 +1040,14 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     assumeDedicatedStrategy();
 
     assertThat(service
-                   .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
-                                                                          .getIoMaxPoolSize().getAsInt()), 1,
-                                      () -> 1l),
+        .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
+            .getIoMaxPoolSize().getAsInt()), 1,
+                           () -> 1l),
                not(instanceOf(ThrottledScheduler.class)));
     assertThat(service
-                   .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getIoMaxPoolSize().getAsInt()
-                                                                          - 1), 1,
-                                      () -> 1l),
+        .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getIoMaxPoolSize().getAsInt()
+            - 1), 1,
+                           () -> 1l),
                instanceOf(ThrottledScheduler.class));
   }
 
