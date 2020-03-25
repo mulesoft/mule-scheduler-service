@@ -7,6 +7,7 @@
 package org.mule.service.scheduler.internal.threads;
 
 import static java.lang.Integer.MAX_VALUE;
+import static java.lang.Math.min;
 import static java.lang.String.format;
 import static java.lang.System.currentTimeMillis;
 import static java.lang.System.getProperties;
@@ -686,6 +687,7 @@ public class SchedulerThreadPools {
     private IllegalThreadStateException doDestroyThreadGroup() {
       IllegalThreadStateException destroyException = null;
 
+      final long durationMillis = shutdownTimeoutMillis.get();
       final long stopNanos = nanoTime() + MILLISECONDS.toNanos(shutdownTimeoutMillis.get()) + SECONDS.toNanos(1);
       while (nanoTime() <= stopNanos && !threadGroup.isDestroyed()) {
         try {
@@ -699,7 +701,7 @@ public class SchedulerThreadPools {
           destroyException = e;
           try {
             yield();
-            sleep(50);
+            sleep(min(50, durationMillis));
           } catch (InterruptedException e1) {
             currentThread().interrupt();
             break;
