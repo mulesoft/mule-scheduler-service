@@ -11,8 +11,10 @@ import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
 import static java.util.Arrays.asList;
 import static java.util.concurrent.Executors.newCachedThreadPool;
+import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.ForkJoinPool.commonPool;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.sameInstance;
@@ -58,6 +60,7 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
@@ -78,6 +81,7 @@ import org.junit.runners.Parameterized.Parameters;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
+import io.qameta.allure.Issue;
 
 @Feature(SCHEDULER_SERVICE)
 @RunWith(Parameterized.class)
@@ -371,6 +375,74 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     latch.await(5, SECONDS);
 
     assertNoClassLoaderReferenceHeld(clRefRef.get(), GC_POLLING_TIMEOUT);
+  }
+
+  @Test
+  @Issue("MULE-18471")
+  @Description("Attemps to force a race condition between stopping a scheduler and periodic tasks being rescheduled.")
+  public void avoidRaceConditionBetweenStopAndRescheduleFixedDelayCausingLeak()
+      throws InstantiationException, IllegalAccessException, ClassNotFoundException, InterruptedException {
+    final Scheduler customScheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
+
+    ClassLoader delegatorClassLoader = createDelegatorClassLoader();
+    PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
+
+    @SuppressWarnings("unchecked")
+    Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
+
+    final ExecutorService scheduleExecutor = newFixedThreadPool(CORES * 2);
+    for (int i = 0; i < CORES * 24; ++i) {
+      scheduleTaskReferencingDelegator(scheduleExecutor, customScheduler, delegator);
+    }
+
+    delegator = null;
+    delegatorClassLoader = null;
+
+    sleep(DEFAULT_POLLING_INTERVAL);
+    customScheduler.stop();
+
+    assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
+
+    scheduleExecutor.shutdownNow();
+  }
+
+  private void scheduleTaskReferencingDelegator(Executor scheduleExecutor, final Scheduler customScheduler,
+                                                Consumer<Runnable> delegator) {
+    scheduleExecutor.execute(() -> customScheduler.scheduleWithFixedDelay(() -> delegator.accept(() -> {
+    }), 0, 1, NANOSECONDS));
+  }
+
+  @Test
+  @Issue("MULE-18471")
+  @Description("Attemps to force a race condition between stopping a scheduler and a task being scheduled.")
+  public void avoidRaceConditionBetweenStopAndScheduleFixedDelayCausingLeak()
+      throws InstantiationException, IllegalAccessException, ClassNotFoundException, InterruptedException {
+    final Scheduler customScheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
+
+    ClassLoader delegatorClassLoader = createDelegatorClassLoader();
+    PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
+
+    @SuppressWarnings("unchecked")
+    Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
+
+    final ExecutorService scheduleExecutor = newSingleThreadExecutor();
+    scheduleTaskReferencingDelegatorPending(scheduleExecutor, customScheduler, delegator);
+
+    delegator = null;
+    delegatorClassLoader = null;
+
+    sleep(DEFAULT_POLLING_INTERVAL);
+    customScheduler.stop();
+
+    assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
+
+    scheduleExecutor.shutdownNow();
+  }
+
+  private void scheduleTaskReferencingDelegatorPending(Executor scheduleExecutor, final Scheduler customScheduler,
+                                                       Consumer<Runnable> delegator) {
+    scheduleExecutor.execute(() -> customScheduler.scheduleWithFixedDelay(() -> delegator.accept(() -> {
+    }), 10000, 1, SECONDS));
   }
 
   private ClassLoader createDelegatorClassLoader() {
@@ -703,12 +775,13 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
       return null;
     });
 
-    // Asssert that the task is waiting
+    // Assert that the task is waiting
     expected.expect(TimeoutException.class);
     try {
       submitted.get(5, SECONDS);
     } finally {
       latch.countDown();
+      ioScheduler.shutdown();
     }
   }
 

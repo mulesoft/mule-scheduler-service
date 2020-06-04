@@ -22,7 +22,7 @@ import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 
-public class QuartzScheduledFututre<V> implements ScheduledFuture<V> {
+public class QuartzScheduledFuture<V> implements ScheduledFuture<V> {
 
   private Scheduler quartzScheduler;
   private Trigger trigger;
@@ -32,7 +32,7 @@ public class QuartzScheduledFututre<V> implements ScheduledFuture<V> {
    * 
    * @param task the actual task that was scheduled.
    */
-  QuartzScheduledFututre(org.quartz.Scheduler quartzScheduler, Trigger trigger, RunnableFuture<?> task) {
+  QuartzScheduledFuture(org.quartz.Scheduler quartzScheduler, Trigger trigger, RunnableFuture<?> task) {
     this.quartzScheduler = quartzScheduler;
     this.trigger = trigger;
     this.task = task;
