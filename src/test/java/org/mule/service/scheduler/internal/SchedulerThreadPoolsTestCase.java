@@ -379,7 +379,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
   @Test
   @Issue("MULE-18471")
-  @Description("Attemps to force a race condition between stopping a scheduler and periodic tasks being rescheduled.")
+  @Description("Attempts to force a race condition between stopping a scheduler and periodic tasks being rescheduled.")
   public void avoidRaceConditionBetweenStopAndRescheduleFixedDelayCausingLeak()
       throws InstantiationException, IllegalAccessException, ClassNotFoundException, InterruptedException {
     final Scheduler customScheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
@@ -414,7 +414,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
   @Test
   @Issue("MULE-18471")
-  @Description("Attemps to force a race condition between stopping a scheduler and a task being scheduled.")
+  @Description("Attempts to force a race condition between stopping a scheduler and a task being scheduled.")
   public void avoidRaceConditionBetweenStopAndScheduleFixedDelayCausingLeak()
       throws InstantiationException, IllegalAccessException, ClassNotFoundException, InterruptedException {
     final Scheduler customScheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);

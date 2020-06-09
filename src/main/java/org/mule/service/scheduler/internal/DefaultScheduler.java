@@ -209,6 +209,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   }
 
   private void fixedDelayWrapUp(RunnableFuture<?> task, long delay, TimeUnit unit) {
+    // This synchronization is to avoid race conditions against #doShutdown when processing the same task
     synchronized (task) {
       if (!task.isCancelled()) {
         final ScheduledFutureDecorator<?> scheduled = new ScheduledFutureDecorator<>(scheduledExecutor
@@ -296,7 +297,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   public void shutdown() {
     shutdownLock.writeLock().lock();
     try {
-      LOGGER.debug("Shutting down " + this.toString());
+      LOGGER.debug("Shutting down {}", this);
       doShutdown();
       stopFinally();
     } finally {
@@ -307,6 +308,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   protected void doShutdown() {
     this.shutdown = true;
     for (RunnableFuture<?> task : scheduledTasks.keySet()) {
+      // This synchronization is to avoid race conditions against #fixedDelayWrapUp when processing the same task
       synchronized (task) {
         final ScheduledFuture<?> scheduledFuture = scheduledTasks.get(task);
 
@@ -321,7 +323,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   @Override
   public List<Runnable> shutdownNow() {
-    LOGGER.debug("Shutting down NOW " + this.toString());
+    LOGGER.debug("Shutting down NOW {}", this);
     shutdownLock.writeLock().lock();
     try {
       return doShutdownNow();
