@@ -22,17 +22,17 @@ import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 
-public class QuartzScheduledFututre<V> implements ScheduledFuture<V> {
+public class QuartzScheduledFuture<V> implements ScheduledFuture<V> {
 
-  private Scheduler quartzScheduler;
-  private Trigger trigger;
-  private RunnableFuture<?> task;
+  private final Scheduler quartzScheduler;
+  private final Trigger trigger;
+  private final RunnableFuture<?> task;
 
   /**
-   * 
+   *
    * @param task the actual task that was scheduled.
    */
-  QuartzScheduledFututre(org.quartz.Scheduler quartzScheduler, Trigger trigger, RunnableFuture<?> task) {
+  QuartzScheduledFuture(org.quartz.Scheduler quartzScheduler, Trigger trigger, RunnableFuture<?> task) {
     this.quartzScheduler = quartzScheduler;
     this.trigger = trigger;
     this.task = task;
@@ -46,7 +46,14 @@ public class QuartzScheduledFututre<V> implements ScheduledFuture<V> {
   @Override
   public int compareTo(Delayed o) {
     long diff = getDelay(NANOSECONDS) - o.getDelay(NANOSECONDS);
-    return (diff < 0) ? -1 : (diff > 0) ? 1 : 0;
+
+    if (diff < 0) {
+      return -1;
+    } else if (diff > 0) {
+      return 1;
+    } else {
+      return 0;
+    }
   }
 
   @Override
