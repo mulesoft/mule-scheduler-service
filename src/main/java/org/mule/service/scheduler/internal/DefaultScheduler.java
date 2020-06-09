@@ -42,6 +42,8 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -88,6 +90,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   private static final ScheduledFuture<?> NULL_SCHEDULED_FUTURE = NullScheduledFuture.INSTANCE;
   private final Map<RunnableFuture<?>, ScheduledFuture<?>> scheduledTasks;
 
+  private final ReadWriteLock shutdownLock = new ReentrantReadWriteLock();
   private volatile boolean shutdown = false;
 
   protected Supplier<Long> shutdownTimeoutMillis;
@@ -141,57 +144,80 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   }
 
   private <V> ScheduledFuture<V> doSchedule(final RunnableFuture<V> task, long delay, TimeUnit unit) {
-    final ScheduledFuture<V> scheduled = new ScheduledFutureDecorator(scheduledExecutor.schedule(schedulableTask(task, () -> {
-      removeTask(task);
-      // Retry after some time, the max theoretical duration of cpu-light tasks
-      doSchedule(task, 10, MILLISECONDS);
-    }), delay, unit), task, false);
+    shutdownLock.readLock().lock();
+    try {
+      final ScheduledFuture<V> scheduled = new ScheduledFutureDecorator(scheduledExecutor.schedule(schedulableTask(task, () -> {
+        removeTask(task);
+        // Retry after some time, the max theoretical duration of cpu-light tasks
+        doSchedule(task, 10, MILLISECONDS);
+      }), delay, unit), task, false);
 
-    putTask(task, scheduled);
-    return scheduled;
+      putTask(task, scheduled);
+      return scheduled;
+    } finally {
+      shutdownLock.readLock().unlock();
+    }
   }
 
   @Override
   public ScheduledFuture<?> scheduleAtFixedRate(Runnable command, long initialDelay, long period, TimeUnit unit) {
-    checkShutdown();
-    requireNonNull(command);
+    shutdownLock.readLock().lock();
+    try {
+      checkShutdown();
+      requireNonNull(command);
 
-    final RunnableFuture<?> task = new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), command, t -> {
-      if (t.isCancelled()) {
-        taskFinished(t);
-      }
-    }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement());
+      final RunnableFuture<?> task =
+          new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), command, t -> {
+            if (t.isCancelled()) {
+              taskFinished(t);
+            }
+          }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement());
 
-    final ScheduledFuture<?> scheduled =
-        new ScheduledFutureDecorator<>(scheduledExecutor.scheduleAtFixedRate(schedulableTask(task, EMPTY_RUNNABLE), initialDelay,
-                                                                             period, unit),
-                                       task, true);
+      final ScheduledFuture<?> scheduled =
+          new ScheduledFutureDecorator<>(scheduledExecutor.scheduleAtFixedRate(schedulableTask(task, EMPTY_RUNNABLE),
+                                                                               initialDelay,
+                                                                               period, unit),
+                                         task, true);
 
-    putTask(task, scheduled);
-    return scheduled;
+      putTask(task, scheduled);
+      return scheduled;
+    } finally {
+      shutdownLock.readLock().unlock();
+    }
   }
 
   @Override
   public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command, long initialDelay, long delay, TimeUnit unit) {
-    checkShutdown();
-    requireNonNull(command);
+    shutdownLock.readLock().lock();
+    try {
+      checkShutdown();
+      requireNonNull(command);
 
-    final RunnableFuture<?> task = new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), command, t -> {
-      fixedDelayWrapUp(t, delay, unit);
-    }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement());
+      final RunnableFuture<?> task =
+          new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), command,
+                                                  t -> fixedDelayWrapUp(t, delay, unit), currentThread().getContextClassLoader(),
+                                                  this, command.getClass().getName(), idGenerator.getAndIncrement());
 
-    final ScheduledFutureDecorator<?> scheduled = new ScheduledFutureDecorator<>(scheduledExecutor
-        .schedule(schedulableTask(task, () -> fixedDelayWrapUp(task, delay, unit)), initialDelay, unit), task, true);
+      final ScheduledFutureDecorator<?> scheduled = new ScheduledFutureDecorator<>(scheduledExecutor
+          .schedule(schedulableTask(task, () -> fixedDelayWrapUp(task, delay, unit)), initialDelay, unit), task, true);
 
-    putTask(task, scheduled);
-    return scheduled;
+      putTask(task, scheduled);
+      return scheduled;
+    } finally {
+      shutdownLock.readLock().unlock();
+    }
   }
 
   private void fixedDelayWrapUp(RunnableFuture<?> task, long delay, TimeUnit unit) {
-    if (!task.isCancelled()) {
-      scheduledExecutor.schedule(schedulableTask(task, () -> fixedDelayWrapUp(task, delay, unit)), delay, unit);
-    } else {
-      taskFinished(task);
+    // This synchronization is to avoid race conditions against #doShutdown when processing the same task
+    synchronized (task) {
+      if (!task.isCancelled()) {
+        final ScheduledFutureDecorator<?> scheduled = new ScheduledFutureDecorator<>(scheduledExecutor
+            .schedule(schedulableTask(task, () -> fixedDelayWrapUp(task, delay, unit)), delay, unit), task, true);
+        scheduledTasks.replace(task, scheduled);
+      } else {
+        taskFinished(task);
+      }
     }
   }
 
@@ -202,32 +228,38 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   @Override
   public ScheduledFuture<?> scheduleWithCronExpression(Runnable command, String cronExpression, TimeZone timeZone) {
-    checkShutdown();
-    requireNonNull(command);
-
-    final RunnableFuture<?> task = new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), command, t -> {
-      if (t.isCancelled()) {
-        taskFinished(t);
-      }
-    }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement());
-
-    JobDataMap jobDataMap = new JobDataMap();
-    jobDataMap.put(JOB_TASK_KEY, schedulableTask(task, EMPTY_RUNNABLE));
-    JobDetail job = newJob(jobClass).usingJobData(jobDataMap).build();
-
-    CronTrigger trigger = newTrigger()
-        .withSchedule(cronSchedule(cronExpression).withMisfireHandlingInstructionIgnoreMisfires().inTimeZone(timeZone)).build();
-
+    shutdownLock.readLock().lock();
     try {
-      quartzScheduler.scheduleJob(job, trigger);
-    } catch (SchedulerException e) {
-      throw new MuleRuntimeException(e);
+      checkShutdown();
+      requireNonNull(command);
+
+      final RunnableFuture<?> task =
+          new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), command, t -> {
+            if (t.isCancelled()) {
+              taskFinished(t);
+            }
+          }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement());
+
+      JobDataMap jobDataMap = new JobDataMap();
+      jobDataMap.put(JOB_TASK_KEY, schedulableTask(task, EMPTY_RUNNABLE));
+      JobDetail job = newJob(jobClass).usingJobData(jobDataMap).build();
+
+      CronTrigger trigger = newTrigger()
+          .withSchedule(cronSchedule(cronExpression).withMisfireHandlingInstructionIgnoreMisfires().inTimeZone(timeZone)).build();
+
+      try {
+        quartzScheduler.scheduleJob(job, trigger);
+      } catch (SchedulerException e) {
+        throw new MuleRuntimeException(e);
+      }
+
+      QuartzScheduledFuture<Object> scheduled = new QuartzScheduledFuture<>(quartzScheduler, trigger, task);
+
+      putTask(task, scheduled);
+      return scheduled;
+    } finally {
+      shutdownLock.readLock().unlock();
     }
-
-    QuartzScheduledFututre<Object> scheduled = new QuartzScheduledFututre<>(quartzScheduler, trigger, task);
-
-    putTask(task, scheduled);
-    return scheduled;
   }
 
   private final SuppressingLogger schedulableSuppressionLogger;
@@ -263,29 +295,41 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   @Override
   public void shutdown() {
-    LOGGER.debug("Shutting down " + this.toString());
-    doShutdown();
-    stopFinally();
+    shutdownLock.writeLock().lock();
+    try {
+      LOGGER.debug("Shutting down {}", this);
+      doShutdown();
+      stopFinally();
+    } finally {
+      shutdownLock.writeLock().unlock();
+    }
   }
 
   protected void doShutdown() {
     this.shutdown = true;
-    for (Entry<RunnableFuture<?>, ScheduledFuture<?>> taskEntry : scheduledTasks.entrySet()) {
-      final ScheduledFuture<?> scheduledFuture = taskEntry.getValue();
+    for (RunnableFuture<?> task : scheduledTasks.keySet()) {
+      // This synchronization is to avoid race conditions against #fixedDelayWrapUp when processing the same task
+      synchronized (task) {
+        final ScheduledFuture<?> scheduledFuture = scheduledTasks.get(task);
 
-      if (!(scheduledFuture instanceof ScheduledFutureDecorator) || ((ScheduledFutureDecorator) scheduledFuture).isPeriodic()) {
-        scheduledFuture.cancel(false);
+        if (scheduledFuture != null
+            && (!(scheduledFuture instanceof ScheduledFutureDecorator)
+                || ((ScheduledFutureDecorator) scheduledFuture).isPeriodic())) {
+          scheduledFuture.cancel(false);
+        }
       }
     }
   }
 
   @Override
   public List<Runnable> shutdownNow() {
-    LOGGER.debug("Shutting down NOW " + this.toString());
+    LOGGER.debug("Shutting down NOW {}", this);
+    shutdownLock.writeLock().lock();
     try {
       return doShutdownNow();
     } finally {
       stopFinally();
+      shutdownLock.writeLock().unlock();
     }
   }
 
@@ -346,9 +390,12 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     if (LOGGER.isDebugEnabled()) {
       LOGGER.debug("Stopping {}", this);
     }
-    // Disable new tasks from being submitted
-    doShutdown();
+
+    shutdownLock.writeLock().lock();
+
     try {
+      // Disable new tasks from being submitted
+      doShutdown();
       // Wait a while for existing tasks to terminate
       final Long timeout = shutdownTimeoutMillis.get();
       if (!awaitTermination(timeout, MILLISECONDS)) {
@@ -378,6 +425,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
       currentThread().interrupt();
     } finally {
       stopFinally();
+      shutdownLock.writeLock().unlock();
     }
   }
 
