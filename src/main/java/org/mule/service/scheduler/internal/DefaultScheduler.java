@@ -146,14 +146,17 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   private <V> ScheduledFuture<V> doSchedule(final RunnableFuture<V> task, long delay, TimeUnit unit) {
     shutdownLock.readLock().lock();
     try {
-      final ScheduledFuture<V> scheduled = new ScheduledFutureDecorator(scheduledExecutor.schedule(schedulableTask(task, () -> {
-        removeTask(task);
-        // Retry after some time, the max theoretical duration of cpu-light tasks
-        doSchedule(task, 10, MILLISECONDS);
-      }), delay, unit), task, false);
+      // This synchronization is to avoid race conditions against #doShutdown or #fixedDelayWrapUp when processing the same task
+      synchronized (task) {
+        final ScheduledFuture<V> scheduled = new ScheduledFutureDecorator(scheduledExecutor.schedule(schedulableTask(task, () -> {
+          removeTask(task);
+          // Retry after some time, the max theoretical duration of cpu-light tasks
+          doSchedule(task, 10, MILLISECONDS);
+        }), delay, unit), task, false);
 
-      putTask(task, scheduled);
-      return scheduled;
+        putTask(task, scheduled);
+        return scheduled;
+      }
     } finally {
       shutdownLock.readLock().unlock();
     }
@@ -173,14 +176,17 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
             }
           }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement());
 
-      final ScheduledFuture<?> scheduled =
-          new ScheduledFutureDecorator<>(scheduledExecutor.scheduleAtFixedRate(schedulableTask(task, EMPTY_RUNNABLE),
-                                                                               initialDelay,
-                                                                               period, unit),
-                                         task, true);
+      // This synchronization is to avoid race conditions against #doShutdown or #fixedDelayWrapUp when processing the same task
+      synchronized (task) {
+        final ScheduledFuture<?> scheduled =
+            new ScheduledFutureDecorator<>(scheduledExecutor.scheduleAtFixedRate(schedulableTask(task, EMPTY_RUNNABLE),
+                                                                                 initialDelay,
+                                                                                 period, unit),
+                                           task, true);
 
-      putTask(task, scheduled);
-      return scheduled;
+        putTask(task, scheduled);
+        return scheduled;
+      }
     } finally {
       shutdownLock.readLock().unlock();
     }
@@ -198,18 +204,22 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
                                                   t -> fixedDelayWrapUp(t, delay, unit), currentThread().getContextClassLoader(),
                                                   this, command.getClass().getName(), idGenerator.getAndIncrement());
 
-      final ScheduledFutureDecorator<?> scheduled = new ScheduledFutureDecorator<>(scheduledExecutor
-          .schedule(schedulableTask(task, () -> fixedDelayWrapUp(task, delay, unit)), initialDelay, unit), task, true);
+      // This synchronization is to avoid race conditions against #doShutdown or #fixedDelayWrapUp when processing the same task
+      synchronized (task) {
+        final ScheduledFutureDecorator<?> scheduled = new ScheduledFutureDecorator<>(scheduledExecutor
+            .schedule(schedulableTask(task, () -> fixedDelayWrapUp(task, delay, unit)), initialDelay, unit), task, true);
 
-      putTask(task, scheduled);
-      return scheduled;
+        putTask(task, scheduled);
+        return scheduled;
+      }
     } finally {
       shutdownLock.readLock().unlock();
     }
   }
 
   private void fixedDelayWrapUp(RunnableFuture<?> task, long delay, TimeUnit unit) {
-    // This synchronization is to avoid race conditions against #doShutdown when processing the same task
+    // This synchronization is to avoid race conditions against #doShutdown or the schedule of the task when processing the same
+    // task
     synchronized (task) {
       if (!task.isCancelled()) {
         final ScheduledFutureDecorator<?> scheduled = new ScheduledFutureDecorator<>(scheduledExecutor
@@ -240,23 +250,28 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
             }
           }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement());
 
-      JobDataMap jobDataMap = new JobDataMap();
-      jobDataMap.put(JOB_TASK_KEY, schedulableTask(task, EMPTY_RUNNABLE));
-      JobDetail job = newJob(jobClass).usingJobData(jobDataMap).build();
+      // This synchronization is to avoid race conditions against #doShutdown or #fixedDelayWrapUp when processing the same task
+      synchronized (task) {
+        JobDataMap jobDataMap = new JobDataMap();
+        jobDataMap.put(JOB_TASK_KEY, schedulableTask(task, EMPTY_RUNNABLE));
+        JobDetail job = newJob(jobClass).usingJobData(jobDataMap).build();
 
-      CronTrigger trigger = newTrigger()
-          .withSchedule(cronSchedule(cronExpression).withMisfireHandlingInstructionIgnoreMisfires().inTimeZone(timeZone)).build();
+        CronTrigger trigger = newTrigger()
+            .withSchedule(cronSchedule(cronExpression).withMisfireHandlingInstructionIgnoreMisfires().inTimeZone(timeZone))
+            .build();
 
-      try {
-        quartzScheduler.scheduleJob(job, trigger);
-      } catch (SchedulerException e) {
-        throw new MuleRuntimeException(e);
+        try {
+          quartzScheduler.scheduleJob(job, trigger);
+        } catch (SchedulerException e) {
+          throw new MuleRuntimeException(e);
+        }
+
+        QuartzScheduledFuture<Object> scheduled = new QuartzScheduledFuture<>(quartzScheduler, trigger, task);
+
+        putTask(task, scheduled);
+
+        return scheduled;
       }
-
-      QuartzScheduledFuture<Object> scheduled = new QuartzScheduledFuture<>(quartzScheduler, trigger, task);
-
-      putTask(task, scheduled);
-      return scheduled;
     } finally {
       shutdownLock.readLock().unlock();
     }
@@ -308,7 +323,8 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   protected void doShutdown() {
     this.shutdown = true;
     for (RunnableFuture<?> task : scheduledTasks.keySet()) {
-      // This synchronization is to avoid race conditions against #fixedDelayWrapUp when processing the same task
+      // This synchronization is to avoid race conditions against #fixedDelayWrapUp or the schedule of the task when processing
+      // the same task
       synchronized (task) {
         final ScheduledFuture<?> scheduledFuture = scheduledTasks.get(task);
 
