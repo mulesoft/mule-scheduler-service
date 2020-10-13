@@ -375,7 +375,19 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   @Override
   public boolean isTerminated() {
-    return shutdown && scheduledTasks.isEmpty();
+    if (shutdown && scheduledTasks.isEmpty()) {
+      return true;
+    } else if (shutdown) {
+      Thread currentThread = currentThread();
+
+      // If the only remaining task is running in this thread currently stopping, return right away to avoid waiting on itself.
+      return scheduledTasks.keySet().stream()
+          .noneMatch(t -> !currentThread
+              .equals((t instanceof AbstractRunnableFutureDecorator) ? ((AbstractRunnableFutureDecorator) t).getRunningThread()
+                  : null));
+    }
+
+    return false;
   }
 
   @Override
