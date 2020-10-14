@@ -569,7 +569,6 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
       scheduler.stop();
     });
 
-    expected.expect(CancellationException.class);
     try {
       stopSubmit.get(10, SECONDS);
     } finally {

@@ -12,12 +12,12 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.MuleRuntimeException;
 
-import org.slf4j.Logger;
-import org.slf4j.MDC;
-
 import java.lang.reflect.Field;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RunnableFuture;
+
+import org.slf4j.Logger;
+import org.slf4j.MDC;
 
 /**
  * Abstract base decorator for a a {@link RunnableFuture} in order to do hook behavior before the execution of the decorated
@@ -30,6 +30,8 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   private static final Logger logger = getLogger(AbstractRunnableFutureDecorator.class);
 
   private ClassLoader classLoader;
+
+  private Thread runningThread;
 
   private static Field threadLocalsField;
 
@@ -103,6 +105,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     if (getThreadNameSuffix() != null) {
       currentThread.setName(currentThreadName.concat(": ").concat(getThreadNameSuffix()));
     }
+    this.runningThread = currentThread;
     if (logger.isTraceEnabled()) {
       MDC.put("task", task.toString());
     }
@@ -140,12 +143,13 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   }
 
   protected void resetClassloader() {
-    // Since this object may be alive until the next time this task is triggered, we are eager to release the claassloader.
+    // Since this object may be alive until the next time this task is triggered, we are eager to release the classloader.
     this.classLoader = null;
   }
 
   protected void wrapUp() throws Exception {
     started = false;
+    runningThread = null;
     clearAllThreadLocals();
   }
 
@@ -161,6 +165,13 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
    */
   boolean isStarted() {
     return started;
+  }
+
+  /**
+   * @return the thread where this task is running, or {@code null} if it not running.
+   */
+  public Thread getRunningThread() {
+    return runningThread;
   }
 
   @Override

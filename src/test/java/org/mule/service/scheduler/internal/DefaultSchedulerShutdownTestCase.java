@@ -19,9 +19,11 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
+import static org.mule.tck.probe.PollingProber.probe;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SchedulerServiceStory.SHUTDOWN;
 
+import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.util.concurrent.Latch;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
@@ -40,6 +42,7 @@ import org.junit.Test;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
+import io.qameta.allure.Issue;
 import io.qameta.allure.Story;
 
 @Feature(SCHEDULER_SERVICE)
@@ -317,6 +320,17 @@ public class DefaultSchedulerShutdownTestCase extends BaseDefaultSchedulerTestCa
     Thread.sleep(50);
 
     verify(sharedScheduledExecutor, never()).schedule(any(Runnable.class), anyLong(), any());
+  }
+
+  @Test
+  @Issue("MULE-18884")
+  public void shutdownFromWithinSchedulerTaskDoesntWait() {
+    final Future<?> stopFuture = executor.submit(() -> {
+      ((Scheduler) executor).stop();
+    });
+
+    // the timeout of this probe has to be way lower that the graceful shutdown timeout of the scheduler for replicating the bug.
+    probe(1000, 10, () -> stopFuture.isDone() && executor.isTerminated());
   }
 
   protected void assertRejected(final ScheduledExecutorService executor,
