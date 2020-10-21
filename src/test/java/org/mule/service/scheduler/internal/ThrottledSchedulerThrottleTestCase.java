@@ -22,6 +22,7 @@ import static org.mule.tck.probe.PollingProber.probe;
 
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.util.concurrent.Latch;
+import org.mule.runtime.core.privileged.util.MapUtils;
 import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.executor.SchedulerTaskThrottledException;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
@@ -132,21 +133,16 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
   @Test
   @Description("Tests that the throttling remains stable after a successful scheduled task execution")
   @Issue("MULE-18909")
-  public void scheduledTaskMustLeaveThrottlingStableAfterExecution()
-      throws InterruptedException, ExecutionException, TimeoutException {
+  public void scheduledTaskMustDecrementThrottlingCounterAfterExecution() {
     final ScheduledExecutorService scheduler = service
         .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE, () -> 5000L);
-
-    Scheduler cpuLightScheduler = service.createCpuLightScheduler(config(), 1, () -> 5000L);
-
-    Latch firstTaskCompletionLatch = new Latch();
-    Future<?> submit = scheduler.schedule(firstTaskCompletionLatch::countDown, 10, MILLISECONDS);
-    awaitLatch(firstTaskCompletionLatch);
-    sleep(10);
-    assertThat(submit.isDone(), is(true));
-    Latch secondTaskCompletionLatch = new Latch();
-    scheduler.schedule(secondTaskCompletionLatch::countDown, 10, MILLISECONDS);
-    awaitLatch(secondTaskCompletionLatch);
+    CountDownLatch secondTaskIsExecuting = new CountDownLatch(1);
+    scheduler.schedule(() -> {
+      scheduler.schedule(secondTaskIsExecuting::countDown, 100, MILLISECONDS);
+    }, 10, MILLISECONDS);
+    if (!awaitLatch(secondTaskIsExecuting)) {
+      fail("Second task should be able to successfully execute");
+    } ;
   }
 
   private void doSchedule(final ScheduledExecutorService scheduler, CountDownLatch latch2) {
