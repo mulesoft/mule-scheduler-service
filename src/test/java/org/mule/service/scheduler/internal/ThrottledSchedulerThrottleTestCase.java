@@ -272,7 +272,6 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
     }
 
     sleep(1000);
-
     innerLatch.countDown();
 
     probe(() -> {
@@ -318,5 +317,4 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
       return true;
     });
   }
-
 }
