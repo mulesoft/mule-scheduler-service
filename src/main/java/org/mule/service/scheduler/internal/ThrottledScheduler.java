@@ -54,6 +54,8 @@ public class ThrottledScheduler extends DefaultScheduler {
   protected void putTask(RunnableFuture<?> task, ScheduledFuture<?> scheduledFuture) {
     if (scheduledFuture instanceof NullScheduledFuture) {
       thottlingPolicy.throttle(() -> super.putTask(task, scheduledFuture), task, this);
+    } else {
+      super.putTask(task, scheduledFuture);
     }
   }
 
@@ -64,7 +66,10 @@ public class ThrottledScheduler extends DefaultScheduler {
 
   @Override
   protected ScheduledFuture<?> removeTask(RunnableFuture<?> task) {
-    ScheduledFuture<?> removedTask = super.removeTask(task);
+    ScheduledFuture<?> removedTask;
+    synchronized (task) {
+      removedTask = super.removeTask(task);
+    }
     if (removedTask != null) {
       thottlingPolicy.throttleWrapUp();
     }

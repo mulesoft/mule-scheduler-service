@@ -87,7 +87,7 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
           if (isLogThrottleEnabled()) {
             logThrottle(task.toString(), "AbortPolicy", scheduler.toString());
           }
-          runningTasks.getAndDecrement();
+          // runningTasks.getAndDecrement();
           throw new SchedulerTaskThrottledException("Task '" + task.toString() + "' throttled back from '"
               + scheduler.toString() + "'");
         } else {
