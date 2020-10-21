@@ -97,7 +97,7 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
   }
 
   @Test
-  @Description("Tests that the throttler count is cinsistent after task cancellation")
+  @Description("Tests that the throttler count is consistent after task cancellation")
   public void interruptionUpdatesThrottleCounterCorrectly() throws InterruptedException, ExecutionException, TimeoutException {
     final ScheduledExecutorService scheduler = service
         .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE, () -> 5000L);
@@ -127,6 +127,23 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
     });
 
     outerSubmit.get(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
+  }
+
+  @Test
+  @Description("Tests that the throttler count is decreased after scheduled task completion")
+  @Issue("MULE-18909")
+  public void scheduledTaskMustDecrementThrottlingCounterAfterExecution() {
+    final ScheduledExecutorService scheduler = service
+        .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE, () -> 5000L);
+
+    CountDownLatch secondTaskIsExecuting = new CountDownLatch(1);
+
+    scheduler.schedule(() -> scheduler.schedule(secondTaskIsExecuting::countDown,
+                                                1000, MILLISECONDS),
+                       1000, MILLISECONDS);
+
+    assertThat("Second task should have been executed",
+               awaitLatch(secondTaskIsExecuting), is(true));
   }
 
   private void doSchedule(final ScheduledExecutorService scheduler, CountDownLatch latch2) {
