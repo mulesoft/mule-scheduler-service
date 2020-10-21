@@ -131,7 +131,7 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
 
   @Test
   @Description("Tests that the throttling remains stable after a successful scheduled task execution")
-  @Issue("MULE-17938")
+  @Issue("MULE-18909")
   public void scheduledTaskMustLeaveThrottlingStableAfterExecution()
       throws InterruptedException, ExecutionException, TimeoutException {
     final ScheduledExecutorService scheduler = service
