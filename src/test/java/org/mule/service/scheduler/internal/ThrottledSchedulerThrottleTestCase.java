@@ -22,7 +22,6 @@ import static org.mule.tck.probe.PollingProber.probe;
 
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.util.concurrent.Latch;
-import org.mule.runtime.core.privileged.util.MapUtils;
 import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.executor.SchedulerTaskThrottledException;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
