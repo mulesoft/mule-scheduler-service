@@ -83,11 +83,10 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
       synchronized (runningTasks) {
         if (runningTasks.incrementAndGet() > maxConcurrentTasks) {
           ++rejectedCount;
-
+          // runningTasks.decrementAndGet();
           if (isLogThrottleEnabled()) {
             logThrottle(task.toString(), "AbortPolicy", scheduler.toString());
           }
-          // runningTasks.getAndDecrement();
           throw new SchedulerTaskThrottledException("Task '" + task.toString() + "' throttled back from '"
               + scheduler.toString() + "'");
         } else {

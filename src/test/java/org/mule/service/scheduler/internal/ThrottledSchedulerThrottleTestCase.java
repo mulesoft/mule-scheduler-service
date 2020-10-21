@@ -97,7 +97,7 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
   }
 
   @Test
-  @Description("Tests that the throttler count is cinsistent after task cancellation")
+  @Description("Tests that the throttler count is consistent after task cancellation")
   public void interruptionUpdatesThrottleCounterCorrectly() throws InterruptedException, ExecutionException, TimeoutException {
     final ScheduledExecutorService scheduler = service
         .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE, () -> 5000L);
@@ -127,6 +127,26 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
     });
 
     outerSubmit.get(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
+  }
+
+  @Test
+  @Description("Tests that the throttling remains stable after a successful scheduled task execution")
+  @Issue("MULE-17938")
+  public void scheduledTaskMustLeaveThrottlingStableAfterExecution()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    final ScheduledExecutorService scheduler = service
+        .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE, () -> 5000L);
+
+    Scheduler cpuLightScheduler = service.createCpuLightScheduler(config(), 1, () -> 5000L);
+
+    Latch firstTaskCompletionLatch = new Latch();
+    Future<?> submit = scheduler.schedule(firstTaskCompletionLatch::countDown, 10, MILLISECONDS);
+    awaitLatch(firstTaskCompletionLatch);
+    sleep(10);
+    assertThat(submit.isDone(), is(true));
+    Latch secondTaskCompletionLatch = new Latch();
+    scheduler.schedule(secondTaskCompletionLatch::countDown, 10, MILLISECONDS);
+    awaitLatch(secondTaskCompletionLatch);
   }
 
   private void doSchedule(final ScheduledExecutorService scheduler, CountDownLatch latch2) {
@@ -257,6 +277,7 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
     }
 
     sleep(1000);
+
     innerLatch.countDown();
 
     probe(() -> {
@@ -302,4 +323,5 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
       return true;
     });
   }
+
 }

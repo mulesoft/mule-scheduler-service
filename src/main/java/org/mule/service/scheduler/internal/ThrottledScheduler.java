@@ -9,6 +9,7 @@ package org.mule.service.scheduler.internal;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.service.scheduler.ThreadType;
 import org.mule.service.scheduler.internal.executor.ByCallerThrottlingPolicy;
+import org.mule.service.scheduler.internal.executor.SchedulerTaskThrottledException;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RunnableFuture;
@@ -53,7 +54,12 @@ public class ThrottledScheduler extends DefaultScheduler {
   @Override
   protected void putTask(RunnableFuture<?> task, ScheduledFuture<?> scheduledFuture) {
     if (scheduledFuture instanceof NullScheduledFuture) {
-      thottlingPolicy.throttle(() -> super.putTask(task, scheduledFuture), task, this);
+      try {
+        thottlingPolicy.throttle(() -> super.putTask(task, scheduledFuture), task, this);
+      } catch (SchedulerTaskThrottledException e) {
+        thottlingPolicy.throttleWrapUp();
+        throw e;
+      }
     } else {
       super.putTask(task, scheduledFuture);
     }
