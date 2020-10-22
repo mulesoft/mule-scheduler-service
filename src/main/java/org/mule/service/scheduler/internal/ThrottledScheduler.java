@@ -54,16 +54,7 @@ public class ThrottledScheduler extends DefaultScheduler {
   protected void putTask(RunnableFuture<?> task, ScheduledFuture<?> scheduledFuture) {
     if (scheduledFuture instanceof NullScheduledFuture) {
       thottlingPolicy.throttle(() -> super.putTask(task, scheduledFuture), task, this);
-    } else {
-      // for non immediate tasks, the throttle is applied at #schedulableTask and this has to be done so that #removeTask
-      // decreases the counter as expected.
-      super.putTask(task, scheduledFuture);
     }
-  }
-
-  @Override
-  protected <T> Runnable schedulableTask(RunnableFuture<T> task, Runnable rejectionCallback) {
-    return () -> thottlingPolicy.throttle(() -> super.schedulableTask(task, rejectionCallback).run(), task, this);
   }
 
   @Override
@@ -73,6 +64,15 @@ public class ThrottledScheduler extends DefaultScheduler {
       thottlingPolicy.throttleWrapUp();
     }
     return removedTask;
+  }
+
+  @Override
+  protected <T> Runnable schedulableTask(RunnableFuture<T> task, Runnable rejectionCallback) {
+    return () -> thottlingPolicy.throttle(() -> {
+      super.schedulableTask(task, rejectionCallback).run();
+      // non immediate tasks do not manage the throttling policy in the putTask/removeTask methods.
+      thottlingPolicy.throttleWrapUp();
+    }, task, this);
   }
 
   @Override
