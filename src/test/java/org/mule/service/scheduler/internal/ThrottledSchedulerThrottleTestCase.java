@@ -9,9 +9,11 @@ package org.mule.service.scheduler.internal;
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
+import static java.util.concurrent.TimeUnit.HOURS;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
@@ -97,7 +99,7 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
   }
 
   @Test
-  @Description("Tests that the throttler count is cinsistent after task cancellation")
+  @Description("Tests that the throttler count is consistent after task cancellation")
   public void interruptionUpdatesThrottleCounterCorrectly() throws InterruptedException, ExecutionException, TimeoutException {
     final ScheduledExecutorService scheduler = service
         .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE, () -> 5000L);
@@ -120,7 +122,78 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
       doSchedule(scheduler, latch);
       try {
         doSchedule(scheduler, latch);
-        fail("Not rejected");
+        fail("Not rejected: " + scheduler.toString());
+      } catch (RejectedExecutionException e) {
+        // Expected
+      }
+    });
+
+    outerSubmit.get(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
+  }
+
+  @Test
+  @Description("Tests that the throttler count is consistent after scheduled task pre-cancellation")
+  public void cancellationOfScheduledUpdatesThrottleCounterCorrectly()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    final ScheduledExecutorService scheduler = service
+        .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE, () -> 5000L);
+
+    Scheduler cpuLightScheduler = service.createCpuLightScheduler(config(), 2, () -> 5000L);
+
+    Future<?> outerSubmit = cpuLightScheduler.submit(() -> {
+      Future<?> submit = scheduler.schedule(() -> {
+        // Nothing to do, this has to be cancelled before being triggered
+      }, 1, HOURS);
+
+      submit.cancel(true);
+
+      CountDownLatch latch = new CountDownLatch(2);
+
+      doSchedule(scheduler, latch);
+      try {
+        doSchedule(scheduler, latch);
+        fail("Not rejected: " + scheduler.toString());
+      } catch (RejectedExecutionException e) {
+        // Expected
+      }
+    });
+
+    outerSubmit.get(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
+  }
+
+  @Test
+  @Description("Tests that the throttler count is consistent after scheduled task cancellation")
+  public void interruptionDuringExecutionOfScheduledUpdatesThrottleCounterCorrectly()
+      throws InterruptedException, ExecutionException, TimeoutException {
+    final ScheduledExecutorService scheduler = service
+        .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE, () -> 5000L);
+
+    Scheduler cpuLightScheduler = service.createCpuLightScheduler(config(), 2, () -> 5000L);
+
+    Future<?> outerSubmit = cpuLightScheduler.submit(() -> {
+      Future<?> submit = scheduler.schedule(() -> {
+        try {
+          Thread.sleep(DEFAULT_TEST_TIMEOUT_SECS * 1000);
+        } catch (InterruptedException e) {
+          currentThread().interrupt();
+        }
+      }, 10, MILLISECONDS);
+
+      try {
+        Thread.sleep(1000);
+      } catch (InterruptedException e1) {
+        currentThread().interrupt();
+        fail("Interrupted");
+      }
+
+      submit.cancel(true);
+
+      CountDownLatch latch = new CountDownLatch(2);
+
+      doSchedule(scheduler, latch);
+      try {
+        doSchedule(scheduler, latch);
+        fail("Not rejected: " + scheduler.toString());
       } catch (RejectedExecutionException e) {
         // Expected
       }
@@ -137,6 +210,41 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
         currentThread().interrupt();
       }
     });
+  }
+
+  @Test
+  @Description("Tests that the throttler count is decreased after scheduled task completion")
+  @Issue("MULE-18909")
+  public void scheduledTaskMustDecrementThrottlingCounterAfterExecution() {
+    final ScheduledExecutorService scheduler = service
+        .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE, () -> 5000L);
+
+    CountDownLatch secondTaskIsExecuting = new CountDownLatch(2);
+
+    scheduler.schedule(secondTaskIsExecuting::countDown,
+                       1, MILLISECONDS);
+    scheduler.schedule(secondTaskIsExecuting::countDown,
+                       1000, MILLISECONDS);
+
+    assertThat("Second task should have been executed",
+               awaitLatch(secondTaskIsExecuting), is(true));
+  }
+
+  @Test
+  @Description("Tests that the throttler count is decreased after scheduled task completion")
+  @Issue("MULE-18909")
+  public void scheduledTaskMustDecrementThrottlingCounterAfterExecutionNested() {
+    final ScheduledExecutorService scheduler = service
+        .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE, () -> 5000L);
+
+    CountDownLatch secondTaskIsExecuting = new CountDownLatch(1);
+
+    scheduler.schedule(() -> scheduler.schedule(secondTaskIsExecuting::countDown,
+                                                1000, MILLISECONDS),
+                       1000, MILLISECONDS);
+
+    assertThat("Second task should have been executed",
+               awaitLatch(secondTaskIsExecuting), is(true));
   }
 
   @Test
@@ -275,7 +383,7 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
   }
 
   @Test
-  @Description("A throttled scheduler may accept many scheduled tasks and throttle then when they actually execute.")
+  @Description("A throttled scheduler may accept many scheduled tasks and throttle them when they actually execute.")
   @Issue("MULE-18053")
   public void scheduleOnThrottledScheduler() throws InterruptedException, ExecutionException, TimeoutException {
     final ScheduledExecutorService scheduler = service
@@ -283,22 +391,61 @@ public class ThrottledSchedulerThrottleTestCase extends BaseDefaultSchedulerTest
                            () -> 5000L);
 
     final int totalTasks = 2;
-    Scheduler waitAllowed = service.createIoScheduler(config(), totalTasks, () -> 5000L);
 
     final Latch innerLatch = new Latch();
 
     final List<Future> tasks = new ArrayList<>();
 
     for (int i = 0; i < totalTasks; ++i) {
-      waitAllowed.execute(() -> {
-        tasks.add(scheduler.schedule(() -> {
-          return awaitLatch(innerLatch);
-        }, 1, SECONDS));
-      });
+      tasks.add(scheduler.schedule(() -> {
+        return awaitLatch(innerLatch);
+      }, 1, SECONDS));
     }
 
     probe(() -> {
       assertThat(tasks, hasSize(totalTasks));
+      return true;
+    });
+
+    // Check the state of the scheduler
+    innerLatch.countDown();
+    probe(() -> {
+      assertThat(scheduler.toString(), scheduler.toString(), endsWith("(throttling: 0/1)"));
+      return true;
+    });
+  }
+
+  @Test
+  @Description("A throttled scheduler may accept many scheduled tasks and throttle them when they actually execute.")
+  @Issue("MULE-18053")
+  public void scheduleOnThrottledSchedulerCancelled() throws InterruptedException, ExecutionException, TimeoutException {
+    final ScheduledExecutorService scheduler = service
+        .createIoScheduler(config().withMaxConcurrentTasks(SINGLE_TASK_THROTTLE_SIZE), SINGLE_TASK_THROTTLE_SIZE,
+                           () -> 5000L);
+
+    final int totalTasks = 2;
+
+    final Latch innerLatch = new Latch();
+
+    final List<Future> tasks = new ArrayList<>();
+
+    for (int i = 0; i < totalTasks; ++i) {
+      tasks.add(scheduler.schedule(() -> {
+        return awaitLatch(innerLatch);
+      }, 1, SECONDS));
+    }
+
+    probe(() -> {
+      assertThat(tasks, hasSize(totalTasks));
+      return true;
+    });
+
+    tasks.forEach(f -> f.cancel(true));
+    innerLatch.countDown();
+
+    // Check the state of the scheduler
+    probe(() -> {
+      assertThat(scheduler.toString(), scheduler.toString(), endsWith("(throttling: 0/1)"));
       return true;
     });
   }
