@@ -58,17 +58,21 @@ public class ThrottledScheduler extends DefaultScheduler {
   }
 
   @Override
-  protected <T> Runnable schedulableTask(RunnableFuture<T> task, Runnable rejectionCallback) {
-    return () -> thottlingPolicy.throttle(() -> super.schedulableTask(task, rejectionCallback).run(), task, this);
-  }
-
-  @Override
   protected ScheduledFuture<?> removeTask(RunnableFuture<?> task) {
     ScheduledFuture<?> removedTask = super.removeTask(task);
     if (removedTask != null) {
       thottlingPolicy.throttleWrapUp();
     }
     return removedTask;
+  }
+
+  @Override
+  protected <T> Runnable schedulableTask(RunnableFuture<T> task, Runnable rejectionCallback) {
+    return () -> thottlingPolicy.throttle(() -> {
+      super.schedulableTask(task, rejectionCallback).run();
+      // non immediate tasks do not manage the throttling policy in the putTask/removeTask methods.
+      thottlingPolicy.throttleWrapUp();
+    }, task, this);
   }
 
   @Override
