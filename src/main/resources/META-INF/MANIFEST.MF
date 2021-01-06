@@ -1,0 +1,32 @@
+Manifest-Version: 1.0
+Build-Date: 
+Built-By: aiannucci
+Specification-Title: Mule Scheduler Service Implementation
+Implementation-Vendor-Id: org.mule.services
+Description: Mule Runtime and Integration Platform
+Git-commit-id: 40d9090ed2ae18f2485c3d180d0c58125468df5a
+Recommended-Jdks: [1.8.0_181,9),[11,12)
+Product-Url: https://developer.mulesoft.com/
+Build-Revision: 40d9090e
+Dev-List-Email: mule-esb@mulesoft.com
+Git-commit-time: 2020-11-03T15:21:54-0300
+Git-tags: 
+Implementation-Title: Mule Scheduler Service Implementation
+Git-remote-origin-url: https://github.com/mulesoft/mule-scheduler-serv
+ ice.git
+Implementation-Version: 1.4.0-SNAPSHOT
+Specification-Vendor: MuleSoft, Inc.
+Supported-Jdks: [1.8.0,12)
+Implementation-Vendor: MuleSoft, Inc.
+Git-branch: DEL-1823
+Git-commit-id-describe: 40d9090-dirty
+License: CPAL v1.0 http://www.mulesoft.com/CPAL/
+More-Info: For more information go to https://developer.mulesoft.com/
+Vendor-Url: http://www.mulesoft.com
+Support: Get commercial support: http://www.mulesoft.com/support
+Created-By: Apache Maven 3.6.3
+Build-Jdk: 1.8.0_275
+Specification-Version: 1.4
+Implementation-URL: https://developer.mulesoft.com/mule-core-services-
+ parent/mule-service-scheduler/
+
