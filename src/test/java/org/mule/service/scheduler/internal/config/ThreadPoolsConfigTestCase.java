@@ -12,6 +12,7 @@ import static java.lang.System.setProperty;
 import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.startsWith;
+import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertThat;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
@@ -354,7 +355,8 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     props.store(new FileOutputStream(schedulerConfigFile), "unevenParenthesis");
 
     expected.expect(DefaultMuleException.class);
-    expected.expectMessage(startsWith(IO_PREFIX + "." + WORK_QUEUE_SIZE + ": <eval>:1:3 Expected ) but found eof"));
+    expected.expectMessage(startsWith(IO_PREFIX + "." + WORK_QUEUE_SIZE));
+    expected.expectMessage(containsString("<eval>:1:3 Expected ) but found eof"));
     loadThreadPoolsConfig();
   }
 
