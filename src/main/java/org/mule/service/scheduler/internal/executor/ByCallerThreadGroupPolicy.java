@@ -28,8 +28,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Dynamically determines the {@link RejectedExecutionHandler} implementation to use according to the {@link ThreadGroup} of the
- * current thread. If the current thread is not a {@link SchedulerService} managed thread then
- * {@link WaitPolicy} is used.
+ * current thread. If the current thread is not a {@link SchedulerService} managed thread then {@link WaitPolicy} is used.
  *
  * @see AbortPolicy
  * @see WaitPolicy
