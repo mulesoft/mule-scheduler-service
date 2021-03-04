@@ -36,7 +36,7 @@ public class WaitPolicy implements RejectedExecutionHandler {
    * Constructs a <tt>WaitPolicy</tt> which waits (almost) forever.
    *
    * @param shutdownPolicy the policy to use when the executor is shutdown.
-   * @param scheduelrName the name of the target {@link Scheduler}
+   * @param scheduelrName  the name of the target {@link Scheduler}
    */
   public WaitPolicy(RejectedExecutionHandler shutdownPolicy, String schedulerName) {
     // effectively waits forever
@@ -48,7 +48,7 @@ public class WaitPolicy implements RejectedExecutionHandler {
    * <code>Long.MAX_VALUE</code>.
    *
    * @param shutdownPolicy the policy to use when the executor is shutdown.
-   * @param schedulerName the name of the target {@link Scheduler}
+   * @param schedulerName  the name of the target {@link Scheduler}
    */
   public WaitPolicy(long time, TimeUnit timeUnit, RejectedExecutionHandler shutdownPolicy, String schedulerName) {
     super();

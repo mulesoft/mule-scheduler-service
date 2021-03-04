@@ -398,7 +398,7 @@ public abstract class SchedulerThreadPools {
    * <p>
    * In that case, the threads are prestarted by dispatching work to the executor as a workaround, which avoids the issue.
    *
-   * @param executor the executor to prestart the threads for
+   * @param executor     the executor to prestart the threads for
    * @param corePoolSize the number of threads to start in e=the {@code executor}
    */
   protected void prestartCoreThreads(final AbstractExecutorService executor, int corePoolSize) {

@@ -29,11 +29,11 @@ public abstract class AbstractByCallerPolicy {
   /**
    * Builds a new {@link AbstractByCallerPolicy} with the given {@code waitGroups}.
    *
-   * @param waitGroups the group of threads for which a {@link WaitPolicy} will be applied. For the rest, an {@link AbortPolicy}
-   *        will be applied.
+   * @param waitGroups                      the group of threads for which a {@link WaitPolicy} will be applied. For the rest, an
+   *                                        {@link AbortPolicy} will be applied.
    * @param runCpuLightWhenTargetBusyGroups the group of threads for which a {@link CallerRunsPolicy} will be applied when
-   *        dispatching to cpu-light.
-   * @param parentGroup the {@link SchedulerService} parent {@link ThreadGroup}
+   *                                        dispatching to cpu-light.
+   * @param parentGroup                     the {@link SchedulerService} parent {@link ThreadGroup}
    */
   protected AbstractByCallerPolicy(Set<ThreadGroup> waitGroups, Set<ThreadGroup> runCpuLightWhenTargetBusyGroups,
                                    ThreadGroup parentGroup) {

@@ -43,13 +43,13 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
   /**
    * Decorates the given {@code task}
    *
-   * @param taskSupplier the supplier for tasks to be decorated
-   * @param command the actual command that was given to the Scheduler
+   * @param taskSupplier   the supplier for tasks to be decorated
+   * @param command        the actual command that was given to the Scheduler
    * @param wrapUpCallback the callback to execute after the task is done
-   * @param classLoader the context {@link ClassLoader} on which the {@code task} should be executed
-   * @param scheduler the owner {@link Executor} of this task
-   * @param taskAsString a {@link String} representation of the task, used for logging and troubleshooting.
-   * @param id a unique it for this task.
+   * @param classLoader    the context {@link ClassLoader} on which the {@code task} should be executed
+   * @param scheduler      the owner {@link Executor} of this task
+   * @param taskAsString   a {@link String} representation of the task, used for logging and troubleshooting.
+   * @param id             a unique it for this task.
    */
   RunnableRepeatableFutureDecorator(Supplier<RunnableFuture<V>> taskSupplier,
                                     Runnable command,
