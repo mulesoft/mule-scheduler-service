@@ -58,7 +58,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   private volatile boolean started = false;
 
   /**
-   * @param id a unique it for this task.
+   * @param id          a unique it for this task.
    * @param classLoader the context {@link ClassLoader} on which the {@code task} should be executed
    */
   protected AbstractRunnableFutureDecorator(int id, ClassLoader classLoader) {
@@ -78,8 +78,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   }
 
   /**
-   * Performs the required bookkeeping before and after running the task, as well as setting the appropriate context for the
-   * task.
+   * Performs the required bookkeeping before and after running the task, as well as setting the appropriate context for the task.
    * <p>
    * Any {@link Exception} thrown as part of the task processing or bookkeeping is handled by this method and not rethrown.
    *

@@ -42,10 +42,10 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
    * Builds a new {@link ByCallerThrottlingPolicy} with the given {@code waitGroups}.
    *
    * @param maxConcurrentTasks how many tasks can be running at the same time for the owner {@link ThrottledScheduler}.
-   * @param waitGroups the group of threads for which waiting will be applied. For the rest, any task exceeding the throttle value
-   *        will be rejected.
-   * @param parentGroup the {@link SchedulerService} parent {@link ThreadGroup}
-   * @param traceLogger the logger to be used when tracing is enabled
+   * @param waitGroups         the group of threads for which waiting will be applied. For the rest, any task exceeding the
+   *                           throttle value will be rejected.
+   * @param parentGroup        the {@link SchedulerService} parent {@link ThreadGroup}
+   * @param traceLogger        the logger to be used when tracing is enabled
    */
   public ByCallerThrottlingPolicy(int maxConcurrentTasks,
                                   Set<ThreadGroup> waitGroups,

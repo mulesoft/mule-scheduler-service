@@ -30,8 +30,8 @@ class ScheduledFutureDecorator<V> implements ScheduledFuture<V> {
    * Decorates the given {@code scheduled}
    * 
    * @param scheduled the {@link ScheduledFuture} to be decorated
-   * @param task the actual task that was scheduled.
-   * @param periodic {@code true} if this task will run on a regular basis, {@code false} otherwise
+   * @param task      the actual task that was scheduled.
+   * @param periodic  {@code true} if this task will run on a regular basis, {@code false} otherwise
    */
   ScheduledFutureDecorator(ScheduledFuture<V> scheduled, RunnableFuture<?> task, boolean periodic) {
     this.scheduled = scheduled;
