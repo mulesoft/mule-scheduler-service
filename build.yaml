@@ -3,3 +3,4 @@ upstreamProjects:
 mavenSettingsXmlId: mule-runtime-maven-settings-MuleSettings
 archiveArtifacts: "**/hs_*.log"
 projectType: runtime
+devBranchesRegex: "1\\.4\\.0"
