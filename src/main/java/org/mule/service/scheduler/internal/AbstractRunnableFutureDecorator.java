@@ -89,7 +89,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
 
     if (cl == null) {
       if (logger.isDebugEnabled()) {
-        logger.debug("Task " + this.toString() + " has been cancelled. Retunrning immendiately.");
+        logger.debug("Task " + this + " has been cancelled. Returning immediately.");
       }
       return;
     }
