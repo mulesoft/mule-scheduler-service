@@ -8,6 +8,7 @@ package org.mule.service.scheduler.internal;
 
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
+import static org.mule.runtime.core.internal.profiling.ThreadProfilingContext.currentThreadProfilingContext;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.MuleRuntimeException;
@@ -16,6 +17,7 @@ import java.lang.reflect.Field;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RunnableFuture;
 
+import org.mule.runtime.core.internal.profiling.ThreadProfilingContext;
 import org.slf4j.Logger;
 import org.slf4j.MDC;
 
@@ -53,9 +55,11 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   }
 
   private final int id;
-
   private volatile boolean ranAtLeastOnce = false;
   private volatile boolean started = false;
+  // TODO: Try to flag this propagation
+  // At this point, the thread is the one that scheduled the task execution. We store its context to allow its propagation.
+  private ThreadProfilingContext schedulerThreadProfilingContext = currentThreadProfilingContext();
 
   /**
    * @param id          a unique it for this task.
@@ -74,6 +78,8 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     }
     ranAtLeastOnce = true;
     started = true;
+    currentThreadProfilingContext().replaceWith(schedulerThreadProfilingContext);
+    schedulerThreadProfilingContext = null;
     return startTime;
   }
 
