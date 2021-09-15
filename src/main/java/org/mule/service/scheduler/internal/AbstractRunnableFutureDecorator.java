@@ -6,18 +6,18 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext.currentThreadProfilingContext;
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
-import static org.mule.runtime.core.internal.profiling.ThreadProfilingContext.currentThreadProfilingContext;
 import static org.slf4j.LoggerFactory.getLogger;
 
+import org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 
 import java.lang.reflect.Field;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RunnableFuture;
 
-import org.mule.runtime.core.internal.profiling.ThreadProfilingContext;
 import org.slf4j.Logger;
 import org.slf4j.MDC;
 
@@ -74,12 +74,11 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     long startTime = 0;
     if (logger.isTraceEnabled()) {
       startTime = nanoTime();
-      logger.trace("Starting task " + toString() + "...");
+      logger.trace("Starting task " + this + "...");
     }
     ranAtLeastOnce = true;
     started = true;
     currentThreadProfilingContext().replaceWith(schedulerThreadProfilingContext);
-    schedulerThreadProfilingContext = null;
     return startTime;
   }
 
