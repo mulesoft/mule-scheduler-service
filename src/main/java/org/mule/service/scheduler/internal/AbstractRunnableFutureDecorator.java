@@ -9,6 +9,7 @@ package org.mule.service.scheduler.internal;
 import static org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext.getCurrentThreadProfilingContext;
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
+import static org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext.initializeThreadProfilingContext;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext;
@@ -79,7 +80,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     started = true;
     // We only propagate the ThreadProfilingContext data if both threads have a ThreadProfilingContext, which means that they are
     // both coming from runtime managed pools.
-    if (schedulerThreadProfilingContext != null && getCurrentThreadProfilingContext() != null) {
+    if (schedulerThreadProfilingContext != null) {
       getCurrentThreadProfilingContext().replaceWith(schedulerThreadProfilingContext);
     }
 
@@ -119,7 +120,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     }
 
     try {
-      task.run();
+      initializeThreadProfilingContext(task).run();
       if (task.isCancelled()) {
         if (logger.isTraceEnabled()) {
           // Log instead of rethrow to avoid flooding the logger with stack traces of cancellation, which may be very common.
