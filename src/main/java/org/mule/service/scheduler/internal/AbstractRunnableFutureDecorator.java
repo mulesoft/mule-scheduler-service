@@ -6,7 +6,7 @@
  */
 package org.mule.service.scheduler.internal;
 
-import static org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext.currentThreadProfilingContext;
+import static org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext.getCurrentThreadProfilingContext;
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -57,9 +57,8 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   private final int id;
   private volatile boolean ranAtLeastOnce = false;
   private volatile boolean started = false;
-  // TODO: Try to flag this propagation
   // At this point, the thread is the one that scheduled the task execution. We store its context to allow its propagation.
-  private ThreadProfilingContext schedulerThreadProfilingContext = currentThreadProfilingContext();
+  private ThreadProfilingContext schedulerThreadProfilingContext = getCurrentThreadProfilingContext();
 
   /**
    * @param id          a unique it for this task.
@@ -78,7 +77,12 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     }
     ranAtLeastOnce = true;
     started = true;
-    currentThreadProfilingContext().replaceWith(schedulerThreadProfilingContext);
+    // We only propagate the ThreadProfilingContext data if both threads have a ThreadProfilingContext, which means that they are
+    // both coming from runtime managed pools.
+    if (schedulerThreadProfilingContext != null && getCurrentThreadProfilingContext() != null) {
+      getCurrentThreadProfilingContext().replaceWith(schedulerThreadProfilingContext);
+    }
+
     return startTime;
   }
 
