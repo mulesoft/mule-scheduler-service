@@ -9,7 +9,8 @@ package org.mule.service.scheduler.internal;
 import static org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext.getCurrentThreadProfilingContext;
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
-import static org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext.initializeThreadProfilingContext;
+import static org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext.resetCurrentThreadProfilingContext;
+import static org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext.setCurrentThreadProfilingContext;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext;
@@ -59,7 +60,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   private volatile boolean ranAtLeastOnce = false;
   private volatile boolean started = false;
   // At this point, the thread is the one that scheduled the task execution. We store its context to allow its propagation.
-  private ThreadProfilingContext schedulerThreadProfilingContext = getCurrentThreadProfilingContext();
+  private final ThreadProfilingContext schedulerThreadProfilingContext = getCurrentThreadProfilingContext();
 
   /**
    * @param id          a unique it for this task.
@@ -68,9 +69,11 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   protected AbstractRunnableFutureDecorator(int id, ClassLoader classLoader) {
     this.id = id;
     this.classLoader = classLoader;
+    // TODO: Fire SCHEDULING_TASK_EXECUTION profiling event
   }
 
   protected long beforeRun() {
+    // TODO: Fire STARTING_TASK_EXECUTION profiling event
     long startTime = 0;
     if (logger.isTraceEnabled()) {
       startTime = nanoTime();
@@ -78,10 +81,12 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     }
     ranAtLeastOnce = true;
     started = true;
-    // We only propagate the ThreadProfilingContext data if both threads have a ThreadProfilingContext, which means that they are
-    // both coming from runtime managed pools.
+
+    // TODO: Evaluate a feature flag check (could be "thread.profiling" or something like that)
     if (schedulerThreadProfilingContext != null) {
-      getCurrentThreadProfilingContext().replaceWith(schedulerThreadProfilingContext);
+      setCurrentThreadProfilingContext(schedulerThreadProfilingContext);
+    } else {
+      resetCurrentThreadProfilingContext();
     }
 
     return startTime;
@@ -120,27 +125,27 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     }
 
     try {
-      initializeThreadProfilingContext(task).run();
+      task.run();
       if (task.isCancelled()) {
         if (logger.isTraceEnabled()) {
           // Log instead of rethrow to avoid flooding the logger with stack traces of cancellation, which may be very common.
-          logger.trace("Task " + toString() + " cancelled");
+          logger.trace("Task " + this + " cancelled");
         }
       } else {
         task.get();
       }
     } catch (ExecutionException e) {
-      logger.error("Uncaught throwable in task " + toString(), e);
+      logger.error("Uncaught throwable in task " + this, e);
     } catch (InterruptedException e) {
       currentThread.interrupt();
     } finally {
       try {
         wrapUp();
       } catch (Exception e) {
-        logger.error("Exception wrapping up execution of " + toString(), e);
+        logger.error("Exception wrapping up execution of " + this, e);
       } finally {
         if (logger.isTraceEnabled()) {
-          logger.trace("Task " + toString() + " finished after " + (nanoTime() - startTime) + " nanoseconds");
+          logger.trace("Task " + this + " finished after " + (nanoTime() - startTime) + " nanoseconds");
         }
 
         currentThread.setContextClassLoader(currentClassLoader);
@@ -157,6 +162,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   }
 
   protected void wrapUp() throws Exception {
+    // TODO: Fire TASK_EXECUTED profiling event
     started = false;
     runningThread = null;
     clearAllThreadLocals();
