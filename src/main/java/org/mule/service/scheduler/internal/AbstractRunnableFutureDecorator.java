@@ -6,15 +6,15 @@
  */
 package org.mule.service.scheduler.internal;
 
-import static org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext.getCurrentThreadProfilingContext;
+import static org.mule.runtime.api.profiling.tracing.TaskTracingService.getTaskTracingContext;
+import static org.mule.runtime.api.profiling.tracing.TaskTracingService.propagateTaskTracingContext;
+import static org.mule.runtime.api.profiling.tracing.TaskTracingService.resetTaskTracingContext;
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
-import static org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext.resetCurrentThreadProfilingContext;
-import static org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext.setCurrentThreadProfilingContext;
 import static org.slf4j.LoggerFactory.getLogger;
 
-import org.mule.runtime.api.profiling.context.threading.ThreadProfilingContext;
 import org.mule.runtime.api.exception.MuleRuntimeException;
+import org.mule.runtime.api.profiling.tracing.TaskTracingContext;
 
 import java.lang.reflect.Field;
 import java.util.concurrent.ExecutionException;
@@ -60,7 +60,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   private volatile boolean ranAtLeastOnce = false;
   private volatile boolean started = false;
   // At this point, the thread is the one that scheduled the task execution. We store its context to allow its propagation.
-  private final ThreadProfilingContext schedulerThreadProfilingContext = getCurrentThreadProfilingContext();
+  private final TaskTracingContext initialTaskTracingContext = getTaskTracingContext();
 
   /**
    * @param id          a unique it for this task.
@@ -69,7 +69,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   protected AbstractRunnableFutureDecorator(int id, ClassLoader classLoader) {
     this.id = id;
     this.classLoader = classLoader;
-    // TODO: Fire SCHEDULING_TASK_EXECUTION profiling event
+    // TODO: Fire SCHEDULING_TASK_EXECUTION profiling event (maybe at the point of construction)
   }
 
   protected long beforeRun() {
@@ -82,11 +82,11 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     ranAtLeastOnce = true;
     started = true;
 
-    // TODO: Evaluate a feature flag check (could be "thread.profiling" or something like that)
-    if (schedulerThreadProfilingContext != null) {
-      setCurrentThreadProfilingContext(schedulerThreadProfilingContext);
+    // TODO: Consider a feature flag check (could be "thread.profiling" or something like that)
+    if (initialTaskTracingContext != null) {
+      propagateTaskTracingContext(initialTaskTracingContext);
     } else {
-      resetCurrentThreadProfilingContext();
+      resetTaskTracingContext();
     }
 
     return startTime;
