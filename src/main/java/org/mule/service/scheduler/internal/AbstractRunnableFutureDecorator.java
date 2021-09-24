@@ -6,15 +6,13 @@
  */
 package org.mule.service.scheduler.internal;
 
-import static org.mule.runtime.api.profiling.tracing.TaskTracingService.getTaskTracingContext;
-import static org.mule.runtime.api.profiling.tracing.TaskTracingService.propagateTaskTracingContext;
-import static org.mule.runtime.api.profiling.tracing.TaskTracingService.resetTaskTracingContext;
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
 import static org.slf4j.LoggerFactory.getLogger;
 
-import org.mule.runtime.api.exception.MuleRuntimeException;
+import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.profiling.tracing.TaskTracingContext;
+import org.mule.runtime.api.exception.MuleRuntimeException;
 
 import java.lang.reflect.Field;
 import java.util.concurrent.ExecutionException;
@@ -59,8 +57,9 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   private final int id;
   private volatile boolean ranAtLeastOnce = false;
   private volatile boolean started = false;
-  // At this point, the thread is the one that scheduled the task execution. We store its context to allow its propagation.
-  private final TaskTracingContext initialTaskTracingContext = getTaskTracingContext();
+  // TODO EE-8076: Inject the actual profiling service
+  private final ProfilingService profilingService = null;
+  private final TaskTracingContext initialTaskTracingContext;
 
   /**
    * @param id          a unique it for this task.
@@ -69,11 +68,14 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   protected AbstractRunnableFutureDecorator(int id, ClassLoader classLoader) {
     this.id = id;
     this.classLoader = classLoader;
-    // TODO: Fire SCHEDULING_TASK_EXECUTION profiling event (maybe at the point of construction)
+    // At this point, the thread is the one that scheduled the task execution. We store its context to allow its propagation.
+    initialTaskTracingContext =
+        profilingService != null ? profilingService.getTaskTracingService().getCurrentTaskTracingContext() : null;
+    // TODO EE-8026: Fire SCHEDULING_TASK_EXECUTION profiling event (or maybe at the point of construction)
   }
 
   protected long beforeRun() {
-    // TODO: Fire STARTING_TASK_EXECUTION profiling event
+    // TODO EE-8026: Fire STARTING_TASK_EXECUTION profiling event
     long startTime = 0;
     if (logger.isTraceEnabled()) {
       startTime = nanoTime();
@@ -82,11 +84,13 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     ranAtLeastOnce = true;
     started = true;
 
-    // TODO: Consider a feature flag check (could be "thread.profiling" or something like that)
-    if (initialTaskTracingContext != null) {
-      propagateTaskTracingContext(initialTaskTracingContext);
-    } else {
-      resetTaskTracingContext();
+    // TODO EE-8026: Granularity: Consider a feature flag check (could be "thread.profiling" or something like that)
+    if (profilingService != null) {
+      if (initialTaskTracingContext != null) {
+        profilingService.getTaskTracingService().setCurrentTaskTracingContext(initialTaskTracingContext);
+      } else {
+        profilingService.getTaskTracingService().deleteCurrentTaskTracingContext();
+      }
     }
 
     return startTime;
@@ -162,7 +166,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   }
 
   protected void wrapUp() throws Exception {
-    // TODO: Fire TASK_EXECUTED profiling event
+    // TODO EE-8026: Fire TASK_EXECUTED profiling event
     started = false;
     runningThread = null;
     clearAllThreadLocals();
