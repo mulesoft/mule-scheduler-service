@@ -30,6 +30,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lifecycle.LifecycleException;
+import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
@@ -289,8 +290,13 @@ public abstract class SchedulerThreadPools {
     }
   }
 
+  public Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate,
+                                           Supplier<Long> stopTimeout) {
+    return createCpuLightScheduler(config, parallelTasksEstimate, stopTimeout, null);
+  }
+
   public abstract Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate,
-                                                    Supplier<Long> stopTimeout);
+                                                    Supplier<Long> stopTimeout, ProfilingService profilingService);
 
   public abstract Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout);
 

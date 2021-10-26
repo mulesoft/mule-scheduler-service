@@ -14,6 +14,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.mule.service.scheduler.ThreadType.IO;
 
 import org.mule.runtime.api.exception.MuleException;
+import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
@@ -89,7 +90,8 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
   }
 
   @Override
-  public Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate, Supplier<Long> stopTimeout) {
+  public Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate, Supplier<Long> stopTimeout,
+                                           ProfilingService profilingService) {
     return createIoScheduler(config, parallelTasksEstimate, stopTimeout);
   }
 
