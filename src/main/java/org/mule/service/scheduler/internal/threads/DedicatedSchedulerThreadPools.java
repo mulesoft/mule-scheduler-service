@@ -129,11 +129,11 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
                                                               new HashSet<>(asList(ioGroup, customWaitGroup)),
                                                               parentGroup,
                                                               traceLogger),
-                                 stopTimeout, shutdownCallback(activeCpuLightSchedulers));
+                                 stopTimeout, shutdownCallback(activeCpuLightSchedulers), profilingService);
     } else {
       scheduler = new DefaultScheduler(schedulerName, cpuLightExecutor, parallelTasksEstimate,
                                        scheduledExecutor, quartzScheduler, CPU_LIGHT,
-                                       stopTimeout, shutdownCallback(activeCpuLightSchedulers));
+                                       stopTimeout, shutdownCallback(activeCpuLightSchedulers), profilingService);
     }
 
     addScheduler(activeCpuLightSchedulers, scheduler);
@@ -141,7 +141,8 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
   }
 
   @Override
-  public Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
+  public Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout,
+                                     ProfilingService profilingService) {
     validateCustomSchedulerOnlyConfigNotChanged(config);
     final String schedulerName = resolveSchedulerName(config, IO_THREADS_NAME);
     Scheduler scheduler;
@@ -152,18 +153,19 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
                                                               new HashSet<>(asList(ioGroup, customWaitGroup)),
                                                               parentGroup,
                                                               traceLogger),
-                                 stopTimeout, shutdownCallback(activeIoSchedulers));
+                                 stopTimeout, shutdownCallback(activeIoSchedulers), profilingService);
     } else {
       scheduler = new DefaultScheduler(schedulerName, ioExecutor, workers,
                                        scheduledExecutor, quartzScheduler, IO,
-                                       stopTimeout, shutdownCallback(activeIoSchedulers));
+                                       stopTimeout, shutdownCallback(activeIoSchedulers), profilingService);
     }
     addScheduler(activeIoSchedulers, scheduler);
     return scheduler;
   }
 
   @Override
-  public Scheduler createCpuIntensiveScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
+  public Scheduler createCpuIntensiveScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout,
+                                               ProfilingService profilingService) {
     validateCustomSchedulerOnlyConfigNotChanged(config);
     final String schedulerName = resolveSchedulerName(config, COMPUTATION_THREADS_NAME);
     Scheduler scheduler;
@@ -174,11 +176,11 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
                                                               new HashSet<>(asList(ioGroup, customWaitGroup)),
                                                               parentGroup,
                                                               traceLogger),
-                                 stopTimeout, shutdownCallback(activeCpuIntensiveSchedulers));
+                                 stopTimeout, shutdownCallback(activeCpuIntensiveSchedulers), profilingService);
     } else {
       scheduler = new DefaultScheduler(schedulerName, computationExecutor, workers, scheduledExecutor,
                                        quartzScheduler, CPU_INTENSIVE, stopTimeout,
-                                       shutdownCallback(activeCpuIntensiveSchedulers));
+                                       shutdownCallback(activeCpuIntensiveSchedulers), profilingService);
     }
     addScheduler(activeCpuIntensiveSchedulers, scheduler);
     return scheduler;

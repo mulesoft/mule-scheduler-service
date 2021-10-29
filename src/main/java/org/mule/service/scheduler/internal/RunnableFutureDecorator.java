@@ -8,6 +8,7 @@ package org.mule.service.scheduler.internal;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
+import org.mule.runtime.api.profiling.ProfilingService;
 import org.slf4j.Logger;
 
 import java.util.concurrent.ExecutionException;
@@ -42,8 +43,8 @@ class RunnableFutureDecorator<V> extends AbstractRunnableFutureDecorator<V> {
    * @param id           a unique it for this task.
    */
   RunnableFutureDecorator(RunnableFuture<V> task, ClassLoader classLoader, DefaultScheduler scheduler, String taskAsString,
-                          int id) {
-    super(id, classLoader);
+                          int id, ProfilingService profilingService) {
+    super(id, classLoader, profilingService);
     this.task = task;
     this.scheduler = scheduler;
     this.taskAsString = taskAsString;

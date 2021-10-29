@@ -22,6 +22,7 @@ import static org.quartz.TriggerBuilder.newTrigger;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.MuleRuntimeException;
+import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.service.scheduler.ThreadType;
 import org.mule.service.scheduler.internal.logging.SuppressingLogger;
@@ -93,6 +94,8 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   private final ReadWriteLock shutdownLock = new ReentrantReadWriteLock();
   private volatile boolean shutdown = false;
 
+  private final ProfilingService profilingService;
+
   protected Supplier<Long> shutdownTimeoutMillis;
 
   protected final Consumer<Scheduler> shutdownCallback;
@@ -112,7 +115,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   public DefaultScheduler(String name, ExecutorService executor, int parallelTasksEstimate,
                           ScheduledExecutorService scheduledExecutor,
                           org.quartz.Scheduler quartzScheduler, ThreadType threadsType, Supplier<Long> shutdownTimeoutMillis,
-                          Consumer<Scheduler> shutdownCallback) {
+                          Consumer<Scheduler> shutdownCallback, ProfilingService profilingService) {
     this.name = name + " @" + toHexString(hashCode());
     scheduledTasks = new ConcurrentHashMap<>(parallelTasksEstimate, 1.00f, getRuntime().availableProcessors());
     this.executor = executor;
@@ -121,6 +124,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     this.threadType = threadsType;
     this.shutdownTimeoutMillis = shutdownTimeoutMillis;
     this.shutdownCallback = shutdownCallback;
+    this.profilingService = profilingService;
 
     this.schedulableSuppressionLogger =
         new SuppressingLogger(LOGGER, 5000, "Similar log entries will be suppressed for the following 5 seconds for scheduler '"
@@ -174,7 +178,8 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
             if (t.isCancelled()) {
               taskFinished(t);
             }
-          }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement());
+          }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement(),
+                                                  profilingService);
 
       // This synchronization is to avoid race conditions against #doShutdown or #fixedDelayWrapUp when processing the same task
       synchronized (task) {
@@ -202,7 +207,8 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
       final RunnableFuture<?> task =
           new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), command,
                                                   t -> fixedDelayWrapUp(t, delay, unit), currentThread().getContextClassLoader(),
-                                                  this, command.getClass().getName(), idGenerator.getAndIncrement());
+                                                  this, command.getClass().getName(), idGenerator.getAndIncrement(),
+                                                  profilingService);
 
       // This synchronization is to avoid race conditions against #doShutdown or #fixedDelayWrapUp when processing the same task
       synchronized (task) {
@@ -248,7 +254,8 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
             if (t.isCancelled()) {
               taskFinished(t);
             }
-          }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement());
+          }, currentThread().getContextClassLoader(), this, command.getClass().getName(), idGenerator.getAndIncrement(),
+                                                  profilingService);
 
       // This synchronization is to avoid race conditions against #doShutdown or #fixedDelayWrapUp when processing the same task
       synchronized (task) {
@@ -474,7 +481,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
   private <T> RunnableFuture<T> newDecoratedTaskFor(final RunnableFuture<T> newTaskFor, final Class<?> taskClass) {
     return new RunnableFutureDecorator<>(newTaskFor, currentThread().getContextClassLoader(), this, taskClass.getName(),
-                                         idGenerator.getAndIncrement());
+                                         idGenerator.getAndIncrement(), profilingService);
   }
 
   @Override

@@ -49,7 +49,7 @@ public class RunnableRepeatableFutureDecoratorTestCase extends BaseDefaultSchedu
     taskDecorator =
         new RunnableRepeatableFutureDecorator<>(() -> new FutureTask<>(command, null), command, d -> {
           throw new WrapUpException();
-        }, taskClassloader, scheduler, "testTask", -1);
+        }, taskClassloader, scheduler, "testTask", -1, null);
 
     taskDecorator.run();
 
@@ -69,7 +69,7 @@ public class RunnableRepeatableFutureDecoratorTestCase extends BaseDefaultSchedu
           if (runCount.get() < 2) {
             taskDecorator.run();
           }
-        }, RunnableRepeatableFutureDecoratorTestCase.class.getClassLoader(), scheduler, "testTask", -1);
+        }, RunnableRepeatableFutureDecoratorTestCase.class.getClassLoader(), scheduler, "testTask", -1, null);
 
     taskDecorator.run();
 

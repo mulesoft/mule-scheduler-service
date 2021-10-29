@@ -16,6 +16,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import org.mule.runtime.api.profiling.ProfilingService;
 import org.slf4j.Logger;
 
 /**
@@ -54,8 +55,9 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
   RunnableRepeatableFutureDecorator(Supplier<RunnableFuture<V>> taskSupplier,
                                     Runnable command,
                                     Consumer<RunnableRepeatableFutureDecorator<V>> wrapUpCallback,
-                                    ClassLoader classLoader, DefaultScheduler scheduler, String taskAsString, int id) {
-    super(id, classLoader);
+                                    ClassLoader classLoader, DefaultScheduler scheduler, String taskAsString, int id,
+                                    ProfilingService profilingService) {
+    super(id, classLoader, profilingService);
     this.taskSupplier = taskSupplier;
     this.command = command;
     this.wrapUpCallback = wrapUpCallback;
