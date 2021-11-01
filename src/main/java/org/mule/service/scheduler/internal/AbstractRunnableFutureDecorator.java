@@ -16,13 +16,13 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.exception.MuleRuntimeException;
+import org.mule.runtime.api.profiling.tracing.TracingContext;
+import org.mule.service.scheduler.internal.profiling.DefaultTaskSchedulingProfilingEventContext;
 
 import java.lang.reflect.Field;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RunnableFuture;
 
-import org.mule.runtime.api.profiling.tracing.TracingContext;
-import org.mule.service.scheduler.internal.profiling.DefaultTaskSchedulingProfilingEventContext;
 import org.slf4j.Logger;
 import org.slf4j.MDC;
 
