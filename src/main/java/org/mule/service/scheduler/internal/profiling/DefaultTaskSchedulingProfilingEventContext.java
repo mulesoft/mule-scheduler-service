@@ -6,16 +6,21 @@
  */
 package org.mule.service.scheduler.internal.profiling;
 
-import org.mule.runtime.api.profiling.tracing.TaskTracingContext;
+import org.mule.runtime.api.profiling.tracing.TracingContext;
 import org.mule.runtime.api.profiling.type.context.TaskSchedulingProfilingEventContext;
 
 public class DefaultTaskSchedulingProfilingEventContext implements TaskSchedulingProfilingEventContext {
 
   private final long triggerTimestamp;
-  private final TaskTracingContext taskTracingContext;
+  private final String taskId;
+  private final String threadName;
+  private final TracingContext taskTracingContext;
 
-  public DefaultTaskSchedulingProfilingEventContext(long triggerTimestamp, TaskTracingContext taskTracingContext) {
+  public DefaultTaskSchedulingProfilingEventContext(long triggerTimestamp, String taskId, String threadName,
+                                                    TracingContext taskTracingContext) {
     this.triggerTimestamp = triggerTimestamp;
+    this.taskId = taskId;
+    this.threadName = threadName;
     this.taskTracingContext = taskTracingContext;
   }
 
@@ -25,7 +30,17 @@ public class DefaultTaskSchedulingProfilingEventContext implements TaskSchedulin
   }
 
   @Override
-  public TaskTracingContext getTaskTracingContext() {
+  public TracingContext getTaskTracingContext() {
     return taskTracingContext;
+  }
+
+  @Override
+  public String getTaskId() {
+    return taskId;
+  }
+
+  @Override
+  public String getThreadName() {
+    return threadName;
   }
 }
