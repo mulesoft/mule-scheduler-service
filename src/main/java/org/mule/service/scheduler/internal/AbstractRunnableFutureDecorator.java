@@ -76,7 +76,6 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     if (profilingService != null) {
       this.profilingService = profilingService;
       initialTaskTracingContext = profilingService.getTracingService().getCurrentTracingContext();
-      // TODO: Try to find a better place for this event (here, the task is being constructed but not scheduled)
       profilingService.getProfilingDataProducer(SCHEDULING_TASK_EXECUTION)
           .triggerProfilingEvent(new DefaultTaskSchedulingProfilingEventContext(currentTimeMillis(), String.valueOf(id),
                                                                                 Thread.currentThread().getName(),
@@ -132,8 +131,6 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
       if (profilingService != null) {
         if (initialTaskTracingContext != null) {
           profilingService.getTracingService().setCurrentTracingContext(initialTaskTracingContext);
-        } else {
-          profilingService.getTracingService().deleteCurrentTracingContext();
         }
         profilingService.getProfilingDataProducer(STARTING_TASK_EXECUTION)
             .triggerProfilingEvent(new DefaultTaskSchedulingProfilingEventContext(currentTimeMillis(), String.valueOf(id),
@@ -185,6 +182,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
                                                                                 Thread.currentThread().getName(), profilingService
                                                                                     .getTracingService()
                                                                                     .getCurrentTracingContext()));
+      profilingService.getTracingService().deleteCurrentTracingContext();
     }
     started = false;
     runningThread = null;

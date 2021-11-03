@@ -9,8 +9,13 @@ package org.mule.service.scheduler.internal;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
 
+import org.mule.runtime.api.profiling.tracing.TracingContext;
+import org.mule.runtime.api.profiling.tracing.TracingService;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
 
@@ -83,6 +88,18 @@ public class RunnableFutureDecoratorTestCase extends BaseDefaultSchedulerTestCas
   public void mdcValuesNotSpreadAmongTasks() throws InterruptedException, ExecutionException {
     submitMdcPut();
     submitMdcGet();
+  }
+
+  @Test
+  public void tracingContextPropagation() throws ExecutionException, InterruptedException {
+    TracingService tracingService = mock(TracingService.class);
+    TracingContext currentTracingContext = mock(TracingContext.class);
+    when(profilingService.getTracingService()).thenReturn(tracingService);
+    when(tracingService.getCurrentTracingContext()).thenReturn(currentTracingContext);
+    scheduler.submit(() -> {
+    }).get();
+    verify(profilingService.getTracingService()).setCurrentTracingContext(currentTracingContext);
+    verify(profilingService.getTracingService()).deleteCurrentTracingContext();
   }
 
   private void submitMdcPut()

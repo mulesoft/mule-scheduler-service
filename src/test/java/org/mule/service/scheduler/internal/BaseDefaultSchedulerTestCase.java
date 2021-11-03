@@ -13,9 +13,14 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.number.IsCloseTo.closeTo;
 import static org.junit.Assert.assertThat;
+import static org.mockito.Answers.RETURNS_MOCKS;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mule.service.scheduler.ThreadType.CUSTOM;
 
+import org.mockito.Answers;
+import org.mockito.Mock;
+import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 
@@ -57,9 +62,11 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
   protected ExecutorService sharedExecutor;
   protected ScheduledThreadPoolExecutor sharedScheduledExecutor;
   protected org.quartz.Scheduler sharedQuartzScheduler;
+  protected ProfilingService profilingService;
 
   @Before
   public void before() throws Exception {
+    profilingService = mock(ProfilingService.class, RETURNS_MOCKS);
     sharedExecutor =
         new ThreadPoolExecutor(1, 1, 0, SECONDS, sharedExecutorQueue, defaultThreadFactory());
     sharedScheduledExecutor = spy(new ScheduledThreadPoolExecutor(1, defaultThreadFactory()));
@@ -102,7 +109,7 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
 
   protected ScheduledExecutorService createExecutor() {
     return new DefaultScheduler(BaseDefaultSchedulerTestCase.class.getSimpleName(), sharedExecutor, 1, sharedScheduledExecutor,
-                                sharedQuartzScheduler, CUSTOM, () -> 5000L, EMPTY_SHUTDOWN_CALLBACK, null);
+                                sharedQuartzScheduler, CUSTOM, () -> 5000L, EMPTY_SHUTDOWN_CALLBACK, profilingService);
   }
 
   protected boolean awaitLatch(final CountDownLatch latch) {

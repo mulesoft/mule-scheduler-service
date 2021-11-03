@@ -11,13 +11,18 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mule.runtime.api.profiling.tracing.TracingContext;
+import org.mule.runtime.api.profiling.tracing.TracingService;
 
 public class RunnableRepeatableFutureDecoratorTestCase extends BaseDefaultSchedulerTestCase {
 
@@ -75,6 +80,18 @@ public class RunnableRepeatableFutureDecoratorTestCase extends BaseDefaultSchedu
 
     assertThat(taskDecorator.isStarted(), is(false));
     assertThat(runCount.get(), is(2));
+  }
+
+  @Test
+  public void tracingContextPropagation() throws ExecutionException, InterruptedException {
+    TracingService tracingService = mock(TracingService.class);
+    TracingContext currentTracingContext = mock(TracingContext.class);
+    when(profilingService.getTracingService()).thenReturn(tracingService);
+    when(tracingService.getCurrentTracingContext()).thenReturn(currentTracingContext);
+    scheduler.submit(() -> {
+    }).get();
+    verify(profilingService.getTracingService()).setCurrentTracingContext(currentTracingContext);
+    verify(profilingService.getTracingService()).deleteCurrentTracingContext();
   }
 
   private static class WrapUpException extends RuntimeException {
