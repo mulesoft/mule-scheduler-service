@@ -14,6 +14,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import org.mule.runtime.api.profiling.tracing.ExecutionContext;
+import org.mule.runtime.api.profiling.tracing.TracingService;
+
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -21,8 +24,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.mule.runtime.api.profiling.tracing.TracingContext;
-import org.mule.runtime.api.profiling.tracing.TracingService;
 
 public class RunnableRepeatableFutureDecoratorTestCase extends BaseDefaultSchedulerTestCase {
 
@@ -85,13 +86,13 @@ public class RunnableRepeatableFutureDecoratorTestCase extends BaseDefaultSchedu
   @Test
   public void tracingContextPropagation() throws ExecutionException, InterruptedException {
     TracingService tracingService = mock(TracingService.class);
-    TracingContext currentTracingContext = mock(TracingContext.class);
+    ExecutionContext currentExecutionContext = mock(ExecutionContext.class);
     when(profilingService.getTracingService()).thenReturn(tracingService);
-    when(tracingService.getCurrentTracingContext()).thenReturn(currentTracingContext);
+    when(tracingService.getCurrentExecutionContext()).thenReturn(currentExecutionContext);
     scheduler.submit(() -> {
     }).get();
-    verify(profilingService.getTracingService()).setCurrentTracingContext(currentTracingContext);
-    verify(profilingService.getTracingService()).deleteCurrentTracingContext();
+    verify(profilingService.getTracingService()).setCurrentExecutionContext(currentExecutionContext);
+    verify(profilingService.getTracingService()).deleteCurrentExecutionContext();
   }
 
   private static class WrapUpException extends RuntimeException {

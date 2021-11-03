@@ -14,7 +14,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
 
-import org.mule.runtime.api.profiling.tracing.TracingContext;
+import org.mule.runtime.api.profiling.tracing.ExecutionContext;
 import org.mule.runtime.api.profiling.tracing.TracingService;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
@@ -93,13 +93,13 @@ public class RunnableFutureDecoratorTestCase extends BaseDefaultSchedulerTestCas
   @Test
   public void tracingContextPropagation() throws ExecutionException, InterruptedException {
     TracingService tracingService = mock(TracingService.class);
-    TracingContext currentTracingContext = mock(TracingContext.class);
+    ExecutionContext currentExecutionContext = mock(ExecutionContext.class);
     when(profilingService.getTracingService()).thenReturn(tracingService);
-    when(tracingService.getCurrentTracingContext()).thenReturn(currentTracingContext);
+    when(tracingService.getCurrentExecutionContext()).thenReturn(currentExecutionContext);
     scheduler.submit(() -> {
     }).get();
-    verify(profilingService.getTracingService()).setCurrentTracingContext(currentTracingContext);
-    verify(profilingService.getTracingService()).deleteCurrentTracingContext();
+    verify(profilingService.getTracingService()).setCurrentExecutionContext(currentExecutionContext);
+    verify(profilingService.getTracingService()).deleteCurrentExecutionContext();
   }
 
   private void submitMdcPut()

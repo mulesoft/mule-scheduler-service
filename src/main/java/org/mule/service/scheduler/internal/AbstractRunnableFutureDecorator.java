@@ -17,7 +17,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.exception.MuleRuntimeException;
-import org.mule.runtime.api.profiling.tracing.TracingContext;
+import org.mule.runtime.api.profiling.tracing.ExecutionContext;
 import org.mule.service.scheduler.internal.profiling.DefaultTaskSchedulingProfilingEventContext;
 
 import java.lang.reflect.Field;
@@ -64,7 +64,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   private volatile boolean ranAtLeastOnce = false;
   private volatile boolean started = false;
   private ProfilingService profilingService = null;
-  private TracingContext initialTaskTracingContext = null;
+  private ExecutionContext initialExecutionContext = null;
 
   /**
    * @param id          a unique it for this task.
@@ -76,11 +76,11 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     // At this point, the thread is the one that scheduled the task execution. We store its context to allow its propagation.
     if (profilingService != null) {
       this.profilingService = profilingService;
-      initialTaskTracingContext = profilingService.getTracingService().getCurrentTracingContext();
+      initialExecutionContext = profilingService.getTracingService().getCurrentExecutionContext();
       profilingService.getProfilingDataProducer(SCHEDULING_TASK_EXECUTION)
           .triggerProfilingEvent(new DefaultTaskSchedulingProfilingEventContext(currentTimeMillis(), valueOf(id),
                                                                                 currentThread().getName(),
-                                                                                initialTaskTracingContext));
+                                                                                initialExecutionContext));
     }
   }
 
@@ -130,15 +130,15 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
 
     try {
       if (profilingService != null) {
-        if (initialTaskTracingContext != null) {
-          profilingService.getTracingService().setCurrentTracingContext(initialTaskTracingContext);
+        if (initialExecutionContext != null) {
+          profilingService.getTracingService().setCurrentExecutionContext(initialExecutionContext);
         }
         profilingService.getProfilingDataProducer(STARTING_TASK_EXECUTION)
             .triggerProfilingEvent(new DefaultTaskSchedulingProfilingEventContext(currentTimeMillis(), valueOf(id),
                                                                                   currentThread().getName(),
                                                                                   profilingService
                                                                                       .getTracingService()
-                                                                                      .getCurrentTracingContext()));
+                                                                                      .getCurrentExecutionContext()));
       }
       task.run();
       if (task.isCancelled()) {
@@ -182,8 +182,8 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
           .triggerProfilingEvent(new DefaultTaskSchedulingProfilingEventContext(currentTimeMillis(), valueOf(id),
                                                                                 currentThread().getName(), profilingService
                                                                                     .getTracingService()
-                                                                                    .getCurrentTracingContext()));
-      profilingService.getTracingService().deleteCurrentTracingContext();
+                                                                                    .getCurrentExecutionContext()));
+      profilingService.getTracingService().deleteCurrentExecutionContext();
     }
     started = false;
     runningThread = null;
