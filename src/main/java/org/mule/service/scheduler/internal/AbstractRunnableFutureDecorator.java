@@ -6,12 +6,13 @@
  */
 package org.mule.service.scheduler.internal;
 
-import static java.lang.System.currentTimeMillis;
-import static java.lang.System.nanoTime;
-import static java.lang.Thread.currentThread;
 import static org.mule.runtime.api.profiling.type.RuntimeProfilingEventTypes.SCHEDULING_TASK_EXECUTION;
 import static org.mule.runtime.api.profiling.type.RuntimeProfilingEventTypes.STARTING_TASK_EXECUTION;
 import static org.mule.runtime.api.profiling.type.RuntimeProfilingEventTypes.TASK_EXECUTED;
+import static java.lang.String.valueOf;
+import static java.lang.System.currentTimeMillis;
+import static java.lang.System.nanoTime;
+import static java.lang.Thread.currentThread;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.profiling.ProfilingService;
@@ -77,8 +78,8 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
       this.profilingService = profilingService;
       initialTaskTracingContext = profilingService.getTracingService().getCurrentTracingContext();
       profilingService.getProfilingDataProducer(SCHEDULING_TASK_EXECUTION)
-          .triggerProfilingEvent(new DefaultTaskSchedulingProfilingEventContext(currentTimeMillis(), String.valueOf(id),
-                                                                                Thread.currentThread().getName(),
+          .triggerProfilingEvent(new DefaultTaskSchedulingProfilingEventContext(currentTimeMillis(), valueOf(id),
+                                                                                currentThread().getName(),
                                                                                 initialTaskTracingContext));
     }
   }
@@ -133,8 +134,8 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
           profilingService.getTracingService().setCurrentTracingContext(initialTaskTracingContext);
         }
         profilingService.getProfilingDataProducer(STARTING_TASK_EXECUTION)
-            .triggerProfilingEvent(new DefaultTaskSchedulingProfilingEventContext(currentTimeMillis(), String.valueOf(id),
-                                                                                  Thread.currentThread().getName(),
+            .triggerProfilingEvent(new DefaultTaskSchedulingProfilingEventContext(currentTimeMillis(), valueOf(id),
+                                                                                  currentThread().getName(),
                                                                                   profilingService
                                                                                       .getTracingService()
                                                                                       .getCurrentTracingContext()));
@@ -178,8 +179,8 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   protected void wrapUp() throws Exception {
     if (profilingService != null) {
       profilingService.getProfilingDataProducer(TASK_EXECUTED)
-          .triggerProfilingEvent(new DefaultTaskSchedulingProfilingEventContext(currentTimeMillis(), String.valueOf(id),
-                                                                                Thread.currentThread().getName(), profilingService
+          .triggerProfilingEvent(new DefaultTaskSchedulingProfilingEventContext(currentTimeMillis(), valueOf(id),
+                                                                                currentThread().getName(), profilingService
                                                                                     .getTracingService()
                                                                                     .getCurrentTracingContext()));
       profilingService.getTracingService().deleteCurrentTracingContext();
