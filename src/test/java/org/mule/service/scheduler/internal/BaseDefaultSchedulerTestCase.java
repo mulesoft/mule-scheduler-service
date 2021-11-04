@@ -16,19 +16,17 @@ import static org.junit.Assert.assertThat;
 import static org.mockito.Answers.RETURNS_MOCKS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.when;
+import static org.mule.runtime.api.profiling.type.RuntimeProfilingEventTypes.SCHEDULING_TASK_EXECUTION;
+import static org.mule.runtime.api.profiling.type.RuntimeProfilingEventTypes.STARTING_TASK_EXECUTION;
+import static org.mule.runtime.api.profiling.type.RuntimeProfilingEventTypes.TASK_EXECUTED;
 import static org.mule.service.scheduler.ThreadType.CUSTOM;
 
-import org.mockito.Answers;
-import org.mockito.Mock;
 import org.mule.runtime.api.profiling.ProfilingService;
+import org.mule.runtime.api.profiling.tracing.TracingService;
 import org.mule.runtime.api.scheduler.Scheduler;
+import org.mule.runtime.core.internal.profiling.producer.TaskSchedulingProfilingDataProducer;
 import org.mule.tck.junit4.AbstractMuleTestCase;
-
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.rules.ExpectedException;
-import org.quartz.impl.StdSchedulerFactory;
 
 import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -39,6 +37,12 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.function.Consumer;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.rules.ExpectedException;
+import org.quartz.impl.StdSchedulerFactory;
 
 public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
 
@@ -62,11 +66,18 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
   protected ExecutorService sharedExecutor;
   protected ScheduledThreadPoolExecutor sharedScheduledExecutor;
   protected org.quartz.Scheduler sharedQuartzScheduler;
-  protected ProfilingService profilingService;
+
+  // Mule profiling mocks
+  protected ProfilingService profilingService = mock(ProfilingService.class, RETURNS_MOCKS);
+  private TracingService tracingService = mock(TracingService.class);
+  TaskSchedulingProfilingDataProducer schedulingTaskDataProducer = mock(TaskSchedulingProfilingDataProducer.class);
+  TaskSchedulingProfilingDataProducer executingTaskDataProducer = mock(TaskSchedulingProfilingDataProducer.class);
+  TaskSchedulingProfilingDataProducer executedTaskDataProducer = mock(TaskSchedulingProfilingDataProducer.class);
 
   @Before
   public void before() throws Exception {
-    profilingService = mock(ProfilingService.class, RETURNS_MOCKS);
+    initializeProfilingMocks();
+
     sharedExecutor =
         new ThreadPoolExecutor(1, 1, 0, SECONDS, sharedExecutorQueue, defaultThreadFactory());
     sharedScheduledExecutor = spy(new ScheduledThreadPoolExecutor(1, defaultThreadFactory()));
@@ -77,16 +88,6 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
     schedulerFactory.initialize(defaultQuartzProperties());
     sharedQuartzScheduler = spy(schedulerFactory.getScheduler());
     sharedQuartzScheduler.start();
-  }
-
-  private Properties defaultQuartzProperties() {
-    Properties factoryProperties = new Properties();
-
-    factoryProperties.setProperty("org.quartz.scheduler.instanceName", getClass().getSimpleName());
-    factoryProperties.setProperty("org.quartz.threadPool.class", "org.quartz.simpl.SimpleThreadPool");
-    factoryProperties.setProperty("org.quartz.threadPool.threadNamePrefix", getClass().getSimpleName() + "_qz");
-    factoryProperties.setProperty("org.quartz.threadPool.threadCount", "1");
-    return factoryProperties;
   }
 
   @After
@@ -119,6 +120,24 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
       currentThread().interrupt();
       return false;
     }
+  }
+
+  private void initializeProfilingMocks() {
+    when(profilingService.getProfilingDataProducer(SCHEDULING_TASK_EXECUTION)).thenReturn(schedulingTaskDataProducer);
+    when(profilingService.getProfilingDataProducer(STARTING_TASK_EXECUTION)).thenReturn(executingTaskDataProducer);
+    when(profilingService.getProfilingDataProducer(STARTING_TASK_EXECUTION)).thenReturn(executingTaskDataProducer);
+    when(profilingService.getProfilingDataProducer(TASK_EXECUTED)).thenReturn(executedTaskDataProducer);
+    when(profilingService.getTracingService()).thenReturn(tracingService);
+  }
+
+  private Properties defaultQuartzProperties() {
+    Properties factoryProperties = new Properties();
+
+    factoryProperties.setProperty("org.quartz.scheduler.instanceName", getClass().getSimpleName());
+    factoryProperties.setProperty("org.quartz.threadPool.class", "org.quartz.simpl.SimpleThreadPool");
+    factoryProperties.setProperty("org.quartz.threadPool.threadNamePrefix", getClass().getSimpleName() + "_qz");
+    factoryProperties.setProperty("org.quartz.threadPool.threadCount", "1");
+    return factoryProperties;
   }
 
 }

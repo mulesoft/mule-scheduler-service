@@ -15,13 +15,14 @@ import static org.mockito.Mockito.when;
 import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
 
 import org.mule.runtime.api.profiling.tracing.ExecutionContext;
-import org.mule.runtime.api.profiling.tracing.TracingService;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
 
 import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
 
 import org.junit.After;
 import org.junit.Before;
@@ -90,16 +91,38 @@ public class RunnableFutureDecoratorTestCase extends BaseDefaultSchedulerTestCas
     submitMdcGet();
   }
 
+  // TODO: Test and assert profiling events emission
+
+  // TODO: Modify RepeatableRunnableFutureDecorator accordingly
+
   @Test
-  public void tracingContextPropagation() throws ExecutionException, InterruptedException {
-    TracingService tracingService = mock(TracingService.class);
+  public void executionContextPropagation() {
     ExecutionContext currentExecutionContext = mock(ExecutionContext.class);
-    when(profilingService.getTracingService()).thenReturn(tracingService);
-    when(tracingService.getCurrentExecutionContext()).thenReturn(currentExecutionContext);
-    scheduler.submit(() -> {
-    }).get();
+    when(profilingService.getTracingService().getCurrentExecutionContext()).thenReturn(currentExecutionContext);
+    RunnableFutureDecorator<?> runnableFutureDecorator = getRunnableFutureDecorator(() -> null);
+    runnableFutureDecorator.run();
     verify(profilingService.getTracingService()).setCurrentExecutionContext(currentExecutionContext);
     verify(profilingService.getTracingService()).deleteCurrentExecutionContext();
+  }
+
+  @Test
+  public void failedTaskExecutionContextPropagation() {
+    ExecutionContext currentExecutionContext = mock(ExecutionContext.class);
+    when(profilingService.getTracingService().getCurrentExecutionContext()).thenReturn(currentExecutionContext);
+    RunnableFutureDecorator<?> runnableFutureDecorator = getRunnableFutureDecorator(() -> {
+      throw new RuntimeException("This exception should not alter the execution context propagation");
+    });
+    try {
+      runnableFutureDecorator.run();
+    } catch (RuntimeException e) {
+      verify(profilingService.getTracingService()).setCurrentExecutionContext(currentExecutionContext);
+      verify(profilingService.getTracingService()).deleteCurrentExecutionContext();
+    }
+  }
+
+  private <T> RunnableFutureDecorator<T> getRunnableFutureDecorator(Callable<T> task) {
+    return new RunnableFutureDecorator<T>(new FutureTask<T>(task), this.getClass().getClassLoader(), scheduler, "testTask", 1,
+                                          profilingService);
   }
 
   private void submitMdcPut()
