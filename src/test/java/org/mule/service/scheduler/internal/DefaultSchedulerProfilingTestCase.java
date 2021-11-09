@@ -13,7 +13,6 @@ import static org.mockito.Mockito.verify;
 
 
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
@@ -40,7 +39,7 @@ public class DefaultSchedulerProfilingTestCase extends BaseDefaultSchedulerTestC
   }
 
   @Test
-  public void defaultSchedulerSubmitProfiling() throws ExecutionException, InterruptedException {
+  public void defaultSchedulerSubmitProfiling() throws InterruptedException {
     CountDownLatch remainingTasks = new CountDownLatch(2);
     scheduler.submit(remainingTasks::countDown);
     // TASK_EXECUTED profiling event cannot be verified without a new submit.

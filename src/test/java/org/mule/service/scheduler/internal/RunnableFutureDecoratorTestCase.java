@@ -91,10 +91,6 @@ public class RunnableFutureDecoratorTestCase extends BaseDefaultSchedulerTestCas
     submitMdcGet();
   }
 
-  // TODO: Test and assert profiling events emission
-
-  // TODO: Modify RepeatableRunnableFutureDecorator accordingly
-
   @Test
   public void executionContextPropagation() {
     ExecutionContext currentExecutionContext = mock(ExecutionContext.class);

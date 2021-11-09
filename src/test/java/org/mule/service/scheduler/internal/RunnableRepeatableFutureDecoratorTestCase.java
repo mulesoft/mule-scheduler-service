@@ -15,9 +15,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import org.mule.runtime.api.profiling.tracing.ExecutionContext;
-import org.mule.runtime.api.profiling.tracing.TracingService;
 
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -84,15 +82,36 @@ public class RunnableRepeatableFutureDecoratorTestCase extends BaseDefaultSchedu
   }
 
   @Test
-  public void tracingContextPropagation() throws ExecutionException, InterruptedException {
-    TracingService tracingService = mock(TracingService.class);
+  public void executionContextPropagation() {
     ExecutionContext currentExecutionContext = mock(ExecutionContext.class);
-    when(profilingService.getTracingService()).thenReturn(tracingService);
-    when(tracingService.getCurrentExecutionContext()).thenReturn(currentExecutionContext);
-    scheduler.submit(() -> {
-    }).get();
+    when(profilingService.getTracingService().getCurrentExecutionContext()).thenReturn(currentExecutionContext);
+    RunnableRepeatableFutureDecorator<?> runnableFutureDecorator = getRunnableRepeatableFutureDecorator(() -> {
+    });
+    runnableFutureDecorator.run();
     verify(profilingService.getTracingService()).setCurrentExecutionContext(currentExecutionContext);
     verify(profilingService.getTracingService()).deleteCurrentExecutionContext();
+  }
+
+  @Test
+  public void failedTaskExecutionContextPropagation() {
+    ExecutionContext currentExecutionContext = mock(ExecutionContext.class);
+    when(profilingService.getTracingService().getCurrentExecutionContext()).thenReturn(currentExecutionContext);
+    RunnableRepeatableFutureDecorator<?> runnableFutureDecorator = getRunnableRepeatableFutureDecorator(() -> {
+      throw new RuntimeException("This exception should not alter the execution context propagation");
+    });
+    try {
+      runnableFutureDecorator.run();
+    } catch (RuntimeException e) {
+      verify(profilingService.getTracingService()).setCurrentExecutionContext(currentExecutionContext);
+      verify(profilingService.getTracingService()).deleteCurrentExecutionContext();
+    }
+  }
+
+  private RunnableRepeatableFutureDecorator<?> getRunnableRepeatableFutureDecorator(Runnable task) {
+    return new RunnableRepeatableFutureDecorator<>(() -> new FutureTask<>(task, null),
+                                                   task, objectRunnableRepeatableFutureDecorator -> {
+                                                   }, RunnableRepeatableFutureDecoratorTestCase.class.getClassLoader(),
+                                                   scheduler, "testTask", 1, profilingService);
   }
 
   private static class WrapUpException extends RuntimeException {
