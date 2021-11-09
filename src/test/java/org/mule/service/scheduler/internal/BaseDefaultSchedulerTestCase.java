@@ -59,6 +59,8 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
   protected static final Consumer<Scheduler> EMPTY_SHUTDOWN_CALLBACK = sched -> {
   };
 
+  protected boolean isProfilingServiceEnabled = false;
+
   @Rule
   public ExpectedException expected = ExpectedException.none();
 
@@ -110,7 +112,8 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
 
   protected ScheduledExecutorService createExecutor() {
     return new DefaultScheduler(BaseDefaultSchedulerTestCase.class.getSimpleName(), sharedExecutor, 1, sharedScheduledExecutor,
-                                sharedQuartzScheduler, CUSTOM, () -> 5000L, EMPTY_SHUTDOWN_CALLBACK, profilingService);
+                                sharedQuartzScheduler, CUSTOM, () -> 5000L, EMPTY_SHUTDOWN_CALLBACK,
+                                isProfilingServiceEnabled ? profilingService : null);
   }
 
   protected boolean awaitLatch(final CountDownLatch latch) {

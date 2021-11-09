@@ -6,19 +6,25 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static java.util.Arrays.asList;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyZeroInteractions;
 
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
+@RunWith(Parameterized.class)
 public class DefaultSchedulerProfilingTestCase extends BaseDefaultSchedulerTestCase {
 
   private DefaultScheduler scheduler;
@@ -28,6 +34,17 @@ public class DefaultSchedulerProfilingTestCase extends BaseDefaultSchedulerTestC
   public void before() throws Exception {
     super.before();
     scheduler = (DefaultScheduler) createExecutor();
+  }
+
+  @Parameterized.Parameters(name = "Profiling feature: {0}")
+  public static List<Object[]> parameters() {
+    return asList(
+                  new Object[] {Boolean.FALSE},
+                  new Object[] {Boolean.TRUE});
+  }
+
+  public DefaultSchedulerProfilingTestCase(Boolean isProfilingServiceEnabled) {
+    this.isProfilingServiceEnabled = isProfilingServiceEnabled;
   }
 
   @Override
@@ -66,9 +83,15 @@ public class DefaultSchedulerProfilingTestCase extends BaseDefaultSchedulerTestC
 
   private void assertProfiling(CountDownLatch remainingTasks) throws InterruptedException {
     remainingTasks.await();
-    verify(schedulingTaskDataProducer, times(2)).triggerProfilingEvent(any());
-    verify(executingTaskDataProducer, times(2)).triggerProfilingEvent(any());
-    // Since the scheduler thread pool is of size one, at least one of the tasks has been fully executed.
-    verify(executedTaskDataProducer, atLeastOnce()).triggerProfilingEvent(any());
+    if (isProfilingServiceEnabled) {
+      verify(schedulingTaskDataProducer, times(2)).triggerProfilingEvent(any());
+      verify(executingTaskDataProducer, times(2)).triggerProfilingEvent(any());
+      // Since the scheduler thread pool is of size one, at least one of the tasks has been fully executed.
+      verify(executedTaskDataProducer, atLeastOnce()).triggerProfilingEvent(any());
+    } else {
+      verifyZeroInteractions(schedulingTaskDataProducer);
+      verifyZeroInteractions(executingTaskDataProducer);
+      verifyZeroInteractions(executedTaskDataProducer);
+    }
   }
 }

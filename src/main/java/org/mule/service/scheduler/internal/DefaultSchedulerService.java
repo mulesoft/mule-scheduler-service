@@ -21,6 +21,8 @@ import static org.mule.runtime.core.api.config.MuleProperties.OBJECT_SCHEDULER_B
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.slf4j.LoggerFactory.getLogger;
 
+import org.mule.runtime.api.config.FeatureFlaggingService;
+import org.mule.runtime.api.config.MuleRuntimeFeature;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lifecycle.Startable;
@@ -90,56 +92,75 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   @Override
   public Scheduler cpuLightScheduler() {
-    return cpuLightScheduler(config(), getInstance(), null);
+    return cpuLightScheduler(config(), getInstance(), null, null);
   }
 
   @Override
   public Scheduler cpuLightScheduler(SchedulerConfig config) {
-    return cpuLightScheduler(config, getInstance(), null);
+    return cpuLightScheduler(config, getInstance(), null, null);
   }
 
   @Override
   public Scheduler cpuLightScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
                                      SchedulerPoolsConfigFactory poolsConfigFactory) {
-    return cpuLightScheduler(config, poolsConfigFactory, null);
+    return cpuLightScheduler(config, poolsConfigFactory, null, null);
   }
 
   @Inject
   public Scheduler cpuLightScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
-                                     SchedulerPoolsConfigFactory poolsConfigFactory, ProfilingService profilingService) {
+                                     SchedulerPoolsConfigFactory poolsConfigFactory,
+                                     FeatureFlaggingService featureFlaggingService, ProfilingService profilingService) {
     checkStarted();
     pollsReadLock.lock();
     try {
       return poolsByConfig.get(poolsConfigFactory)
-          .createCpuLightScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config), profilingService);
+          .createCpuLightScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config),
+                                   getProfilingService(featureFlaggingService, profilingService));
     } finally {
       pollsReadLock.unlock();
     }
   }
 
+  /**
+   * Returns the {@link ProfilingService} only if the profiling is enabled.
+   * 
+   * @param featureFlaggingService The {@link FeatureFlaggingService}
+   * @param profilingService       The {@link ProfilingService}
+   * @return The given {@link ProfilingService} or null if the profiling feature is disabled.
+   */
+  private ProfilingService getProfilingService(FeatureFlaggingService featureFlaggingService, ProfilingService profilingService) {
+    if (featureFlaggingService != null && featureFlaggingService.isEnabled(MuleRuntimeFeature.ENABLE_PROFILING_SERVICE)) {
+      return profilingService;
+    } else {
+      return null;
+    }
+  }
+
   @Override
   public Scheduler cpuIntensiveScheduler() {
-    return cpuIntensiveScheduler(config(), getInstance(), null);
+    return cpuIntensiveScheduler(config(), getInstance(), null, null);
   }
 
   @Override
   public Scheduler cpuIntensiveScheduler(SchedulerConfig config) {
-    return cpuIntensiveScheduler(config, getInstance(), null);
+    return cpuIntensiveScheduler(config, getInstance(), null, null);
   }
 
   @Override
   public Scheduler cpuIntensiveScheduler(SchedulerConfig config, SchedulerPoolsConfigFactory poolsConfigFactory) {
-    return cpuIntensiveScheduler(config, poolsConfigFactory, null);
+    return cpuIntensiveScheduler(config, poolsConfigFactory, null, null);
   }
 
   @Inject
   public Scheduler cpuIntensiveScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
-                                         SchedulerPoolsConfigFactory poolsConfigFactory, ProfilingService profilingService) {
+                                         SchedulerPoolsConfigFactory poolsConfigFactory,
+                                         FeatureFlaggingService featureFlaggingService, ProfilingService profilingService) {
     checkStarted();
     pollsReadLock.lock();
     try {
       return poolsByConfig.get(poolsConfigFactory)
-          .createCpuIntensiveScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config), profilingService);
+          .createCpuIntensiveScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config),
+                                       getProfilingService(featureFlaggingService, profilingService));
     } finally {
       pollsReadLock.unlock();
     }
@@ -147,28 +168,30 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   @Override
   public Scheduler ioScheduler() {
-    return ioScheduler(config(), getInstance(), null);
+    return ioScheduler(config(), getInstance(), null, null);
   }
 
   @Override
   public Scheduler ioScheduler(SchedulerConfig config) {
-    return ioScheduler(config, getInstance(), null);
+    return ioScheduler(config, getInstance(), null, null);
   }
 
   @Override
   public Scheduler ioScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
                                SchedulerPoolsConfigFactory poolsConfigFactory) {
-    return ioScheduler(config, poolsConfigFactory, null);
+    return ioScheduler(config, poolsConfigFactory, null, null);
   }
 
   @Inject
   public Scheduler ioScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
-                               SchedulerPoolsConfigFactory poolsConfigFactory, ProfilingService profilingService) {
+                               SchedulerPoolsConfigFactory poolsConfigFactory, FeatureFlaggingService featureFlaggingService,
+                               ProfilingService profilingService) {
     checkStarted();
     pollsReadLock.lock();
     try {
       return poolsByConfig.get(poolsConfigFactory)
-          .createIoScheduler(config, ioBoundWorkers(), resolveStopTimeout(config), profilingService);
+          .createIoScheduler(config, ioBoundWorkers(), resolveStopTimeout(config),
+                             getProfilingService(featureFlaggingService, profilingService));
     } finally {
       pollsReadLock.unlock();
     }
@@ -184,22 +207,23 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   @Override
   public Scheduler customScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config) {
-    return customScheduler(config, null);
+    return customScheduler(config, null, null);
   }
 
   @Override
   public Scheduler customScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config, int queueSize) {
-    return customScheduler(config, queueSize, null);
+    return customScheduler(config, queueSize, null, null);
   }
 
   @Inject
   public Scheduler customScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
-                                   ProfilingService profilingService) {
+                                   FeatureFlaggingService featureFlaggingService, ProfilingService profilingService) {
     checkStarted();
     pollsReadLock.lock();
     try {
       return poolsByConfig.get(getInstance())
-          .createCustomScheduler(config, CORES, resolveStopTimeout(config), profilingService);
+          .createCustomScheduler(config, CORES, resolveStopTimeout(config),
+                                 getProfilingService(featureFlaggingService, profilingService));
     } finally {
       pollsReadLock.unlock();
     }
@@ -207,12 +231,13 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   @Inject
   public Scheduler customScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config, int queueSize,
-                                   ProfilingService profilingService) {
+                                   FeatureFlaggingService featureFlaggingService, ProfilingService profilingService) {
     checkStarted();
     pollsReadLock.lock();
     try {
       return poolsByConfig.get(getInstance())
-          .createCustomScheduler(config, CORES, resolveStopTimeout(config), queueSize, profilingService);
+          .createCustomScheduler(config, CORES, resolveStopTimeout(config), queueSize,
+                                 getProfilingService(featureFlaggingService, profilingService));
     } finally {
       pollsReadLock.unlock();
     }
