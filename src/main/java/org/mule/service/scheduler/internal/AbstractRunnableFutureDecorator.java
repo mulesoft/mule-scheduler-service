@@ -74,7 +74,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     this.id = id;
     this.classLoader = classLoader;
     // At this point, the thread is the one that scheduled the task execution. We store its context to allow its propagation.
-    if (profilingService != null) {
+    if (shouldProfile(profilingService)) {
       this.profilingService = profilingService;
       initialExecutionContext = profilingService.getTracingService().getCurrentExecutionContext();
       profilingService.getProfilingDataProducer(SCHEDULING_TASK_EXECUTION)
@@ -129,7 +129,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     }
 
     try {
-      if (profilingService != null) {
+      if (shouldProfile(profilingService)) {
         if (initialExecutionContext != null) {
           profilingService.getTracingService().setCurrentExecutionContext(initialExecutionContext);
         }
@@ -177,7 +177,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   }
 
   protected void wrapUp() throws Exception {
-    if (profilingService != null) {
+    if (shouldProfile(profilingService)) {
       profilingService.getProfilingDataProducer(TASK_EXECUTED)
           .triggerProfilingEvent(new DefaultTaskSchedulingProfilingEventContext(currentTimeMillis(), valueOf(id),
                                                                                 currentThread().getName(), profilingService
@@ -219,4 +219,8 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   public abstract String getSchedulerName();
 
   public abstract String getThreadNameSuffix();
+
+  private boolean shouldProfile(ProfilingService profilingService) {
+    return profilingService != null;
+  }
 }

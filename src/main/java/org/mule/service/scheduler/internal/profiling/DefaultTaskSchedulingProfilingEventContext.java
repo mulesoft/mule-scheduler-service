@@ -9,6 +9,8 @@ package org.mule.service.scheduler.internal.profiling;
 import org.mule.runtime.api.profiling.tracing.ExecutionContext;
 import org.mule.runtime.api.profiling.type.context.TaskSchedulingProfilingEventContext;
 
+import java.util.Optional;
+
 public class DefaultTaskSchedulingProfilingEventContext implements TaskSchedulingProfilingEventContext {
 
   private final long triggerTimestamp;
@@ -30,8 +32,8 @@ public class DefaultTaskSchedulingProfilingEventContext implements TaskSchedulin
   }
 
   @Override
-  public ExecutionContext getTaskTracingContext() {
-    return executionContext;
+  public Optional<ExecutionContext> getTaskTracingContext() {
+    return Optional.ofNullable(executionContext);
   }
 
   @Override
