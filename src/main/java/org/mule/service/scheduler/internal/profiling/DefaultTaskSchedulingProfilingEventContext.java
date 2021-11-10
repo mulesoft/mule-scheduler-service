@@ -11,6 +11,8 @@ import org.mule.runtime.api.profiling.type.context.TaskSchedulingProfilingEventC
 
 import java.util.Optional;
 
+import static java.util.Optional.ofNullable;
+
 public class DefaultTaskSchedulingProfilingEventContext implements TaskSchedulingProfilingEventContext {
 
   private final long triggerTimestamp;
@@ -33,7 +35,7 @@ public class DefaultTaskSchedulingProfilingEventContext implements TaskSchedulin
 
   @Override
   public Optional<ExecutionContext> getTaskTracingContext() {
-    return Optional.ofNullable(executionContext);
+    return ofNullable(executionContext);
   }
 
   @Override
