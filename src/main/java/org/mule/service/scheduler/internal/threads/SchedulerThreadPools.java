@@ -43,7 +43,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.OptionalInt;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.BlockingQueue;
@@ -67,7 +66,6 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.quartz.SchedulerException;
-import org.quartz.impl.StdSchedulerFactory;
 import org.slf4j.Logger;
 
 /**
@@ -166,6 +164,7 @@ public abstract class SchedulerThreadPools {
   protected final Logger traceLogger;
 
   protected ScheduledThreadPoolExecutor scheduledExecutor;
+  private CronSchedulerHandler cronSchedulerHandler;
   protected org.quartz.Scheduler quartzScheduler;
 
   protected SchedulerThreadPools(String name,
@@ -215,12 +214,11 @@ public abstract class SchedulerThreadPools {
     scheduledExecutor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
     scheduledExecutor.setRemoveOnCancelPolicy(true);
 
-    StdSchedulerFactory schedulerFactory = new StdSchedulerFactory();
+    cronSchedulerHandler = new CronSchedulerHandler(parentGroup, threadPoolsConfig.getThreadNamePrefix());
     try {
-      schedulerFactory.initialize(defaultQuartzProperties());
-      quartzScheduler = schedulerFactory.getScheduler();
+      quartzScheduler = cronSchedulerHandler.getScheduler();
       quartzScheduler.start();
-    } catch (SchedulerException e) {
+    } catch (SchedulerException | InterruptedException e) {
       throw new LifecycleException(e, this);
     }
   }
@@ -235,20 +233,6 @@ public abstract class SchedulerThreadPools {
    */
   protected BlockingQueue<Runnable> createQueue(int size) {
     return size == 0 ? new SynchronousQueue<>() : new LinkedBlockingQueue<>(size);
-  }
-
-  /**
-   * @return the properties to provide the quartz scheduler
-   */
-  private Properties defaultQuartzProperties() {
-    Properties factoryProperties = new Properties();
-
-    factoryProperties.setProperty("org.quartz.scheduler.instanceName", threadPoolsConfig.getThreadNamePrefix());
-    factoryProperties.setProperty("org.quartz.threadPool.class", "org.quartz.simpl.SimpleThreadPool");
-    factoryProperties.setProperty("org.quartz.threadPool.threadNamePrefix", threadPoolsConfig.getThreadNamePrefix() + "_qz");
-    factoryProperties.setProperty("org.quartz.threadPool.threadCount", "1");
-    factoryProperties.setProperty("org.quartz.jobStore.misfireThreshold", "" + SECONDS.toMillis(5));
-    return factoryProperties;
   }
 
   protected abstract void shutdownPools() throws MuleException, InterruptedException;
