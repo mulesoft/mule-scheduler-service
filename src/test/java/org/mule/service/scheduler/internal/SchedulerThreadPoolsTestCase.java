@@ -191,7 +191,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Issue("MULE-19943")
   @Description("Tests that cron tasks dispatched to a busy executor are aborted, not blocking execution of tasks from " +
       "other executors.")
-  public void test() throws Exception {
+  public void executorsNotBlocked() throws Exception {
     final Scheduler firstScheduler =
         service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
     final Scheduler secondScheduler =
