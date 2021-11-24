@@ -18,7 +18,10 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.sameInstance;
+import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.greaterThan;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsCollectionContaining.hasItem;
 import static org.hamcrest.core.IsInstanceOf.instanceOf;
@@ -66,6 +69,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -181,6 +185,49 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
         assertThat(custom.shutdownNow(), not(hasItem(task)));
       }
     }).get();
+  }
+
+  @Test
+  @Issue("MULE-19943")
+  @Description("Tests that cron tasks dispatched to a busy executor are aborted, not blocking execution of tasks from " +
+      "other executors.")
+  public void test() throws Exception {
+    final Scheduler firstScheduler =
+        service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
+    final Scheduler secondScheduler =
+        service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
+
+    AtomicInteger executionsNumber = new AtomicInteger(0);
+    int minimumExpectedExecutionsNumber = 5;
+
+    Latch latch = new Latch();
+    ScheduledFuture<?> blockingTask = null;
+    ScheduledFuture<?> normalTask = null;
+    final String everySecond = "*/1 * * ? * *";
+
+    try {
+      blockingTask = firstScheduler.scheduleWithCronExpression(() -> awaitLatch(latch), everySecond);
+      normalTask = secondScheduler.scheduleWithCronExpression(executionsNumber::incrementAndGet, everySecond);
+
+      /*
+       * sleeps a predefined amount of time to ensure the non-blocking task is executed normally, despite one task being blocked
+       */
+      sleep(minimumExpectedExecutionsNumber * 1000);
+      latch.release();
+
+      assertThat(executionsNumber.get(), allOf(greaterThanOrEqualTo(minimumExpectedExecutionsNumber),
+                                               lessThanOrEqualTo(minimumExpectedExecutionsNumber + 1)));
+
+      blockingTask.get(10, SECONDS);
+      normalTask.get(10, SECONDS);
+    } finally {
+      if (blockingTask != null) {
+        blockingTask.cancel(false);
+      }
+      if (normalTask != null) {
+        normalTask.cancel(false);
+      }
+    }
   }
 
   @Test
