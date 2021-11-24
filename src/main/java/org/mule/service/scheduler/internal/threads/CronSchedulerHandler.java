@@ -48,7 +48,12 @@ public class CronSchedulerHandler {
     if (quartzScheduler == null) {
       synchronized (CronSchedulerHandler.class) {
         if (quartzScheduler == null) {
-          new Thread(threadGroup, schedulerCreator, "CronHandler").start();
+          /*
+           * We need to set the thread group of the quartz scheduler thread pool threads to a custom one. The only way to achieve
+           * it is to make them inherit the thread group of the thread creating the scheduler, thus we need to create the
+           * scheduler in a thread that belongs to that custom thread group.
+           */
+          new Thread(threadGroup, schedulerCreator, "CronSchedulerHandler").start();
           if (!latch.await(WAIT_TIMEOUT, MILLISECONDS)) {
             throw new RuntimeException("Quartz scheduler creation timed out");
           }
