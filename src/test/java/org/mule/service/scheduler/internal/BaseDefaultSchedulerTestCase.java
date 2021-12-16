@@ -22,10 +22,11 @@ import static org.mule.runtime.api.profiling.type.RuntimeProfilingEventTypes.STA
 import static org.mule.runtime.api.profiling.type.RuntimeProfilingEventTypes.TASK_EXECUTED;
 import static org.mule.service.scheduler.ThreadType.CUSTOM;
 
+import org.mule.runtime.api.profiling.ProfilingDataProducer;
 import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.profiling.tracing.TracingService;
+import org.mule.runtime.api.profiling.type.context.TaskSchedulingProfilingEventContext;
 import org.mule.runtime.api.scheduler.Scheduler;
-import org.mule.runtime.core.internal.profiling.producer.TaskSchedulingProfilingDataProducer;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 
 import java.util.Properties;
@@ -56,7 +57,7 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
   protected static final Consumer<ScheduledExecutorService> SUBMIT_RESULT_RUNNABLE = exec -> exec.submit(EMPTY_RUNNABLE, 0);
   protected static final Consumer<ScheduledExecutorService> EXECUTE_EMPTY_RUNNABLE = exec -> exec.execute(EMPTY_RUNNABLE);
 
-  protected static final Consumer<Scheduler> EMPTY_SHUTDOWN_CALLBACK = sched -> {
+  protected static final Consumer<Scheduler> EMPTY_SHUTDOWN_CALLBACK = scheduler -> {
   };
 
   protected boolean isProfilingServiceEnabled = false;
@@ -70,11 +71,14 @@ public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
   protected org.quartz.Scheduler sharedQuartzScheduler;
 
   // Mule profiling mocks
-  protected ProfilingService profilingService = mock(ProfilingService.class, RETURNS_MOCKS);
-  private TracingService tracingService = mock(TracingService.class);
-  TaskSchedulingProfilingDataProducer schedulingTaskDataProducer = mock(TaskSchedulingProfilingDataProducer.class);
-  TaskSchedulingProfilingDataProducer executingTaskDataProducer = mock(TaskSchedulingProfilingDataProducer.class);
-  TaskSchedulingProfilingDataProducer executedTaskDataProducer = mock(TaskSchedulingProfilingDataProducer.class);
+  protected final ProfilingService profilingService = mock(ProfilingService.class, RETURNS_MOCKS);
+  private final TracingService tracingService = mock(TracingService.class);
+  protected final ProfilingDataProducer<TaskSchedulingProfilingEventContext, Object> schedulingTaskDataProducer =
+      mock(ProfilingDataProducer.class);
+  protected final ProfilingDataProducer<TaskSchedulingProfilingEventContext, Object> executingTaskDataProducer =
+      mock(ProfilingDataProducer.class);
+  protected final ProfilingDataProducer<TaskSchedulingProfilingEventContext, Object> executedTaskDataProducer =
+      mock(ProfilingDataProducer.class);
 
   @Before
   public void before() throws Exception {
