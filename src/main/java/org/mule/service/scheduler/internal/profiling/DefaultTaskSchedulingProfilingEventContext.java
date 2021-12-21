@@ -13,6 +13,9 @@ import java.util.Optional;
 
 import static java.util.Optional.ofNullable;
 
+/**
+ * Default {@link TaskSchedulingProfilingEventContext} implementation.
+ */
 public class DefaultTaskSchedulingProfilingEventContext implements TaskSchedulingProfilingEventContext {
 
   private final long triggerTimestamp;
