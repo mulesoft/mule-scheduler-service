@@ -30,6 +30,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lifecycle.LifecycleException;
+import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
@@ -289,10 +290,20 @@ public abstract class SchedulerThreadPools {
     }
   }
 
-  public abstract Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate,
-                                                    Supplier<Long> stopTimeout);
+  public Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate,
+                                           Supplier<Long> stopTimeout) {
+    return createCpuLightScheduler(config, parallelTasksEstimate, stopTimeout, null);
+  }
 
-  public abstract Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout);
+  public abstract Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate,
+                                                    Supplier<Long> stopTimeout, ProfilingService profilingService);
+
+  public Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
+    return createIoScheduler(config, workers, stopTimeout, null);
+  }
+
+  public abstract Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout,
+                                              ProfilingService profilingService);
 
   protected boolean addScheduler(List<Scheduler> activeSchedulers, Scheduler scheduler) {
     activeSchedulersWriteLock.lock();
@@ -303,7 +314,12 @@ public abstract class SchedulerThreadPools {
     }
   }
 
-  public abstract Scheduler createCpuIntensiveScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout);
+  public Scheduler createCpuIntensiveScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
+    return createCpuIntensiveScheduler(config, workers, stopTimeout, null);
+  }
+
+  public abstract Scheduler createCpuIntensiveScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout,
+                                                        ProfilingService profilingService);
 
   protected Consumer<Scheduler> shutdownCallback(List<Scheduler> activeSchedulers) {
     return schr -> {
@@ -331,21 +347,28 @@ public abstract class SchedulerThreadPools {
   }
 
   public Scheduler createCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
-    String threadsName = resolveCustomThreadsName(config);
-    return doCreateCustomScheduler(config, workers, stopTimeout, resolveCustomSchedulerName(config),
-                                   // SynchronousQueue may reject tasks early right after creation/finish of the previous task
-                                   createQueue(config.getMaxConcurrentTasks()),
-                                   threadsName);
+    return doCreateCustomScheduler(config, workers, stopTimeout, config.getMaxConcurrentTasks(), null);
+  }
+
+  public Scheduler createCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout,
+                                         ProfilingService profilingService) {
+    return doCreateCustomScheduler(config, workers, stopTimeout, config.getMaxConcurrentTasks(), profilingService);
   }
 
   public Scheduler createCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, int queueSize) {
-    String threadsName = resolveCustomThreadsName(config);
-    return doCreateCustomScheduler(config, workers, stopTimeout, resolveCustomSchedulerName(config),
-                                   createQueue(queueSize), threadsName);
+    return doCreateCustomScheduler(config, workers, stopTimeout, queueSize, null);
   }
 
-  private Scheduler doCreateCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, String schedulerName,
-                                            BlockingQueue<Runnable> workQueue, String threadsName) {
+  public Scheduler createCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout, int queueSize,
+                                         ProfilingService profilingService) {
+    return doCreateCustomScheduler(config, workers, stopTimeout, queueSize, profilingService);
+  }
+
+  private Scheduler doCreateCustomScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout,
+                                            int workQueueSize, ProfilingService profilingService) {
+    String schedulerName = resolveCustomSchedulerName(config);
+    String threadsName = resolveCustomThreadsName(config);
+    BlockingQueue<Runnable> workQueue = createQueue(workQueueSize);
     if (config.getMaxConcurrentTasks() == null) {
       throw new IllegalArgumentException(
                                          "Custom schedulers must define a thread pool size bi calling `config.withMaxConcurrentTasks()`");
@@ -364,7 +387,7 @@ public abstract class SchedulerThreadPools {
     final CustomScheduler customScheduler =
         new CustomScheduler(schedulerName, executor, customChildGroup, workers, scheduledExecutor, quartzScheduler,
                             getCustomSchedulerDestroyerExecutor(), CUSTOM, stopTimeout,
-                            shutdownCallback(activeCustomSchedulers).andThen(s -> executors.remove(executor)));
+                            shutdownCallback(activeCustomSchedulers).andThen(s -> executors.remove(executor)), profilingService);
     executors.add(executor);
     addScheduler(activeCustomSchedulers, customScheduler);
     return customScheduler;
@@ -511,9 +534,10 @@ public abstract class SchedulerThreadPools {
     private CustomScheduler(String name, ExecutorService executor, ThreadGroup threadGroup, int workers,
                             ScheduledExecutorService scheduledExecutor, org.quartz.Scheduler quartzScheduler,
                             ThreadPoolExecutor groupDestroyerExecutor,
-                            ThreadType threadsType, Supplier<Long> shutdownTimeoutMillis, Consumer<Scheduler> shutdownCallback) {
+                            ThreadType threadsType, Supplier<Long> shutdownTimeoutMillis, Consumer<Scheduler> shutdownCallback,
+                            ProfilingService profilingService) {
       super(name, executor, workers, scheduledExecutor, quartzScheduler, threadsType, shutdownTimeoutMillis,
-            shutdownCallback);
+            shutdownCallback, profilingService);
       this.executor = executor;
       this.threadGroup = threadGroup;
       this.groupDestroyerExecutor = groupDestroyerExecutor;

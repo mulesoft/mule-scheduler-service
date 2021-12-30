@@ -25,6 +25,7 @@ import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.lifecycle.Startable;
 import org.mule.runtime.api.lifecycle.Stoppable;
+import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
@@ -69,9 +70,9 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   private static final long DEFAULT_SHUTDOWN_TIMEOUT_MILLIS = 5000;
   private static final int CORES = getRuntime().availableProcessors();
 
-  private ReadWriteLock pollsLock = new ReentrantReadWriteLock();
-  private Lock pollsReadLock = pollsLock.readLock();
-  private Lock pollsWriteLock = pollsLock.writeLock();
+  private final ReadWriteLock pollsLock = new ReentrantReadWriteLock();
+  private final Lock pollsReadLock = pollsLock.readLock();
+  private final Lock pollsWriteLock = pollsLock.writeLock();
 
   private ContainerThreadPoolsConfig containerThreadPoolsConfig;
   private LoadingCache<SchedulerPoolsConfigFactory, SchedulerThreadPools> poolsByConfig;
@@ -79,7 +80,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   private ScheduledFuture<?> poolsMaintenanceTask;
   private ScheduledFuture<?> usageReportingTask;
   private volatile boolean started = false;
-  private LoadingCache<Thread, Boolean> cpuWorkCache = Caffeine.newBuilder().weakKeys()
+  private final LoadingCache<Thread, Boolean> cpuWorkCache = Caffeine.newBuilder().weakKeys()
       .build(t -> isCurrentThreadForCpuWork(getInstance()));
 
   @Override
@@ -89,25 +90,29 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   @Override
   public Scheduler cpuLightScheduler() {
-    checkStarted();
-    final SchedulerConfig config = config();
-    pollsReadLock.lock();
-    try {
-      return poolsByConfig.get(getInstance())
-          .createCpuLightScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
-    } finally {
-      pollsReadLock.unlock();
-    }
+    return cpuLightScheduler(config(), getInstance(), null);
   }
 
   @Override
-  public Scheduler ioScheduler() {
+  public Scheduler cpuLightScheduler(SchedulerConfig config) {
+    return cpuLightScheduler(config, getInstance(), null);
+  }
+
+  @Override
+  public Scheduler cpuLightScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
+                                     SchedulerPoolsConfigFactory poolsConfigFactory) {
+    return cpuLightScheduler(config, poolsConfigFactory, null);
+  }
+
+  @Inject
+  public Scheduler cpuLightScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
+                                     SchedulerPoolsConfigFactory poolsConfigFactory, ProfilingService profilingService) {
     checkStarted();
-    final SchedulerConfig config = config();
     pollsReadLock.lock();
     try {
-      return poolsByConfig.get(getInstance())
-          .createIoScheduler(config, ioBoundWorkers(), resolveStopTimeout(config));
+      return poolsByConfig.get(poolsConfigFactory)
+          .createCpuLightScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config),
+                                   profilingService);
     } finally {
       pollsReadLock.unlock();
     }
@@ -115,90 +120,58 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   @Override
   public Scheduler cpuIntensiveScheduler() {
-    checkStarted();
-    final SchedulerConfig config = config();
-    pollsReadLock.lock();
-    try {
-      return poolsByConfig.get(getInstance())
-          .createCpuIntensiveScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
-    } finally {
-      pollsReadLock.unlock();
-    }
-  }
-
-  @Override
-  public Scheduler cpuLightScheduler(SchedulerConfig config) {
-    checkStarted();
-    pollsReadLock.lock();
-    try {
-      return poolsByConfig.get(getInstance())
-          .createCpuLightScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
-    } finally {
-      pollsReadLock.unlock();
-    }
-  }
-
-  @Override
-  public Scheduler ioScheduler(SchedulerConfig config) {
-    checkStarted();
-    pollsReadLock.lock();
-    try {
-      return poolsByConfig.get(getInstance())
-          .createIoScheduler(config, ioBoundWorkers(), resolveStopTimeout(config));
-    } finally {
-      pollsReadLock.unlock();
-    }
+    return cpuIntensiveScheduler(config(), getInstance(), null);
   }
 
   @Override
   public Scheduler cpuIntensiveScheduler(SchedulerConfig config) {
-    checkStarted();
-    pollsReadLock.lock();
-    try {
-      return poolsByConfig.get(getInstance())
-          .createCpuIntensiveScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
-    } finally {
-      pollsReadLock.unlock();
-    }
+    return cpuIntensiveScheduler(config, getInstance(), null);
   }
 
   @Override
-  @Inject
-  public Scheduler cpuLightScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
-                                     SchedulerPoolsConfigFactory poolsConfigFactory) {
-    checkStarted();
-    pollsReadLock.lock();
-    try {
-      return poolsByConfig.get(poolsConfigFactory)
-          .createCpuLightScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
-    } finally {
-      pollsReadLock.unlock();
-    }
+  public Scheduler cpuIntensiveScheduler(SchedulerConfig config, SchedulerPoolsConfigFactory poolsConfigFactory) {
+    return cpuIntensiveScheduler(config, poolsConfigFactory, null);
   }
 
-  @Override
-  @Inject
-  public Scheduler ioScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
-                               SchedulerPoolsConfigFactory poolsConfigFactory) {
-    checkStarted();
-    pollsReadLock.lock();
-    try {
-      return poolsByConfig.get(poolsConfigFactory)
-          .createIoScheduler(config, ioBoundWorkers(), resolveStopTimeout(config));
-    } finally {
-      pollsReadLock.unlock();
-    }
-  }
-
-  @Override
   @Inject
   public Scheduler cpuIntensiveScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
-                                         SchedulerPoolsConfigFactory poolsConfigFactory) {
+                                         SchedulerPoolsConfigFactory poolsConfigFactory,
+                                         ProfilingService profilingService) {
     checkStarted();
     pollsReadLock.lock();
     try {
       return poolsByConfig.get(poolsConfigFactory)
-          .createCpuIntensiveScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config));
+          .createCpuIntensiveScheduler(config, cpuBoundWorkers(), resolveStopTimeout(config), profilingService);
+    } finally {
+      pollsReadLock.unlock();
+    }
+  }
+
+  @Override
+  public Scheduler ioScheduler() {
+    return ioScheduler(config(), getInstance(), null);
+  }
+
+  @Override
+  public Scheduler ioScheduler(SchedulerConfig config) {
+    return ioScheduler(config, getInstance(), null);
+  }
+
+  @Override
+  public Scheduler ioScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
+                               SchedulerPoolsConfigFactory poolsConfigFactory) {
+    return ioScheduler(config, poolsConfigFactory, null);
+  }
+
+  @Inject
+  public Scheduler ioScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
+                               SchedulerPoolsConfigFactory poolsConfigFactory,
+                               ProfilingService profilingService) {
+    checkStarted();
+    pollsReadLock.lock();
+    try {
+      return poolsByConfig.get(poolsConfigFactory)
+          .createIoScheduler(config, ioBoundWorkers(), resolveStopTimeout(config), profilingService);
     } finally {
       pollsReadLock.unlock();
     }
@@ -213,30 +186,41 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   }
 
   @Override
-  @Inject
   public Scheduler customScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config) {
+    return customScheduler(config, null);
+  }
+
+  @Override
+  public Scheduler customScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config, int queueSize) {
+    return customScheduler(config, queueSize, null);
+  }
+
+  @Inject
+  public Scheduler customScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config,
+                                   ProfilingService profilingService) {
     checkStarted();
     pollsReadLock.lock();
     try {
       return poolsByConfig.get(getInstance())
-          .createCustomScheduler(config, CORES, resolveStopTimeout(config));
+          .createCustomScheduler(config, CORES, resolveStopTimeout(config), profilingService);
     } finally {
       pollsReadLock.unlock();
     }
   }
 
-  @Override
   @Inject
-  public Scheduler customScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config, int queueSize) {
+  public Scheduler customScheduler(@Named(OBJECT_SCHEDULER_BASE_CONFIG) SchedulerConfig config, int queueSize,
+                                   ProfilingService profilingService) {
     checkStarted();
     pollsReadLock.lock();
     try {
       return poolsByConfig.get(getInstance())
-          .createCustomScheduler(config, CORES, resolveStopTimeout(config), queueSize);
+          .createCustomScheduler(config, CORES, resolveStopTimeout(config), queueSize, profilingService);
     } finally {
       pollsReadLock.unlock();
     }
   }
+
 
   private Supplier<Long> resolveStopTimeout(SchedulerConfig config) {
     return () -> config.getShutdownTimeoutMillis().get() != null ? config.getShutdownTimeoutMillis().get()

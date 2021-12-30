@@ -6,6 +6,7 @@
  */
 package org.mule.service.scheduler.internal;
 
+import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.service.scheduler.ThreadType;
 import org.mule.service.scheduler.internal.executor.ByCallerThrottlingPolicy;
@@ -45,9 +46,10 @@ public class ThrottledScheduler extends DefaultScheduler {
   public ThrottledScheduler(String name, ExecutorService executor, int parallelTasksEstimate,
                             ScheduledExecutorService scheduledExecutor, org.quartz.Scheduler quartzScheduler,
                             ThreadType threadsType, ByCallerThrottlingPolicy throttingPolicy,
-                            Supplier<Long> shutdownTimeoutMillis, Consumer<Scheduler> shutdownCallback) {
+                            Supplier<Long> shutdownTimeoutMillis, Consumer<Scheduler> shutdownCallback,
+                            ProfilingService profilingService) {
     super(name, executor, parallelTasksEstimate, scheduledExecutor, quartzScheduler, threadsType, shutdownTimeoutMillis,
-          shutdownCallback);
+          shutdownCallback, profilingService);
     thottlingPolicy = throttingPolicy;
   }
 

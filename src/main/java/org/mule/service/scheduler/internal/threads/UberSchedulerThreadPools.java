@@ -14,6 +14,7 @@ import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.mule.service.scheduler.ThreadType.IO;
 
 import org.mule.runtime.api.exception.MuleException;
+import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
@@ -89,12 +90,14 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
   }
 
   @Override
-  public Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate, Supplier<Long> stopTimeout) {
-    return createIoScheduler(config, parallelTasksEstimate, stopTimeout);
+  public Scheduler createCpuLightScheduler(SchedulerConfig config, int parallelTasksEstimate, Supplier<Long> stopTimeout,
+                                           ProfilingService profilingService) {
+    return createIoScheduler(config, parallelTasksEstimate, stopTimeout, profilingService);
   }
 
   @Override
-  public Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
+  public Scheduler createIoScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout,
+                                     ProfilingService profilingService) {
     validateCustomSchedulerOnlyConfigNotChanged(config);
     final String schedulerName = resolveSchedulerName(config, UBER_THREADS_NAME);
     Scheduler scheduler;
@@ -105,19 +108,20 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
                                                               new HashSet<>(asList(uberGroup, customWaitGroup)),
                                                               parentGroup,
                                                               traceLogger),
-                                 stopTimeout, shutdownCallback(activeSchedulers));
+                                 stopTimeout, shutdownCallback(activeSchedulers), profilingService);
     } else {
       scheduler = new DefaultScheduler(schedulerName, uberExecutor, workers,
                                        scheduledExecutor, quartzScheduler, IO,
-                                       stopTimeout, shutdownCallback(activeSchedulers));
+                                       stopTimeout, shutdownCallback(activeSchedulers), profilingService);
     }
     addScheduler(activeSchedulers, scheduler);
     return scheduler;
   }
 
   @Override
-  public Scheduler createCpuIntensiveScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout) {
-    return createIoScheduler(config, workers, stopTimeout);
+  public Scheduler createCpuIntensiveScheduler(SchedulerConfig config, int workers, Supplier<Long> stopTimeout,
+                                               ProfilingService profilingService) {
+    return createIoScheduler(config, workers, stopTimeout, profilingService);
   }
 
 
