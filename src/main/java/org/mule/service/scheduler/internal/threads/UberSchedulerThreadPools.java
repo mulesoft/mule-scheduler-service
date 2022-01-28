@@ -59,30 +59,30 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
   @Override
   protected void doStart(boolean preStartThreads) throws MuleException {
     // TODO (elrodro83) MULE-14203 Make IO thread pool have an optimal core size
-    uberExecutor = new ThreadPoolExecutor(threadPoolsConfig.getUberCorePoolSize().getAsInt(),
-                                          threadPoolsConfig.getUberMaxPoolSize().getAsInt(),
-                                          threadPoolsConfig.getUberKeepAlive().getAsLong(), MILLISECONDS,
-                                          // At first, it may seem that a SynchronousQueue is not the best option here since it
-                                          // may
-                                          // block the dispatching thread, which may be a CPU-light.
-                                          // However, the alternatives have some limitations that make them impractical:
-                                          //
-                                          // * Using a LinkedBlockingQueue causes the pool not to grow until the queue is full.
-                                          // This
-                                          // causes unwanted delays in the processing if the core size of the pool is small, or
-                                          // keeping too many idle threads if the core size is large.
-                                          //
-                                          // * Using a custom SynchronizedQueue + RejectedExectuionHandler
-                                          // (https://gist.github.com/elrodro83/96e1ee470237a57fb06376a7e4b04f2b) that addresses
-                                          // the
-                                          // limitations of the other 2 approaches, an improvement is seen in the dispatching of
-                                          // the
-                                          // tasks, but at the cost of a slower task taking, which slows down the processing so
-                                          // much
-                                          // that it greatly outweights the gain in the dispatcher.
-                                          createQueue(threadPoolsConfig.getUberQueueSize().getAsInt()),
-                                          new SchedulerThreadFactory(uberGroup),
-                                          byCallerThreadGroupPolicy.apply(uberGroup.getName()));
+    uberExecutor = createExecutor(threadPoolsConfig.getUberCorePoolSize().getAsInt(),
+                                  threadPoolsConfig.getUberMaxPoolSize().getAsInt(),
+                                  threadPoolsConfig.getUberKeepAlive().getAsLong(), MILLISECONDS,
+                                  // At first, it may seem that a SynchronousQueue is not the best option here since it
+                                  // may
+                                  // block the dispatching thread, which may be a CPU-light.
+                                  // However, the alternatives have some limitations that make them impractical:
+                                  //
+                                  // * Using a LinkedBlockingQueue causes the pool not to grow until the queue is full.
+                                  // This
+                                  // causes unwanted delays in the processing if the core size of the pool is small, or
+                                  // keeping too many idle threads if the core size is large.
+                                  //
+                                  // * Using a custom SynchronizedQueue + RejectedExectuionHandler
+                                  // (https://gist.github.com/elrodro83/96e1ee470237a57fb06376a7e4b04f2b) that addresses
+                                  // the
+                                  // limitations of the other 2 approaches, an improvement is seen in the dispatching of
+                                  // the
+                                  // tasks, but at the cost of a slower task taking, which slows down the processing so
+                                  // much
+                                  // that it greatly outweights the gain in the dispatcher.
+                                  createQueue(threadPoolsConfig.getUberQueueSize().getAsInt()),
+                                  new SchedulerThreadFactory(uberGroup),
+                                  byCallerThreadGroupPolicy.apply(uberGroup.getName()));
 
     if (preStartThreads) {
       prestartCoreThreads(uberExecutor, threadPoolsConfig.getUberCorePoolSize().getAsInt());

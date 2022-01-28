@@ -74,39 +74,39 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
   @Override
   protected void doStart(boolean preStartThreads) throws MuleException {
     cpuLightExecutor =
-        new ThreadPoolExecutor(threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
-                               threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
-                               0, SECONDS,
-                               createQueue(threadPoolsConfig.getCpuLightQueueSize().getAsInt()),
-                               new SchedulerThreadFactory(cpuLightGroup),
-                               byCallerThreadGroupPolicy.apply(cpuLightGroup.getName()));
+        createExecutor(threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
+                       threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
+                       0, SECONDS,
+                       createQueue(threadPoolsConfig.getCpuLightQueueSize().getAsInt()),
+                       new SchedulerThreadFactory(cpuLightGroup),
+                       byCallerThreadGroupPolicy.apply(cpuLightGroup.getName()));
 
     // TODO (elrodro83) MULE-14203 Make IO thread pool have an optimal core size
-    ioExecutor = new ThreadPoolExecutor(threadPoolsConfig.getIoCorePoolSize().getAsInt(),
-                                        threadPoolsConfig.getIoMaxPoolSize().getAsInt(),
-                                        threadPoolsConfig.getIoKeepAlive().getAsLong(), MILLISECONDS,
-                                        // At first, it may seem that a SynchronousQueue is not the best option here since it may
-                                        // block the dispatching thread, which may be a CPU-light.
-                                        // However, the alternatives have some limitations that make them impractical:
-                                        //
-                                        // * Using a LinkedBlockingQueue causes the pool not to grow until the queue is full. This
-                                        // causes unwanted delays in the processing if the core size of the pool is small, or
-                                        // keeping too many idle threads if the core size is large.
-                                        //
-                                        // * Using a custom SynchronizedQueue + RejectedExectuionHandler
-                                        // (https://gist.github.com/elrodro83/96e1ee470237a57fb06376a7e4b04f2b) that addresses the
-                                        // limitations of the other 2 approaches, an improvement is seen in the dispatching of the
-                                        // tasks, but at the cost of a slower task taking, which slows down the processing so much
-                                        // that it greatly outweights the gain in the dispatcher.
-                                        createQueue(threadPoolsConfig.getIoQueueSize().getAsInt()),
-                                        new SchedulerThreadFactory(ioGroup),
-                                        byCallerThreadGroupPolicy.apply(ioGroup.getName()));
+    ioExecutor = createExecutor(threadPoolsConfig.getIoCorePoolSize().getAsInt(),
+                                threadPoolsConfig.getIoMaxPoolSize().getAsInt(),
+                                threadPoolsConfig.getIoKeepAlive().getAsLong(), MILLISECONDS,
+                                // At first, it may seem that a SynchronousQueue is not the best option here since it may
+                                // block the dispatching thread, which may be a CPU-light.
+                                // However, the alternatives have some limitations that make them impractical:
+                                //
+                                // * Using a LinkedBlockingQueue causes the pool not to grow until the queue is full. This
+                                // causes unwanted delays in the processing if the core size of the pool is small, or
+                                // keeping too many idle threads if the core size is large.
+                                //
+                                // * Using a custom SynchronizedQueue + RejectedExectuionHandler
+                                // (https://gist.github.com/elrodro83/96e1ee470237a57fb06376a7e4b04f2b) that addresses the
+                                // limitations of the other 2 approaches, an improvement is seen in the dispatching of the
+                                // tasks, but at the cost of a slower task taking, which slows down the processing so much
+                                // that it greatly outweights the gain in the dispatcher.
+                                createQueue(threadPoolsConfig.getIoQueueSize().getAsInt()),
+                                new SchedulerThreadFactory(ioGroup),
+                                byCallerThreadGroupPolicy.apply(ioGroup.getName()));
     computationExecutor =
-        new ThreadPoolExecutor(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
-                               threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
-                               0, SECONDS, createQueue(threadPoolsConfig.getCpuIntensiveQueueSize().getAsInt()),
-                               new SchedulerThreadFactory(computationGroup),
-                               byCallerThreadGroupPolicy.apply(computationGroup.getName()));
+        createExecutor(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
+                       threadPoolsConfig.getCpuIntensivePoolSize().getAsInt(),
+                       0, SECONDS, createQueue(threadPoolsConfig.getCpuIntensiveQueueSize().getAsInt()),
+                       new SchedulerThreadFactory(computationGroup),
+                       byCallerThreadGroupPolicy.apply(computationGroup.getName()));
 
     if (preStartThreads) {
       prestartCoreThreads(cpuLightExecutor, threadPoolsConfig.getCpuLightPoolSize().getAsInt());
