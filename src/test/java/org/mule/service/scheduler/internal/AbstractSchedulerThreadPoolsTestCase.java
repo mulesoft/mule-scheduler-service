@@ -15,6 +15,7 @@ import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerPoolStrategy;
+import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 import org.mule.tck.junit4.AbstractMuleTestCase;
@@ -29,6 +30,7 @@ import static java.util.Arrays.asList;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
+import static org.mule.service.scheduler.internal.threads.SchedulerThreadPools.builder;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 @Feature(SCHEDULER_SERVICE)
@@ -44,7 +46,7 @@ public abstract class AbstractSchedulerThreadPoolsTestCase extends AbstractMuleT
   }
 
   protected SchedulerPoolStrategy strategy;
-  protected ContainerThreadPoolsConfig threadPoolsConfig;
+  protected SchedulerPoolsConfig threadPoolsConfig;
   protected SchedulerThreadPools service;
 
   protected long prestarCallbackSleepTime = 0L;
@@ -58,7 +60,7 @@ public abstract class AbstractSchedulerThreadPoolsTestCase extends AbstractMuleT
     prestarCallbackSleepTime = 0L;
     threadPoolsConfig = buildThreadPoolsConfig();
 
-    service = SchedulerThreadPools.builder(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig)
+    service = builder(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig)
         .setPreStartCallback(executor -> {
           try {
             sleep(prestarCallbackSleepTime);
