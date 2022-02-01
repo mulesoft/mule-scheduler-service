@@ -928,6 +928,50 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
+  @Issue("MULE-20072")
+  @Description("Tests that when a rejected task submitted from a custom pool is executed on the caller thread, the thread locals of the task are isolated from the caller's.")
+  public void customCallerRunsHasThreadLocalsIsolation() throws ExecutionException, InterruptedException {
+    Scheduler sourceScheduler = service
+        .createCustomScheduler(config().withMaxConcurrentTasks(1).withDirectRunCpuLightWhenTargetBusy(true), CORES, () -> 1000L);
+    Scheduler targetScheduler = service.createCpuLightScheduler(config(), CORES, () -> 1000L);
+    // Computes the maximum pool size regardless of the strategy.
+    int maxPoolSize = threadPoolsConfig.getCpuLightPoolSize().orElseGet(() -> threadPoolsConfig.getUberMaxPoolSize().getAsInt());
+    assertCallerRunsThreadLocalsIsolation(sourceScheduler, targetScheduler, maxPoolSize);
+  }
+
+  @Test
+  @Issue("MULE-20072")
+  @Description("Tests that when a rejected task submitted from a CPU Light pool is executed on the caller thread, the thread locals of the task are isolated from the caller's.")
+  public void cpuLightCallerRunsHasThreadLocalsIsolation() throws ExecutionException, InterruptedException {
+    Scheduler scheduler = service.createCpuLightScheduler(config(), CORES, () -> 1000L);
+    // Computes the maximum pool size regardless of the strategy.
+    int maxPoolSize = threadPoolsConfig.getCpuLightPoolSize().orElseGet(() -> threadPoolsConfig.getUberMaxPoolSize().getAsInt());
+    assertCallerRunsThreadLocalsIsolation(scheduler, maxPoolSize);
+  }
+
+  @Test
+  @Issue("MULE-20072")
+  @Description("Tests that when a rejected task submitted from a CPU Intensive pool is executed on the caller thread, the thread locals of the task are isolated from the caller's.")
+  public void cpuIntensiveCallerRunsHasThreadLocalsIsolation() throws ExecutionException, InterruptedException {
+    // Assumes Uber strategy, because on Dedicated, tasks submitted from a CPU Intensive pool to a busy pool are rejected.
+    assumeUberStrategy();
+
+    Scheduler scheduler = service.createCpuIntensiveScheduler(config(), CORES, () -> 1000L);
+    int maxPoolSize = threadPoolsConfig.getUberMaxPoolSize().getAsInt();
+    assertCallerRunsThreadLocalsIsolation(scheduler, maxPoolSize);
+  }
+
+  @Test
+  @Issue("MULE-20072")
+  @Description("Tests that when a rejected task submitted from an IO pool is executed on the caller thread, the thread locals of the task are isolated from the caller's.")
+  public void ioCallerRunsHasThreadLocalsIsolation() throws ExecutionException, InterruptedException {
+    Scheduler scheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
+    // Computes the maximum pool size regardless of the strategy.
+    int maxPoolSize = threadPoolsConfig.getIoMaxPoolSize().orElseGet(() -> threadPoolsConfig.getUberMaxPoolSize().getAsInt());
+    assertCallerRunsThreadLocalsIsolation(scheduler, maxPoolSize);
+  }
+
+  @Test
   @Description("Tests that periodic tasks scheduled to a busy Scheduler are skipped but the job continues executing.")
   public void rejectionPolicyScheduledPeriodic()
       throws MuleException, InterruptedException, ExecutionException, TimeoutException {
@@ -1174,6 +1218,58 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
                instanceOf(ThrottledScheduler.class));
   }
 
+  private void assertCallerRunsThreadLocalsIsolation(Scheduler scheduler, int maxPoolSize)
+      throws ExecutionException, InterruptedException {
+    assertCallerRunsThreadLocalsIsolation(scheduler, scheduler, maxPoolSize);
+  }
+
+  private void assertCallerRunsThreadLocalsIsolation(Scheduler sourceScheduler, Scheduler targetScheduler, int maxPoolSize)
+      throws InterruptedException, ExecutionException {
+    Latch outerLatch = new Latch();
+    Latch innerLatch = new Latch();
+
+    // Fill up the pool, leaving room for just one more task
+    for (int i = 0; i < maxPoolSize - 1; ++i) {
+      consumeThread(targetScheduler, outerLatch);
+    }
+
+    // If the target scheduler is different from the source scheduler, we need to fill it up completely
+    if (sourceScheduler != targetScheduler) {
+      consumeThread(targetScheduler, outerLatch);
+    }
+
+    AtomicReference<Thread> callerThread = new AtomicReference<>();
+    AtomicReference<Thread> executingThread = new AtomicReference<>();
+
+    // The outer task will use the remaining slot in the scheduler, causing it to be full when the inner is sent.
+    Future<Boolean> submitted = sourceScheduler.submit(() -> {
+      ThreadLocal<Integer> threadLocal = ThreadLocal.withInitial(() -> 1);
+      threadLocal.set(2);
+      callerThread.set(currentThread());
+
+      targetScheduler.submit(() -> {
+        assertThat(threadLocal.get(), is(1));
+        threadLocal.set(3);
+        assertThat(threadLocal.get(), is(3));
+        executingThread.set(currentThread());
+        innerLatch.countDown();
+      });
+
+      // If we are here it means the inner task has finished (the execution was on the same thread, and that is also asserted
+      // later).
+      // We check that the thread locals were not cleared.
+      assertThat(threadLocal.get(), is(2));
+
+      return awaitLatch(outerLatch);
+    });
+
+    // These are just control tests here, to ensure that the inner task was executed on the same thread as the outer.
+    assertThat(innerLatch.await(5, SECONDS), is(true));
+    outerLatch.countDown();
+    assertThat(submitted.get(), is(true));
+    assertThat(executingThread.get(), is(callerThread.get()));
+  }
+
   private Callable<Object> threadsConsumer(Scheduler targetScheduler, Latch latch) {
     return () -> {
       while (latch.getCount() > 0) {
@@ -1200,5 +1296,9 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
   private void assumeDedicatedStrategy() {
     assumeThat(strategy, is(DEDICATED));
+  }
+
+  private void assumeUberStrategy() {
+    assumeThat(strategy, is(UBER));
   }
 }
