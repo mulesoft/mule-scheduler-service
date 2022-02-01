@@ -6,8 +6,10 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static java.lang.Runtime.getRuntime;
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
+import static java.util.Arrays.asList;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -34,17 +36,22 @@ import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.core.api.util.IOUtils.toByteArray;
+import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
 import static org.mule.tck.probe.PollingProber.probe;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 import org.mule.runtime.api.exception.MuleException;
+import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerBusyException;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolStrategy;
 import org.mule.runtime.api.util.concurrent.Latch;
+import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
+import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 import org.mule.service.scheduler.internal.util.Delegator;
+import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
 
@@ -66,22 +73,71 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import org.junit.After;
+import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import org.junit.runners.Parameterized.Parameter;
+import org.junit.runners.Parameterized.Parameters;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Issue;
 
 @Feature(SCHEDULER_SERVICE)
-public class SchedulerThreadPoolsTestCase extends AbstractSchedulerThreadPoolsTestCase {
+@RunWith(Parameterized.class)
+public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
+
+  private static final int CORES = getRuntime().availableProcessors();
+  private static final long GC_POLLING_TIMEOUT = 10000;
+
+  @Parameters(name = "{0}")
+  public static List<SchedulerPoolStrategy> parameters() {
+    return asList(DEDICATED, UBER);
+  }
+
+  @Parameter
+  public SchedulerPoolStrategy strategy;
 
   @Rule
   public ExpectedException expected = none();
 
-  public SchedulerThreadPoolsTestCase(SchedulerPoolStrategy strategy) {
-    super(strategy);
+  private ContainerThreadPoolsConfig threadPoolsConfig;
+  private SchedulerThreadPools service;
+
+  private long prestarCallbackSleepTime = 0L;
+
+  @Before
+  public void before() throws MuleException {
+    threadPoolsConfig = loadThreadPoolsConfig();
+    threadPoolsConfig.setSchedulerPoolStrategy(strategy, true);
+
+    service = SchedulerThreadPools.builder(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig)
+        .setPreStartCallback(executor -> {
+          try {
+            sleep(prestarCallbackSleepTime);
+          } catch (InterruptedException e) {
+            currentThread().interrupt();
+            throw new MuleRuntimeException(e);
+          }
+        })
+        .build();
+
+    service.start();
+  }
+
+  @After
+  public void after() throws MuleException, InterruptedException {
+    if (service == null) {
+      return;
+    }
+    for (Scheduler scheduler : new ArrayList<>(service.getSchedulers())) {
+      scheduler.stop();
+    }
+    service.stop();
   }
 
   @Test
@@ -873,50 +929,46 @@ public class SchedulerThreadPoolsTestCase extends AbstractSchedulerThreadPoolsTe
 
   @Test
   @Issue("MULE-20072")
-  @Description("Tests that when a rejected task submitted from a custom pool is executed on the caller thread, the thread locals are not cleared after the task finishes but when the thread is released to the pool.")
-  public void customCallerRunsDoNotClearThreadLocals()
-      throws ExecutionException, NoSuchFieldException, InterruptedException, IllegalAccessException {
+  @Description("Tests that when a rejected task submitted from a custom pool is executed on the caller thread, the thread locals of the task are isolated from the caller's.")
+  public void customCallerRunsHasThreadLocalsIsolation() throws ExecutionException, InterruptedException {
     Scheduler sourceScheduler = service
         .createCustomScheduler(config().withMaxConcurrentTasks(1).withDirectRunCpuLightWhenTargetBusy(true), CORES, () -> 1000L);
     Scheduler targetScheduler = service.createCpuLightScheduler(config(), CORES, () -> 1000L);
     // Computes the maximum pool size regardless of the strategy.
     int maxPoolSize = threadPoolsConfig.getCpuLightPoolSize().orElseGet(() -> threadPoolsConfig.getUberMaxPoolSize().getAsInt());
-    assertCallerRunsDoNotClearThreadLocals(sourceScheduler, targetScheduler, maxPoolSize);
+    assertCallerRunsThreadLocalsIsolation(sourceScheduler, targetScheduler, maxPoolSize);
   }
 
   @Test
   @Issue("MULE-20072")
-  @Description("Tests that when a rejected task submitted from a CPU Light pool is executed on the caller thread, the thread locals are not cleared after the task finishes but when the thread is released to the pool.")
-  public void cpuLightCallerRunsDoNotClearThreadLocals()
-      throws ExecutionException, NoSuchFieldException, InterruptedException, IllegalAccessException {
+  @Description("Tests that when a rejected task submitted from a CPU Light pool is executed on the caller thread, the thread locals of the task are isolated from the caller's.")
+  public void cpuLightCallerRunsHasThreadLocalsIsolation() throws ExecutionException, InterruptedException {
     Scheduler scheduler = service.createCpuLightScheduler(config(), CORES, () -> 1000L);
     // Computes the maximum pool size regardless of the strategy.
     int maxPoolSize = threadPoolsConfig.getCpuLightPoolSize().orElseGet(() -> threadPoolsConfig.getUberMaxPoolSize().getAsInt());
-    assertCallerRunsDoNotClearThreadLocals(scheduler, maxPoolSize);
+    assertCallerRunsThreadLocalsIsolation(scheduler, maxPoolSize);
   }
 
   @Test
   @Issue("MULE-20072")
-  @Description("Tests that when a rejected task submitted from a CPU Intensive pool is executed on the caller thread, the thread locals are not cleared after the task finishes but when the thread is released to the pool.")
-  public void cpuIntensiveCallerRunsDoNotClearThreadLocals()
-      throws ExecutionException, NoSuchFieldException, InterruptedException, IllegalAccessException {
+  @Description("Tests that when a rejected task submitted from a CPU Intensive pool is executed on the caller thread, the thread locals of the task are isolated from the caller's.")
+  public void cpuIntensiveCallerRunsHasThreadLocalsIsolation() throws ExecutionException, InterruptedException {
     // Assumes Uber strategy, because on Dedicated, tasks submitted from a CPU Intensive pool to a busy pool are rejected.
     assumeUberStrategy();
 
     Scheduler scheduler = service.createCpuIntensiveScheduler(config(), CORES, () -> 1000L);
     int maxPoolSize = threadPoolsConfig.getUberMaxPoolSize().getAsInt();
-    assertCallerRunsDoNotClearThreadLocals(scheduler, maxPoolSize);
+    assertCallerRunsThreadLocalsIsolation(scheduler, maxPoolSize);
   }
 
   @Test
   @Issue("MULE-20072")
-  @Description("Tests that when a rejected task submitted from an IO pool is executed on the caller thread, the thread locals are not cleared after the task finishes but when the thread is released to the pool.")
-  public void ioCallerRunsDoNotClearThreadLocals()
-      throws ExecutionException, NoSuchFieldException, InterruptedException, IllegalAccessException {
+  @Description("Tests that when a rejected task submitted from an IO pool is executed on the caller thread, the thread locals of the task are isolated from the caller's.")
+  public void ioCallerRunsHasThreadLocalsIsolation() throws ExecutionException, InterruptedException {
     Scheduler scheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
     // Computes the maximum pool size regardless of the strategy.
     int maxPoolSize = threadPoolsConfig.getIoMaxPoolSize().orElseGet(() -> threadPoolsConfig.getUberMaxPoolSize().getAsInt());
-    assertCallerRunsDoNotClearThreadLocals(scheduler, maxPoolSize);
+    assertCallerRunsThreadLocalsIsolation(scheduler, maxPoolSize);
   }
 
   @Test
@@ -1166,12 +1218,12 @@ public class SchedulerThreadPoolsTestCase extends AbstractSchedulerThreadPoolsTe
                instanceOf(ThrottledScheduler.class));
   }
 
-  private void assertCallerRunsDoNotClearThreadLocals(Scheduler scheduler, int maxPoolSize)
-      throws ExecutionException, NoSuchFieldException, InterruptedException, IllegalAccessException {
-    assertCallerRunsDoNotClearThreadLocals(scheduler, scheduler, maxPoolSize);
+  private void assertCallerRunsThreadLocalsIsolation(Scheduler scheduler, int maxPoolSize)
+      throws ExecutionException, InterruptedException {
+    assertCallerRunsThreadLocalsIsolation(scheduler, scheduler, maxPoolSize);
   }
 
-  private void assertCallerRunsDoNotClearThreadLocals(Scheduler sourceScheduler, Scheduler targetScheduler, int maxPoolSize)
+  private void assertCallerRunsThreadLocalsIsolation(Scheduler sourceScheduler, Scheduler targetScheduler, int maxPoolSize)
       throws InterruptedException, ExecutionException {
     Latch outerLatch = new Latch();
     Latch innerLatch = new Latch();
@@ -1191,11 +1243,14 @@ public class SchedulerThreadPoolsTestCase extends AbstractSchedulerThreadPoolsTe
 
     // The outer task will use the remaining slot in the scheduler, causing it to be full when the inner is sent.
     Future<Boolean> submitted = sourceScheduler.submit(() -> {
-      ThreadLocal<Boolean> threadLocal = ThreadLocal.withInitial(() -> false);
-      threadLocal.set(true);
+      ThreadLocal<Integer> threadLocal = ThreadLocal.withInitial(() -> 1);
+      threadLocal.set(2);
       callerThread.set(currentThread());
 
       targetScheduler.submit(() -> {
+        assertThat(threadLocal.get(), is(1));
+        threadLocal.set(3);
+        assertThat(threadLocal.get(), is(3));
         executingThread.set(currentThread());
         innerLatch.countDown();
       });
@@ -1203,7 +1258,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractSchedulerThreadPoolsTe
       // If we are here it means the inner task has finished (the execution was on the same thread, and that is also asserted
       // later).
       // We check that the thread locals were not cleared.
-      assertThat(threadLocal.get(), is(true));
+      assertThat(threadLocal.get(), is(2));
 
       return awaitLatch(outerLatch);
     });

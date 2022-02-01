@@ -57,9 +57,7 @@ import java.util.concurrent.RejectedExecutionHandler;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -68,7 +66,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import org.mule.service.scheduler.internal.executor.ThreadLocalClearingThreadPoolExecutor;
 import org.quartz.SchedulerException;
 import org.slf4j.Logger;
 
@@ -239,38 +236,6 @@ public abstract class SchedulerThreadPools {
     return size == 0 ? new SynchronousQueue<>() : new LinkedBlockingQueue<>(size);
   }
 
-  /**
-   * Creates a new {@code ThreadPoolExecutor} with the given initial parameters.
-   *
-   * @param corePoolSize    the number of threads to keep in the pool, even if they are idle, unless
-   *                        {@code allowCoreThreadTimeOut} is set
-   * @param maximumPoolSize the maximum number of threads to allow in the pool
-   * @param keepAliveTime   when the number of threads is greater than the core, this is the maximum time that excess idle threads
-   *                        will wait for new tasks before terminating.
-   * @param unit            the time unit for the {@code keepAliveTime} argument
-   * @param workQueue       the queue to use for holding tasks before they are executed. This queue will hold only the
-   *                        {@code Runnable} tasks submitted by the {@code execute} method.
-   * @param threadFactory   the factory to use when the executor creates a new thread
-   * @param handler         the handler to use when execution is blocked because the thread bounds and queue capacities are
-   *                        reached
-   * @throws IllegalArgumentException if one of the following holds:<br>
-   *                                  {@code corePoolSize < 0}<br>
-   *                                  {@code keepAliveTime < 0}<br>
-   *                                  {@code maximumPoolSize <= 0}<br>
-   *                                  {@code maximumPoolSize < corePoolSize}
-   * @throws NullPointerException     if {@code workQueue} or {@code threadFactory} or {@code handler} is null
-   */
-  protected ThreadPoolExecutor createExecutor(int corePoolSize,
-                                              int maximumPoolSize,
-                                              long keepAliveTime,
-                                              TimeUnit unit,
-                                              BlockingQueue<Runnable> workQueue,
-                                              ThreadFactory threadFactory,
-                                              RejectedExecutionHandler handler) {
-    return new ThreadLocalClearingThreadPoolExecutor(corePoolSize, maximumPoolSize, keepAliveTime, unit, workQueue, threadFactory,
-                                                     handler);
-  }
-
   protected abstract void shutdownPools() throws MuleException, InterruptedException;
 
   public final void stop() throws MuleException, InterruptedException {
@@ -411,9 +376,9 @@ public abstract class SchedulerThreadPools {
 
     final ThreadGroup customChildGroup = new ThreadGroup(resolveThreadGroupForCustomScheduler(config), threadsName);
     final ThreadPoolExecutor executor =
-        createExecutor(config.getMaxConcurrentTasks(), config.getMaxConcurrentTasks(), 0L, MILLISECONDS, workQueue,
-                       new SchedulerThreadFactory(customChildGroup, "%s.%02d"),
-                       byCallerThreadGroupPolicy.apply(customChildGroup.getName()));
+        new ThreadPoolExecutor(config.getMaxConcurrentTasks(), config.getMaxConcurrentTasks(), 0L, MILLISECONDS, workQueue,
+                               new SchedulerThreadFactory(customChildGroup, "%s.%02d"),
+                               byCallerThreadGroupPolicy.apply(customChildGroup.getName()));
 
     prestartCoreThreads(executor, config.getMaxConcurrentTasks());
 

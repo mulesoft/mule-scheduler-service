@@ -16,9 +16,11 @@ import static java.lang.Thread.currentThread;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.profiling.ProfilingService;
+import org.mule.runtime.api.exception.MuleRuntimeException;
 import org.mule.runtime.api.profiling.tracing.ExecutionContext;
 import org.mule.service.scheduler.internal.profiling.DefaultTaskSchedulingProfilingEventContext;
 
+import java.lang.reflect.Field;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RunnableFuture;
 
@@ -38,6 +40,60 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
   private ClassLoader classLoader;
 
   private Thread runningThread;
+
+  /**
+   * The remembered value of the thread-locals before the execution of the task. We use this so the task can not interfere with
+   * the thread-locals of the caller thread for cases in which the task is executed on the same thread. Note that this can be null
+   * if there was nothing yet on the thread's thread-locals.
+   */
+  private Object previousThreadLocals;
+
+  /**
+   * Reference to the threadLocals field of the {@link Thread} class, this is necessary because it is not accessible by default.
+   */
+  private static final Field threadLocalsField;
+
+  static {
+    try {
+      // Grabs a reference to the threadLocals field and sets it as accessible using reflection.
+      threadLocalsField = Thread.class.getDeclaredField("threadLocals");
+      threadLocalsField.setAccessible(true);
+    } catch (NoSuchFieldException | SecurityException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * In order to provide thread-locals isolation for the current task in case it is executed on the same thread following a
+   * rejection policy, we remember the current reference and set the internal attribute to null to force re-creation as if it was
+   * a new thread.
+   *
+   * See also {@link #restorePreviousThreadLocals()}.
+   */
+  private void rememberAndClearCurrentThreadLocals() {
+    try {
+      // Remembers the reference to the current thread-locals map.
+      previousThreadLocals = threadLocalsField.get(currentThread());
+      // Clears the current thread-locals, so they can be recreated lazily by the current task.
+      threadLocalsField.set(currentThread(), null);
+    } catch (IllegalAccessException e) {
+      throw new MuleRuntimeException(e);
+    }
+  }
+
+  /**
+   * Restores the current thread's thread-locals to the value they had before {@link #rememberAndClearCurrentThreadLocals()}.
+   */
+  private void restorePreviousThreadLocals() {
+    try {
+      // By restoring the thread-locals map reference to the previous one, we are releasing all current thread-locals, so
+      // they can be reclaimed.
+      threadLocalsField.set(currentThread(), previousThreadLocals);
+      previousThreadLocals = null;
+    } catch (Exception e) {
+      throw new MuleRuntimeException(e);
+    }
+  }
 
   private final int id;
   private volatile boolean ranAtLeastOnce = false;
@@ -71,6 +127,8 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     }
     ranAtLeastOnce = true;
     started = true;
+
+    rememberAndClearCurrentThreadLocals();
 
     return startTime;
   }
@@ -166,6 +224,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     }
     started = false;
     runningThread = null;
+    restorePreviousThreadLocals();
   }
 
   /**
