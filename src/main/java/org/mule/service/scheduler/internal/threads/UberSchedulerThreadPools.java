@@ -84,7 +84,7 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
                                           new SchedulerThreadFactory(uberGroup),
                                           byCallerThreadGroupPolicy.apply(uberGroup.getName()));
 
-    preserveThreadOnErrorGroups = new HashSet<>(asList(uberGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
+    waitGroups = new HashSet<>(asList(uberGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
 
     if (preStartThreads) {
       prestartCoreThreads(uberExecutor, threadPoolsConfig.getUberCorePoolSize().getAsInt());
@@ -134,8 +134,6 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
 
   @Override
   protected ByCallerThreadGroupPolicy createThreadGroupPolicy(String schedulerName) {
-    final Set<ThreadGroup> waitGroups = new HashSet<>(asList(uberGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
-
     return new ByCallerThreadGroupPolicy(waitGroups,
                                          new HashSet<>(asList(customCallerRunsGroup, customCallerRunsAnsWaitGroup)),
                                          uberGroup, parentGroup, schedulerName, traceLogger);

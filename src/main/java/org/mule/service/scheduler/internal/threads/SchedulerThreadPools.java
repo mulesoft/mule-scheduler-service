@@ -157,7 +157,7 @@ public abstract class SchedulerThreadPools {
   protected final ThreadGroup customWaitGroup;
   protected final ThreadGroup customCallerRunsGroup;
   protected final ThreadGroup customCallerRunsAnsWaitGroup;
-  protected Set<ThreadGroup> preserveThreadOnErrorGroups;
+  protected Set<ThreadGroup> waitGroups;
   protected final Set<ThreadPoolExecutor> customSchedulersExecutors = new HashSet<>();
   protected final Function<String, RejectedExecutionHandler> byCallerThreadGroupPolicy;
   protected final Lock activeSchedulersReadLock = activeSchedulersLock.readLock();
@@ -523,20 +523,20 @@ public abstract class SchedulerThreadPools {
 
   public abstract boolean isCurrentThreadForCpuWork();
 
-  public boolean isCurrentThreadSwitchOnErrorRequired() {
+  public boolean isCurrentThreadInWaitGroup() {
     ThreadGroup currentThreadGroup = currentThread().getThreadGroup();
 
     if (currentThreadGroup != null) {
       while (currentThreadGroup.getParent() != null) {
-        if (preserveThreadOnErrorGroups.contains(currentThreadGroup)) {
-          return false;
+        if (waitGroups.contains(currentThreadGroup)) {
+          return true;
         } else {
           currentThreadGroup = currentThreadGroup.getParent();
         }
       }
     }
 
-    return true;
+    return false;
   }
 
   private static class CustomScheduler extends DefaultScheduler {

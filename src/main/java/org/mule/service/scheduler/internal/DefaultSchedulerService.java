@@ -82,8 +82,8 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   private volatile boolean started = false;
   private final LoadingCache<Thread, Boolean> cpuWorkCache = Caffeine.newBuilder().weakKeys()
       .build(t -> isCurrentThreadForCpuWork(getInstance()));
-  private final LoadingCache<Thread, Boolean> switchOnErrorCache = Caffeine.newBuilder().weakKeys()
-      .build(t -> isCurrentThreadSwitchOnErrorRequired(getInstance()));
+  private final LoadingCache<Thread, Boolean> waitGroupCache = Caffeine.newBuilder().weakKeys()
+      .build(t -> isCurrentThreadInWaitGroup(getInstance()));
 
   @Override
   public String getName() {
@@ -253,17 +253,17 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   }
 
   @Override
-  public boolean isCurrentThreadSwitchOnErrorRequired() {
-    return Boolean.TRUE.equals(switchOnErrorCache.get(currentThread()));
+  public boolean isCurrentThreadInWaitGroup() {
+    return Boolean.TRUE.equals(waitGroupCache.get(currentThread()));
   }
 
   @Override
   @Inject
-  public boolean isCurrentThreadSwitchOnErrorRequired(SchedulerPoolsConfigFactory poolsConfigFactory) {
+  public boolean isCurrentThreadInWaitGroup(SchedulerPoolsConfigFactory poolsConfigFactory) {
     checkStarted();
     pollsReadLock.lock();
     try {
-      return poolsByConfig.get(poolsConfigFactory).isCurrentThreadSwitchOnErrorRequired();
+      return poolsByConfig.get(poolsConfigFactory).isCurrentThreadInWaitGroup();
     } finally {
       pollsReadLock.unlock();
     }

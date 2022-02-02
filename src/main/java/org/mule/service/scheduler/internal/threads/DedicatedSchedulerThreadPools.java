@@ -108,7 +108,7 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
                                new SchedulerThreadFactory(computationGroup),
                                byCallerThreadGroupPolicy.apply(computationGroup.getName()));
 
-    preserveThreadOnErrorGroups = new HashSet<>(asList(ioGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
+    waitGroups = new HashSet<>(asList(ioGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
 
     if (preStartThreads) {
       prestartCoreThreads(cpuLightExecutor, threadPoolsConfig.getCpuLightPoolSize().getAsInt());
@@ -213,8 +213,6 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
 
   @Override
   protected ByCallerThreadGroupPolicy createThreadGroupPolicy(String schedulerName) {
-    final Set<ThreadGroup> waitGroups = new HashSet<>(asList(ioGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
-
     return new ByCallerThreadGroupPolicy(waitGroups,
                                          new HashSet<>(asList(cpuLightGroup,
                                                               computationGroup,
