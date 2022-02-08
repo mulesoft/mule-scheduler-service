@@ -73,6 +73,8 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
 
   @Override
   protected void doStart(boolean preStartThreads) throws MuleException {
+    waitGroups = new HashSet<>(asList(ioGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
+
     cpuLightExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
                                threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
@@ -107,8 +109,6 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
                                0, SECONDS, createQueue(threadPoolsConfig.getCpuIntensiveQueueSize().getAsInt()),
                                new SchedulerThreadFactory(computationGroup),
                                byCallerThreadGroupPolicy.apply(computationGroup.getName()));
-
-    waitGroups = new HashSet<>(asList(ioGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
 
     if (preStartThreads) {
       prestartCoreThreads(cpuLightExecutor, threadPoolsConfig.getCpuLightPoolSize().getAsInt());
