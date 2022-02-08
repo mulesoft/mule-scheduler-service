@@ -64,6 +64,8 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
   private final List<Scheduler> activeIoSchedulers = new ArrayList<>();
   private final List<Scheduler> activeCpuIntensiveSchedulers = new ArrayList<>();
 
+  private Set<ThreadGroup> waitGroups;
+
   public DedicatedSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig,
                                        boolean preStartThreads,
                                        Consumer<AbstractExecutorService> preStartCallback,
@@ -226,6 +228,11 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
   @Override
   protected ThreadPoolExecutor getCustomSchedulerDestroyerExecutor() {
     return ioExecutor;
+  }
+
+  @Override
+  protected Set<ThreadGroup> getWaitGroups() {
+    return waitGroups;
   }
 
   @Override

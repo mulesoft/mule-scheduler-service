@@ -49,6 +49,8 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
   private ThreadGroup uberGroup;
   private ThreadPoolExecutor uberExecutor;
 
+  private Set<ThreadGroup> waitGroups;
+
   public UberSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig,
                                   boolean preStartThreads,
                                   Consumer<AbstractExecutorService> preStartCallback,
@@ -142,6 +144,11 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
   @Override
   protected ThreadPoolExecutor getCustomSchedulerDestroyerExecutor() {
     return uberExecutor;
+  }
+
+  @Override
+  protected Set<ThreadGroup> getWaitGroups() {
+    return waitGroups;
   }
 
   @Override

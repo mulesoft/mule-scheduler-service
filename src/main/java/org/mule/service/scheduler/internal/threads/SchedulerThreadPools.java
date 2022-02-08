@@ -157,7 +157,6 @@ public abstract class SchedulerThreadPools {
   protected final ThreadGroup customWaitGroup;
   protected final ThreadGroup customCallerRunsGroup;
   protected final ThreadGroup customCallerRunsAnsWaitGroup;
-  protected Set<ThreadGroup> waitGroups;
   protected final Set<ThreadPoolExecutor> customSchedulersExecutors = new HashSet<>();
   protected final Function<String, RejectedExecutionHandler> byCallerThreadGroupPolicy;
   protected final Lock activeSchedulersReadLock = activeSchedulersLock.readLock();
@@ -521,10 +520,13 @@ public abstract class SchedulerThreadPools {
     return !ste.getClassName().contains("$Proxy");
   }
 
+  protected abstract Set<ThreadGroup> getWaitGroups();
+
   public abstract boolean isCurrentThreadForCpuWork();
 
   public boolean isCurrentThreadInWaitGroup() {
     ThreadGroup currentThreadGroup = currentThread().getThreadGroup();
+    Set<ThreadGroup> waitGroups = getWaitGroups();
 
     if (currentThreadGroup != null) {
       while (currentThreadGroup.getParent() != null) {
