@@ -6,6 +6,7 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static java.lang.Boolean.TRUE;
 import static java.lang.Long.getLong;
 import static java.lang.Runtime.getRuntime;
 import static java.lang.System.lineSeparator;
@@ -254,7 +255,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   @Override
   public boolean isCurrentThreadInWaitGroup() {
-    return Boolean.TRUE.equals(waitGroupCache.get(currentThread()));
+    return TRUE.equals(waitGroupCache.get(currentThread()));
   }
 
   @Override
