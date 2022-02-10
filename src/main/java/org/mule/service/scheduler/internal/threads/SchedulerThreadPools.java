@@ -520,7 +520,26 @@ public abstract class SchedulerThreadPools {
     return !ste.getClassName().contains("$Proxy");
   }
 
+  protected abstract Set<ThreadGroup> getWaitGroups();
+
   public abstract boolean isCurrentThreadForCpuWork();
+
+  public boolean isCurrentThreadInWaitGroup() {
+    ThreadGroup currentThreadGroup = currentThread().getThreadGroup();
+    Set<ThreadGroup> waitGroups = getWaitGroups();
+
+    if (currentThreadGroup != null) {
+      while (currentThreadGroup.getParent() != null) {
+        if (waitGroups.contains(currentThreadGroup)) {
+          return true;
+        } else {
+          currentThreadGroup = currentThreadGroup.getParent();
+        }
+      }
+    }
+
+    return false;
+  }
 
   private static class CustomScheduler extends DefaultScheduler {
 

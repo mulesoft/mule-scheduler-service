@@ -49,6 +49,8 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
   private ThreadGroup uberGroup;
   private ThreadPoolExecutor uberExecutor;
 
+  private Set<ThreadGroup> waitGroups;
+
   public UberSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig,
                                   boolean preStartThreads,
                                   Consumer<AbstractExecutorService> preStartCallback,
@@ -58,6 +60,8 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
 
   @Override
   protected void doStart(boolean preStartThreads) throws MuleException {
+    waitGroups = new HashSet<>(asList(uberGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
+
     // TODO (elrodro83) MULE-14203 Make IO thread pool have an optimal core size
     uberExecutor = new ThreadPoolExecutor(threadPoolsConfig.getUberCorePoolSize().getAsInt(),
                                           threadPoolsConfig.getUberMaxPoolSize().getAsInt(),
@@ -132,8 +136,6 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
 
   @Override
   protected ByCallerThreadGroupPolicy createThreadGroupPolicy(String schedulerName) {
-    final Set<ThreadGroup> waitGroups = new HashSet<>(asList(uberGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
-
     return new ByCallerThreadGroupPolicy(waitGroups,
                                          new HashSet<>(asList(customCallerRunsGroup, customCallerRunsAnsWaitGroup)),
                                          uberGroup, parentGroup, schedulerName, traceLogger);
@@ -142,6 +144,11 @@ class UberSchedulerThreadPools extends SchedulerThreadPools {
   @Override
   protected ThreadPoolExecutor getCustomSchedulerDestroyerExecutor() {
     return uberExecutor;
+  }
+
+  @Override
+  protected Set<ThreadGroup> getWaitGroups() {
+    return waitGroups;
   }
 
   @Override
