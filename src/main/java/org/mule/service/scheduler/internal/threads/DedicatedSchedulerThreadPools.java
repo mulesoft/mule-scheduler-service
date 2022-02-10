@@ -63,6 +63,8 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
   private final List<Scheduler> activeIoSchedulers = new ArrayList<>();
   private final List<Scheduler> activeCpuIntensiveSchedulers = new ArrayList<>();
 
+  private Set<ThreadGroup> waitGroups;
+
   public DedicatedSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig,
                                        boolean preStartThreads,
                                        Consumer<AbstractExecutorService> preStartCallback,
@@ -72,6 +74,8 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
 
   @Override
   protected void doStart(boolean preStartThreads) throws MuleException {
+    waitGroups = new HashSet<>(asList(ioGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
+
     cpuLightExecutor =
         new ThreadPoolExecutor(threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
                                threadPoolsConfig.getCpuLightPoolSize().getAsInt(),
@@ -207,8 +211,6 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
 
   @Override
   protected ByCallerThreadGroupPolicy createThreadGroupPolicy(String schedulerName) {
-    final Set<ThreadGroup> waitGroups = new HashSet<>(asList(ioGroup, customWaitGroup, customCallerRunsAnsWaitGroup));
-
     return new ByCallerThreadGroupPolicy(waitGroups,
                                          new HashSet<>(asList(cpuLightGroup,
                                                               computationGroup,
@@ -222,6 +224,11 @@ class DedicatedSchedulerThreadPools extends SchedulerThreadPools {
   @Override
   protected ThreadPoolExecutor getCustomSchedulerDestroyerExecutor() {
     return ioExecutor;
+  }
+
+  @Override
+  protected Set<ThreadGroup> getWaitGroups() {
+    return waitGroups;
   }
 
   @Override

@@ -6,6 +6,7 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static java.lang.Boolean.TRUE;
 import static java.lang.Long.getLong;
 import static java.lang.Runtime.getRuntime;
 import static java.lang.System.lineSeparator;
@@ -81,6 +82,8 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
   private volatile boolean started = false;
   private LoadingCache<Thread, Boolean> cpuWorkCache = Caffeine.newBuilder().weakKeys()
       .build(t -> isCurrentThreadForCpuWork(getInstance()));
+  private final LoadingCache<Thread, Boolean> waitGroupCache = Caffeine.newBuilder().weakKeys()
+      .build(t -> isCurrentThreadInWaitGroup(getInstance()));
 
   @Override
   public String getName() {
@@ -261,6 +264,23 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     pollsReadLock.lock();
     try {
       return poolsByConfig.get(poolsConfigFactory).isCurrentThreadForCpuWork();
+    } finally {
+      pollsReadLock.unlock();
+    }
+  }
+
+  @Override
+  public boolean isCurrentThreadInWaitGroup() {
+    return TRUE.equals(waitGroupCache.get(currentThread()));
+  }
+
+  @Override
+  @Inject
+  public boolean isCurrentThreadInWaitGroup(SchedulerPoolsConfigFactory poolsConfigFactory) {
+    checkStarted();
+    pollsReadLock.lock();
+    try {
+      return poolsByConfig.get(poolsConfigFactory).isCurrentThreadInWaitGroup();
     } finally {
       pollsReadLock.unlock();
     }
