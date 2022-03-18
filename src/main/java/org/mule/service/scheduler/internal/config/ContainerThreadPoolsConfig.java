@@ -22,6 +22,7 @@ import static java.lang.String.format;
 import static java.lang.System.getProperty;
 import static java.util.regex.Pattern.compile;
 
+import static org.apache.commons.lang3.StringUtils.normalizeSpace;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.DefaultMuleException;
@@ -260,7 +261,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
       return OptionalInt.empty();
     }
 
-    property = property.replaceAll(" ", "");
+    property = normalizeSpace(property);
     if (!POOLSIZE_PATTERN.matcher(property).matches()) {
       throw new DefaultMuleException(propName + ": Expression not valid");
     }
