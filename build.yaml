@@ -1,5 +1,5 @@
 upstreamProjects:
-  Mule-runtime/mule/master
+  Mule-runtime/mule/master-APRIL-2022
 mavenSettingsXmlId: mule-runtime-maven-settings-MuleSettings
 archiveArtifacts: "**/hs_*.log"
 projectType: runtime
