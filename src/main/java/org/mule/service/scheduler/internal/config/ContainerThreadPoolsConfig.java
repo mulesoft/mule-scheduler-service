@@ -6,13 +6,6 @@
  */
 package org.mule.service.scheduler.internal.config;
 
-import static java.io.File.separator;
-import static java.lang.Long.parseLong;
-import static java.lang.Math.max;
-import static java.lang.Runtime.getRuntime;
-import static java.lang.String.format;
-import static java.lang.System.getProperty;
-import static java.util.regex.Pattern.compile;
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
@@ -20,6 +13,16 @@ import static org.mule.runtime.core.api.config.MuleProperties.MULE_HOME_DIRECTOR
 import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
 import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
 import static org.mule.service.scheduler.ThreadType.IO;
+
+import static java.io.File.separator;
+import static java.lang.Long.parseLong;
+import static java.lang.Math.max;
+import static java.lang.Runtime.getRuntime;
+import static java.lang.String.format;
+import static java.lang.System.getProperty;
+import static java.util.regex.Pattern.compile;
+
+import static org.apache.commons.lang3.StringUtils.normalizeSpace;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.DefaultMuleException;
@@ -60,11 +63,11 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
   private static final Pattern MAX_MIN_PATTERN = compile("(max|min)");
   private static final String NUMBER_OR_VAR_REGEXP = "([0-9]+(\\.[0-9]+)?)|cores|mem";
   private static final String FORMULA_FUNCTION_PARAM =
-      "(" + NUMBER_OR_VAR_REGEXP + ")?(\\s*[-+\\/*\\(\\)]\\s*(" + NUMBER_OR_VAR_REGEXP + ")?)*";
+      "(" + NUMBER_OR_VAR_REGEXP + ")?([-+\\/*\\(\\)](" + NUMBER_OR_VAR_REGEXP + ")?)*";
   private static final Pattern POOLSIZE_PATTERN =
       compile("^" + FORMULA_FUNCTION_PARAM
-          + "|max\\s*\\(\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*,\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*\\)"
-          + "|min\\s*\\(\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*,\\s*(" + FORMULA_FUNCTION_PARAM + ")?\\s*\\)$");
+          + "|max\\((" + FORMULA_FUNCTION_PARAM + ")?,(" + FORMULA_FUNCTION_PARAM + ")?\\)"
+          + "|min\\((" + FORMULA_FUNCTION_PARAM + ")?,(" + FORMULA_FUNCTION_PARAM + ")?\\)$");
 
 
 
@@ -258,6 +261,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
       return OptionalInt.empty();
     }
 
+    property = normalizeSpace(property);
     if (!POOLSIZE_PATTERN.matcher(property).matches()) {
       throw new DefaultMuleException(propName + ": Expression not valid");
     }
