@@ -6,6 +6,16 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
+import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
+import static org.mule.runtime.core.api.util.IOUtils.toByteArray;
+import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
+import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
+import static org.mule.tck.probe.PollingProber.probe;
+import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
+
 import static java.lang.Runtime.getRuntime;
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
@@ -16,6 +26,7 @@ import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.ForkJoinPool.commonPool;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.sameInstance;
 import static org.hamcrest.Matchers.allOf;
@@ -31,15 +42,6 @@ import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeThat;
 import static org.junit.rules.ExpectedException.none;
 import static org.mockito.Mockito.mock;
-import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
-import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
-import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
-import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
-import static org.mule.runtime.core.api.util.IOUtils.toByteArray;
-import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
-import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
-import static org.mule.tck.probe.PollingProber.probe;
-import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
@@ -486,10 +488,57 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     scheduleExecutor.shutdownNow();
   }
 
-  private void scheduleTaskReferencingDelegatorPending(Executor scheduleExecutor, final Scheduler customScheduler,
+  @Test
+  @Issue("W-11356027")
+  @Description("Cancelling a recurrent task after it has run at least once does not keep references to the task")
+  public void repeatbleTaskCancellationAfterRunCausingLeak() throws Exception {
+    Scheduler customScheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
+
+    ClassLoader delegatorClassLoader = createDelegatorClassLoader();
+    PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
+
+    @SuppressWarnings("unchecked")
+    Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
+
+    final ExecutorService scheduleExecutor = newSingleThreadExecutor();
+    ScheduledFuture<?> scheduledTaskReferencingDelegatorPending =
+        scheduleTaskReferencingDelegatorPending(scheduleExecutor, customScheduler, delegator,
+                                                // first execution to run immediately
+                                                0,
+                                                // next execution to run in a while
+                                                1000).get();
+
+    delegator = null;
+    delegatorClassLoader = null;
+
+    // give time for the first execution to complete
+    sleep(DEFAULT_POLLING_INTERVAL);
+
+    // cancel the task
+    scheduledTaskReferencingDelegatorPending.cancel(false);
+    customScheduler.stop();
+
+    scheduledTaskReferencingDelegatorPending = null;
+    customScheduler = null;
+
+    // assert that no references remain after having cancelled the task
+    assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
+
+    scheduleExecutor.shutdownNow();
+  }
+
+  private Future<ScheduledFuture<?>> scheduleTaskReferencingDelegatorPending(ExecutorService scheduleExecutor,
+                                                                             final Scheduler customScheduler,
                                                        Consumer<Runnable> delegator) {
-    scheduleExecutor.execute(() -> customScheduler.scheduleWithFixedDelay(() -> delegator.accept(() -> {
-    }), 10000, 1, SECONDS));
+    return scheduleTaskReferencingDelegatorPending(scheduleExecutor, customScheduler, delegator, 10000, 1);
+  }
+
+  private Future<ScheduledFuture<?>> scheduleTaskReferencingDelegatorPending(ExecutorService scheduleExecutor,
+                                                                             final Scheduler customScheduler,
+                                                                             Consumer<Runnable> delegator, int initialDelay,
+                                                                             int delay) {
+    return scheduleExecutor.submit(() -> customScheduler.scheduleWithFixedDelay(() -> delegator.accept(() -> {
+    }), initialDelay, delay, SECONDS));
   }
 
   private ClassLoader createDelegatorClassLoader() {
