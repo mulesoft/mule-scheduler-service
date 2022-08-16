@@ -512,7 +512,9 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     delegatorClassLoader = null;
 
     // give time for the first execution to complete
-    sleep(DEFAULT_POLLING_INTERVAL);
+    sleep(DEFAULT_POLLING_INTERVAL / 2);
+    System.gc();
+    sleep(DEFAULT_POLLING_INTERVAL / 2);
 
     // cancel the task
     scheduledTaskReferencingDelegatorPending.cancel(false);
@@ -529,7 +531,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
   private Future<ScheduledFuture<?>> scheduleTaskReferencingDelegatorPending(ExecutorService scheduleExecutor,
                                                                              final Scheduler customScheduler,
-                                                       Consumer<Runnable> delegator) {
+                                                                             Consumer<Runnable> delegator) {
     return scheduleTaskReferencingDelegatorPending(scheduleExecutor, customScheduler, delegator, 10000, 1);
   }
 
@@ -573,7 +575,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
           System.gc();
           assertThat(clRef.isEnqueued(), is(true));
           return true;
-        }, "A hard reference is being mantained to the child ClassLoader."));
+        }, "A strong reference is being maintained to the ClassLoader child."));
   }
 
   @Test

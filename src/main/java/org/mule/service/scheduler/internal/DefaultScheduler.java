@@ -206,14 +206,16 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
 
       final RunnableFuture<?> task =
           new RunnableRepeatableFutureDecorator<>(() -> super.newTaskFor(command, null), command,
-                                                  t -> fixedDelayWrapUp(t, delay, unit), currentThread().getContextClassLoader(),
+                                                  t -> new SchedulerRejectionCallback(t, delay, unit, this),
+                                                  currentThread().getContextClassLoader(),
                                                   this, command.getClass().getName(), idGenerator.getAndIncrement(),
                                                   profilingService);
 
       // This synchronization is to avoid race conditions against #doShutdown or #fixedDelayWrapUp when processing the same task
       synchronized (task) {
         final ScheduledFutureDecorator<?> scheduled = new ScheduledFutureDecorator<>(scheduledExecutor
-            .schedule(schedulableTask(task, () -> fixedDelayWrapUp(task, delay, unit)), initialDelay, unit), task, true);
+            .schedule(schedulableTask(task, new SchedulerRejectionCallback(task, delay, unit, this)), initialDelay, unit), task,
+                                                                                     true);
 
         putTask(task, scheduled);
         return scheduled;
@@ -223,13 +225,35 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     }
   }
 
+  private static class SchedulerRejectionCallback implements Runnable {
+
+    private RunnableFuture<?> task;
+    private long delay;
+    private TimeUnit unit;
+    private DefaultScheduler scheduler;
+
+    public SchedulerRejectionCallback(RunnableFuture<?> task, long delay, TimeUnit unit, DefaultScheduler scheduler) {
+      this.task = task;
+      this.delay = delay;
+      this.unit = unit;
+      this.scheduler = scheduler;
+    }
+
+    @Override
+    public void run() {
+      this.scheduler.fixedDelayWrapUp(task, delay, unit);
+      this.scheduler = null;
+      this.task = null;
+    }
+  }
+
   private void fixedDelayWrapUp(RunnableFuture<?> task, long delay, TimeUnit unit) {
     // This synchronization is to avoid race conditions against #doShutdown or the schedule of the task when processing the same
     // task
     synchronized (task) {
       if (!task.isCancelled()) {
         final ScheduledFutureDecorator<?> scheduled = new ScheduledFutureDecorator<>(scheduledExecutor
-            .schedule(schedulableTask(task, () -> fixedDelayWrapUp(task, delay, unit)), delay, unit), task, true);
+            .schedule(schedulableTask(task, new SchedulerRejectionCallback(task, delay, unit, this)), delay, unit), task, true);
         scheduledTasks.replace(task, scheduled);
       } else {
         taskFinished(task);
