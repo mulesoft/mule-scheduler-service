@@ -573,7 +573,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
           System.gc();
           assertThat(clRef.isEnqueued(), is(true));
           return true;
-        }, "A hard reference is being mantained to the child ClassLoader."));
+        }, "A strong reference is being maintained to the ClassLoader child."));
   }
 
   @Test
