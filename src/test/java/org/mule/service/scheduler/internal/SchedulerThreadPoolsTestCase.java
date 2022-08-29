@@ -12,8 +12,10 @@ import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.core.api.util.IOUtils.toByteArray;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
+import static org.mule.tck.junit4.matcher.Eventually.eventually;
 import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
 import static org.mule.tck.probe.PollingProber.probe;
+import static org.mule.tck.util.CollectableReference.collectedByGc;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 import static java.lang.Runtime.getRuntime;
@@ -56,6 +58,7 @@ import org.mule.service.scheduler.internal.util.Delegator;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;
+import org.mule.tck.util.CollectableReference;
 
 import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
@@ -491,11 +494,11 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Test
   @Issue("W-11356027")
   @Description("Cancelling a recurrent task after it has run at least once does not keep references to the task")
-  public void repeatbleTaskCancellationAfterRunCausingLeak() throws Exception {
+  public void repeatableTaskCancellationAfterRunDoesNotCauseLeak() throws Exception {
     Scheduler customScheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
 
     ClassLoader delegatorClassLoader = createDelegatorClassLoader();
-    PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
+    CollectableReference<ClassLoader> collectableReference = new CollectableReference<>(delegatorClassLoader);
 
     @SuppressWarnings("unchecked")
     Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
@@ -522,7 +525,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     customScheduler = null;
 
     // assert that no references remain after having cancelled the task
-    assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
+    assertThat(collectableReference, is(eventually(collectedByGc())));
 
     scheduleExecutor.shutdownNow();
   }
