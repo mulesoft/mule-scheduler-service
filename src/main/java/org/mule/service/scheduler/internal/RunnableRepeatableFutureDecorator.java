@@ -28,8 +28,8 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
 
   private static final Logger logger = getLogger(RunnableRepeatableFutureDecorator.class);
 
-  private final Supplier<RunnableFuture<V>> taskSupplier;
-  private final Runnable command;
+  private Supplier<RunnableFuture<V>> taskSupplier;
+  private Runnable command;
   private final Consumer<RunnableRepeatableFutureDecorator<V>> wrapUpCallback;
 
   private final DefaultScheduler scheduler;
@@ -111,6 +111,8 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
       success = task.cancel(mayInterruptIfRunning);
     }
     scheduler.taskFinished(this);
+    this.command = null;
+    this.taskSupplier = null;
     return success;
   }
 
