@@ -47,11 +47,13 @@ import static org.mockito.Mockito.mock;
 
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.exception.MuleRuntimeException;
+import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerBusyException;
 import org.mule.runtime.api.scheduler.SchedulerConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolStrategy;
 import org.mule.runtime.api.util.concurrent.Latch;
+import org.mule.runtime.core.internal.profiling.DefaultProfilingService;
 import org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig;
 import org.mule.service.scheduler.internal.threads.SchedulerThreadPools;
 import org.mule.service.scheduler.internal.util.Delegator;
@@ -489,6 +491,34 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
 
     scheduleExecutor.shutdownNow();
+  }
+
+  @Test
+  @Issue("W-11580777")
+  @Description("The Scheduler does not keep a reference to a ProfilingService which could cause a DefaultMuleContext leak.")
+  public void schedulerDoesNotLeakProfilingServiceAfterShutdown() {
+    ProfilingService profilingService = new DefaultProfilingService();
+    Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L, profilingService);
+    CollectableReference<ProfilingService> collectableReference = new CollectableReference<>(profilingService);
+
+    profilingService = null;
+    scheduler.shutdown();
+
+    assertThat(collectableReference, is(eventually(collectedByGc())));
+  }
+
+  @Test
+  @Issue("W-11580777")
+  @Description("The Scheduler does not keep a reference to a ProfilingService which could cause a DefaultMuleContext leak.")
+  public void schedulerDoesNotLeakProfilingServiceAfterShutdownNow() {
+    ProfilingService profilingService = new DefaultProfilingService();
+    Scheduler scheduler = service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L, profilingService);
+    CollectableReference<ProfilingService> collectableReference = new CollectableReference<>(profilingService);
+
+    profilingService = null;
+    scheduler.shutdownNow();
+
+    assertThat(collectableReference, is(eventually(collectedByGc())));
   }
 
   @Test

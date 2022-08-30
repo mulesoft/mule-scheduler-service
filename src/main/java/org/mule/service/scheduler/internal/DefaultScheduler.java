@@ -94,7 +94,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   private final ReadWriteLock shutdownLock = new ReentrantReadWriteLock();
   private volatile boolean shutdown = false;
 
-  private final ProfilingService profilingService;
+  private ProfilingService profilingService;
 
   protected Supplier<Long> shutdownTimeoutMillis;
 
@@ -342,6 +342,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
         }
       }
     }
+    this.profilingService = null;
   }
 
   @Override
@@ -371,7 +372,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
       }
     }
     scheduledTasks.clear();
-
+    this.profilingService = null;
     return tasks;
   }
 
