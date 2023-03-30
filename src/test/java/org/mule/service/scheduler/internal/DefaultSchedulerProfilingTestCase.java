@@ -7,12 +7,12 @@
 package org.mule.service.scheduler.internal;
 
 import static java.util.Arrays.asList;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyZeroInteractions;
-
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -89,9 +89,9 @@ public class DefaultSchedulerProfilingTestCase extends BaseDefaultSchedulerTestC
       // Since the scheduler thread pool is of size one, at least one of the tasks has been fully executed.
       verify(executedTaskDataProducer, atLeastOnce()).triggerProfilingEvent(any());
     } else {
-      verifyZeroInteractions(schedulingTaskDataProducer);
-      verifyZeroInteractions(executingTaskDataProducer);
-      verifyZeroInteractions(executedTaskDataProducer);
+      verifyNoInteractions(schedulingTaskDataProducer);
+      verifyNoInteractions(executingTaskDataProducer);
+      verifyNoInteractions(executedTaskDataProducer);
     }
   }
 }
