@@ -1,5 +1,4 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
         <groupId>org.mule.services</groupId>
         <artifactId>mule-core-services-parent</artifactId>
@@ -7,7 +6,7 @@
         <relativePath></relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-    
+
     <artifactId>mule-service-scheduler</artifactId>
     <packaging>mule-service</packaging>
     <version>1.6.0-SNAPSHOT</version>
@@ -21,7 +20,7 @@
         <caffeineVersion>2.9.0</caffeineVersion>
         <c3p0Version>0.9.5.5</c3p0Version>
         <graaljsVersion>21.0.0.2</graaljsVersion>
-        
+
         <mockitoVersion>4.11.0</mockitoVersion>
     </properties>
 
@@ -41,7 +40,7 @@
             </plugin>
         </plugins>
     </build>
-    
+
     <dependencyManagement>
         <dependencies>
             <dependency>
@@ -57,8 +56,8 @@
                 <scope>test</scope>
             </dependency>
         </dependencies>
-    </dependencyManagement>   
-    
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
@@ -110,9 +109,8 @@
 
         <dependency>
             <groupId>org.mule.runtime</groupId>
-            <artifactId>mule-core</artifactId>
+            <artifactId>mule-profiling-api</artifactId>
             <scope>provided</scope>
-            <version>${mule.version}</version>
         </dependency>
 
         <dependency>
@@ -134,6 +132,12 @@
         <dependency>
             <groupId>org.mule.tests</groupId>
             <artifactId>mule-tests-allure</artifactId>
+            <version>${mule.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mule.runtime</groupId>
+            <artifactId>mule-core</artifactId>
             <version>${mule.version}</version>
             <scope>test</scope>
         </dependency>
