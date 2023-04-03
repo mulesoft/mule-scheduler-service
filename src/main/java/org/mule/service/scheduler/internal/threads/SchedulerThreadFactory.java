@@ -9,7 +9,6 @@ package org.mule.service.scheduler.internal.threads;
 import static java.lang.String.format;
 import static java.security.AccessController.doPrivileged;
 import static java.security.AccessController.getContext;
-import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 
 import java.security.AccessControlContext;
 import java.security.PrivilegedAction;
@@ -41,15 +40,25 @@ public class SchedulerThreadFactory implements java.util.concurrent.ThreadFactor
 
   @Override
   public Thread newThread(Runnable runnable) {
-    return withContextClassLoader(this.getClass().getClassLoader(), () -> {
+    ClassLoader classLoader = this.getClass().getClassLoader();
+    final Thread currentThread = Thread.currentThread();
+    final ClassLoader currentClassLoader = currentThread.getContextClassLoader();
+    if (currentClassLoader != classLoader) {
+      currentThread.setContextClassLoader(classLoader);
+    }
+
+    try {
       // Avoid the created thread to inherit the security context of the caller thread's stack.
       // If the thread creation is triggered by a deployable artifact classloader, a reference to it would be kept by the created
       // thread without this doPrivileged call.
       return doPrivileged((PrivilegedAction<Thread>) () -> new Thread(group, runnable, format(nameFormat, group.getName(),
                                                                                               counter.getAndIncrement())),
                           ACCESS_CONTROL_CTX);
-
-    });
+    } finally {
+      if (currentClassLoader != classLoader) {
+        currentThread.setContextClassLoader(currentClassLoader);
+      }
+    }
   }
 
   public ThreadGroup getGroup() {

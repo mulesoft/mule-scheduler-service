@@ -9,8 +9,6 @@ package org.mule.service.scheduler.internal;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
-import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
-import static org.mule.runtime.core.api.util.IOUtils.toByteArray;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 import static org.mule.tck.junit4.matcher.Eventually.eventually;
 import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
@@ -29,6 +27,7 @@ import static java.util.concurrent.ForkJoinPool.commonPool;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import static org.apache.commons.io.IOUtils.toByteArray;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.sameInstance;
 import static org.hamcrest.Matchers.allOf;
@@ -317,7 +316,13 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
   public void scheduleToCustomWithClassLoader(final ClassLoader testClassLoader) throws InterruptedException, ExecutionException {
     final AtomicReference<Scheduler> scheduler = new AtomicReference<>();
-    withContextClassLoader(testClassLoader, () -> {
+
+    final Thread currentThread1 = Thread.currentThread();
+    final ClassLoader currentClassLoader = currentThread1.getContextClassLoader();
+    if (currentClassLoader != testClassLoader) {
+      currentThread1.setContextClassLoader(testClassLoader);
+    }
+    try {
       scheduler.set(service.createCustomScheduler(config().withMaxConcurrentTasks(1), 1, () -> 1000L));
 
       try {
@@ -327,7 +332,11 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
       } catch (InterruptedException | ExecutionException e) {
         throw new RuntimeException(e);
       }
-    });
+    } finally {
+      if (currentClassLoader != testClassLoader) {
+        currentThread1.setContextClassLoader(currentClassLoader);
+      }
+    }
 
     scheduler.get().submit(() -> {
       assertThat(currentThread().getContextClassLoader(), is(testClassLoader.getParent()));

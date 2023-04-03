@@ -6,6 +6,12 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static org.mule.runtime.api.artifact.RegistryKeys.OBJECT_SCHEDULER_BASE_CONFIG;
+import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
+import static org.mule.runtime.api.scheduler.SchedulerContainerPoolsConfig.getInstance;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
+import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
+
 import static java.lang.Boolean.TRUE;
 import static java.lang.Long.getLong;
 import static java.lang.Runtime.getRuntime;
@@ -15,11 +21,7 @@ import static java.util.Collections.unmodifiableList;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static java.util.stream.Collectors.toList;
-import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
-import static org.mule.runtime.api.scheduler.SchedulerContainerPoolsConfig.getInstance;
-import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
-import static org.mule.runtime.core.api.config.MuleProperties.OBJECT_SCHEDULER_BASE_CONFIG;
-import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
+
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.MuleException;
@@ -53,6 +55,7 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.RemovalListener;
+
 import org.slf4j.Logger;
 
 /**

@@ -6,6 +6,14 @@
  */
 package org.mule.service.scheduler.internal.config;
 
+import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
+import static org.mule.runtime.api.util.MuleSystemProperties.MULE_HOME_DIRECTORY_PROPERTY;
+import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
+import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
+import static org.mule.service.scheduler.ThreadType.IO;
+
 import static java.io.File.separator;
 import static java.lang.Long.parseLong;
 import static java.lang.Math.max;
@@ -13,20 +21,13 @@ import static java.lang.Runtime.getRuntime;
 import static java.lang.String.format;
 import static java.lang.System.getProperty;
 import static java.util.regex.Pattern.compile;
-import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
-import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
-import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
-import static org.mule.runtime.core.api.config.MuleProperties.MULE_HOME_DIRECTORY_PROPERTY;
-import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
-import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
-import static org.mule.service.scheduler.ThreadType.IO;
+
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.DefaultMuleException;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.SchedulerPoolStrategy;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
-import org.mule.runtime.core.api.config.ConfigurationException;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -165,8 +166,8 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     ScriptEngineManager manager = new ScriptEngineManager();
     ScriptEngine engine = manager.getEngineByName("js");
     if (engine == null) {
-      throw new ConfigurationException(
-                                       createStaticMessage("No 'js' script engine found. It is required to parse the config in 'conf/scheduler-pools.conf'"));
+      throw new DefaultMuleException(
+                                     createStaticMessage("No 'js' script engine found. It is required to parse the config in 'conf/scheduler-pools.conf'"));
     }
     engine.put("cores", CORES);
     engine.put("mem", MEM);
@@ -211,20 +212,20 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     return config;
   }
 
-  private static SchedulerPoolStrategy resolveSchedulerPoolStrategy(Properties properties) throws ConfigurationException {
+  private static SchedulerPoolStrategy resolveSchedulerPoolStrategy(Properties properties) throws DefaultMuleException {
     String strategyName = resolvePropertyValue(properties, STRATEGY_PROPERTY_NAME);
     if (strategyName == null) {
-      throw new ConfigurationException(
-                                       createStaticMessage(format("Property '%s' was not specified in file '%s'",
-                                                                  STRATEGY_PROPERTY_NAME, CONF_FILE_NAME)));
+      throw new DefaultMuleException(
+                                     createStaticMessage(format("Property '%s' was not specified in file '%s'",
+                                                                STRATEGY_PROPERTY_NAME, CONF_FILE_NAME)));
     }
 
     try {
       return SchedulerPoolStrategy.valueOf(strategyName.toUpperCase());
     } catch (IllegalArgumentException e) {
-      throw new ConfigurationException(createStaticMessage(
-                                                           format("There's no %s named '%s'",
-                                                                  SchedulerPoolStrategy.class.getSimpleName(), strategyName)));
+      throw new DefaultMuleException(createStaticMessage(
+                                                         format("There's no %s named '%s'",
+                                                                SchedulerPoolStrategy.class.getSimpleName(), strategyName)));
     }
   }
 
@@ -525,12 +526,12 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
   private void assertStrategy(SchedulerPoolStrategy expected, String propertyName) {
     if (schedulerPoolStrategy != expected) {
-      throw new IllegalStateException(new ConfigurationException(createStaticMessage(format(
-                                                                                            "Property '%s' can only be set when '%s' is '%s'. Current value is '%s'",
-                                                                                            propertyName,
-                                                                                            STRATEGY_PROPERTY_NAME,
-                                                                                            expected,
-                                                                                            schedulerPoolStrategy))));
+      throw new IllegalStateException(format(
+                                             "Property '%s' can only be set when '%s' is '%s'. Current value is '%s'",
+                                             propertyName,
+                                             STRATEGY_PROPERTY_NAME,
+                                             expected,
+                                             schedulerPoolStrategy));
     }
   }
 }
