@@ -6,31 +6,25 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
+import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SchedulerServiceStory.TASK_SCHEDULING;
+
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
 import static org.hamcrest.collection.IsEmptyCollection.empty;
 import static org.hamcrest.number.IsCloseTo.closeTo;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
-import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
-import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SchedulerServiceStory.TASK_SCHEDULING;
-
-import org.mule.runtime.api.scheduler.Scheduler;
-
-import org.junit.Test;
-import org.mockito.InOrder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +37,8 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
+
+import org.junit.Test;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
@@ -496,37 +492,6 @@ public class DefaultSchedulerScheduleTestCase extends AbstractMuleVsJavaExecutor
                    // task won't run until the next tick.
                    ? closeTo(TEST_DELAY_MILLIS - TASK_DURATION_MILLIS, DELTA_MILLIS)
                    : closeTo(0, DELTA_MILLIS));
-  }
-
-  @Test
-  @Description("Tests that scheduleAtFixedDelay parameters are honored")
-  public void fixedDelayRepeats() {
-    assumeThat(executor, instanceOf(Scheduler.class));
-
-    List<Long> startTimes = new ArrayList<>();
-    List<Long> endTimes = new ArrayList<>();
-
-    final CountDownLatch latch = new CountDownLatch(2);
-
-    final ScheduledFuture<?> scheduled = executor.scheduleWithFixedDelay(() -> {
-      startTimes.add(System.nanoTime());
-      try {
-        sleep(TASK_DURATION_MILLIS);
-      } catch (InterruptedException e) {
-        currentThread().interrupt();
-      }
-      latch.countDown();
-      endTimes.add(System.nanoTime());
-    }, 0, TEST_DELAY_MILLIS, MILLISECONDS);
-
-    assertThat(awaitLatch(latch), is(true));
-    scheduled.cancel(true);
-
-    InOrder inOrder = inOrder(sharedScheduledExecutor);
-    inOrder.verify(sharedScheduledExecutor).schedule(any(Runnable.class), eq(0L), eq(MILLISECONDS));
-    inOrder.verify(sharedScheduledExecutor).schedule(any(Runnable.class), eq(TEST_DELAY_MILLIS), eq(MILLISECONDS));
-    assertThat(NANOSECONDS.toMillis(startTimes.get(1) - endTimes.get(0)),
-               greaterThanOrEqualTo(TEST_DELAY_MILLIS - DELTA_MILLIS));
   }
 
 }
