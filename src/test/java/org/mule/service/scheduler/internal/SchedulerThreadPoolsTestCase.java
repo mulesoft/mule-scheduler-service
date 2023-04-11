@@ -7,8 +7,6 @@
 package org.mule.service.scheduler.internal;
 
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
-import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
-import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.core.api.util.IOUtils.toByteArray;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
@@ -21,7 +19,6 @@ import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHED
 import static java.lang.Runtime.getRuntime;
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
-import static java.util.Arrays.asList;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
@@ -32,16 +29,14 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.sameInstance;
 import static org.hamcrest.Matchers.allOf;
-import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
 import static org.hamcrest.core.Is.is;
-import static org.hamcrest.core.IsCollectionContaining.hasItem;
 import static org.hamcrest.core.IsInstanceOf.instanceOf;
+import static org.hamcrest.core.IsIterableContaining.hasItem;
 import static org.hamcrest.core.StringStartsWith.startsWith;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeThat;
 import static org.junit.rules.ExpectedException.none;
 import static org.mockito.Mockito.mock;
 
@@ -85,26 +80,17 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 import org.junit.runners.Parameterized.Parameter;
-import org.junit.runners.Parameterized.Parameters;
 
 import io.qameta.allure.Description;
 import io.qameta.allure.Feature;
 import io.qameta.allure.Issue;
 
 @Feature(SCHEDULER_SERVICE)
-@RunWith(Parameterized.class)
-public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
+public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
 
-  private static final int CORES = getRuntime().availableProcessors();
-  private static final long GC_POLLING_TIMEOUT = 10000;
-
-  @Parameters(name = "{0}")
-  public static List<SchedulerPoolStrategy> parameters() {
-    return asList(DEDICATED, UBER);
-  }
+  protected static final int CORES = getRuntime().availableProcessors();
+  protected static final long GC_POLLING_TIMEOUT = 10000;
 
   @Parameter
   public SchedulerPoolStrategy strategy;
@@ -112,8 +98,8 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   @Rule
   public ExpectedException expected = none();
 
-  private ContainerThreadPoolsConfig threadPoolsConfig;
-  private SchedulerThreadPools service;
+  protected ContainerThreadPoolsConfig threadPoolsConfig;
+  protected SchedulerThreadPools service;
 
   private long prestarCallbackSleepTime = 0L;
 
@@ -373,31 +359,6 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
-  @Description("Tests that IO threads in excess of the core size don't hold a reference to an artifact classloader through the inheritedAccessControlContext.")
-  public void elasticIoThreadsDontReferenceClassLoaderFromAccessControlContext() throws Exception {
-    assumeDedicatedStrategy();
-
-    assertThat(threadPoolsConfig.getIoKeepAlive().getAsLong(), greaterThan(GC_POLLING_TIMEOUT));
-
-    Scheduler scheduler = service.createIoScheduler(config(), threadPoolsConfig.getIoCorePoolSize().getAsInt() + 1, () -> 1000L);
-
-    ClassLoader delegatorClassLoader = createDelegatorClassLoader();
-    PhantomReference<ClassLoader> clRef = new PhantomReference<>(delegatorClassLoader, new ReferenceQueue<>());
-
-    @SuppressWarnings("unchecked")
-    Consumer<Runnable> delegator = (Consumer<Runnable>) delegatorClassLoader.loadClass(Delegator.class.getName()).newInstance();
-    for (int i = 0; i < threadPoolsConfig.getIoCorePoolSize().getAsInt() + 1; ++i) {
-      delegator.accept(() -> scheduler.execute(() -> {
-      }));
-    }
-
-    delegator = null;
-    delegatorClassLoader = null;
-
-    assertNoClassLoaderReferenceHeld(clRef, GC_POLLING_TIMEOUT);
-  }
-
-  @Test
   @Description("Tests that when using a the commonPool from ForkJoinPool, the TCCL of the first invocation is not leaked."
       + " This test essentially validates the workaround for https://bugs.java.com/bugdatabase/view_bug.do?bug_id=JDK-8172726")
   public void forkJoinCommonPoolDoesNotLeakFirstClassLoaderUsed()
@@ -574,7 +535,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     }), initialDelay, delay, SECONDS));
   }
 
-  private ClassLoader createDelegatorClassLoader() {
+  protected ClassLoader createDelegatorClassLoader() {
     // The inheritedAccessControlContext holds a reference to the classloaders of any class in the call stack that starts the
     // thread.
     // With this test, we ensure that the threads are started with only container/service code in the stack, and not from an
@@ -600,7 +561,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     return testClassLoader;
   }
 
-  private void assertNoClassLoaderReferenceHeld(PhantomReference<ClassLoader> clRef, long timeoutMillis) {
+  protected void assertNoClassLoaderReferenceHeld(PhantomReference<ClassLoader> clRef, long timeoutMillis) {
     new PollingProber(timeoutMillis, DEFAULT_POLLING_INTERVAL)
         .check(new JUnitLambdaProbe(() -> {
           System.gc();
@@ -787,42 +748,6 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
-  @Description("Tests that tasks dispatched from a CPU Light thread to a busy Scheduler are rejected.")
-  public void rejectionPolicyCpuLight() throws MuleException, InterruptedException, ExecutionException, TimeoutException {
-    assumeDedicatedStrategy();
-
-    Scheduler sourceScheduler = service.createCpuLightScheduler(config(), CORES, () -> 1000L);
-    Scheduler targetScheduler =
-        service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
-
-    Latch latch = new Latch();
-
-    Future<Object> submit = sourceScheduler.submit(threadsConsumer(targetScheduler, latch));
-
-    expected.expect(ExecutionException.class);
-    expected.expectCause(instanceOf(SchedulerBusyException.class));
-    submit.get(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
-  }
-
-  @Test
-  @Description("Tests that tasks dispatched from a CPU Intensive thread to a busy Scheduler are rejected.")
-  public void rejectionPolicyCpuIntensive() throws MuleException, InterruptedException, ExecutionException, TimeoutException {
-    assumeDedicatedStrategy();
-
-    Scheduler sourceScheduler = service.createCpuIntensiveScheduler(config(), CORES, () -> 1000L);
-    Scheduler targetScheduler =
-        service.createCustomScheduler(config().withMaxConcurrentTasks(1), CORES, () -> 1000L);
-
-    Latch latch = new Latch();
-
-    Future<Object> submit = sourceScheduler.submit(threadsConsumer(targetScheduler, latch));
-
-    expected.expect(ExecutionException.class);
-    expected.expectCause(instanceOf(SchedulerBusyException.class));
-    submit.get(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
-  }
-
-  @Test
   @Description("Tests that tasks dispatched from an IO thread to a busy Scheduler waits for execution.")
   public void rejectionPolicyIO() throws MuleException, InterruptedException, ExecutionException, TimeoutException {
     Scheduler sourceScheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
@@ -844,172 +769,6 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
   }
 
   @Test
-  @Description("Tests that when the IO pool is full, any task dispatched from IO to IO runs in the caller thread instead of being queued, which can cause a deadlock.")
-  public void ioToFullIoDoesntWait() throws InterruptedException, ExecutionException {
-    assumeDedicatedStrategy();
-
-    Scheduler ioScheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
-
-    Latch outerLatch = new Latch();
-    Latch innerLatch = new Latch();
-
-    // Fill up the IO pool, leaving room for just one more task
-    for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt() - 1; ++i) {
-      consumeThread(ioScheduler, outerLatch);
-    }
-
-    AtomicReference<Thread> callerThread = new AtomicReference<>();
-    AtomicReference<Thread> executingThread = new AtomicReference<>();
-
-    // The outer task will use the remaining slot in the scheduler, causing it to be full when the inner is sent.
-    Future<Boolean> submitted = ioScheduler.submit(() -> {
-      callerThread.set(currentThread());
-
-      ioScheduler.submit(() -> {
-        executingThread.set(currentThread());
-        innerLatch.countDown();
-      });
-
-      return awaitLatch(outerLatch);
-    });
-
-    assertThat(innerLatch.await(5, SECONDS), is(true));
-    outerLatch.countDown();
-    assertThat(submitted.get(), is(true));
-    assertThat(executingThread.get(), is(callerThread.get()));
-  }
-
-  @Test
-  @Description("Tests that when the IO pool is full, any task dispatched from a CUSTOM pool with WAIT rejection action to IO is queued.")
-  public void customWaitToFullIoWaits() throws InterruptedException, ExecutionException, TimeoutException {
-    assumeDedicatedStrategy();
-
-    Scheduler customScheduler =
-        service.createCustomScheduler(config().withMaxConcurrentTasks(1).withWaitAllowed(true), CORES, () -> 1000L);
-    Scheduler ioScheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
-
-    Latch latch = new Latch();
-
-    // Fill up the IO pool
-    for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt(); ++i) {
-      consumeThread(ioScheduler, latch);
-    }
-
-    Future<Boolean> submitted = customScheduler.submit(() -> {
-      ioScheduler.submit(() -> {
-      });
-
-      fail("Didn't wait");
-      return null;
-    });
-
-    // Assert that the task is waiting
-    expected.expect(TimeoutException.class);
-    try {
-      submitted.get(5, SECONDS);
-    } finally {
-      latch.countDown();
-      ioScheduler.shutdown();
-    }
-  }
-
-  @Test
-  @Description("Tests that when the CPU-lite pool is full, any task dispatched from a CUSTOM pool with DirectRunToFullCpuLight falg to CPU-lite is run directlyi in the caller thread.")
-  public void customDirectRunToFullCpuLight() throws InterruptedException, ExecutionException, TimeoutException {
-    assumeDedicatedStrategy();
-
-    Scheduler customScheduler =
-        service.createCustomScheduler(config().withMaxConcurrentTasks(1).withDirectRunCpuLightWhenTargetBusy(true), CORES,
-                                      () -> 1000L);
-    Scheduler cpuLightScheduler = service.createCpuLightScheduler(config(), CORES, () -> 1000L);
-
-    Latch latch = new Latch();
-
-    // Fill up the CPU-lite pool
-    for (int i = 0; i < threadPoolsConfig.getCpuLightPoolSize().getAsInt()
-        + threadPoolsConfig.getCpuLightQueueSize().getAsInt(); ++i) {
-      consumeThread(cpuLightScheduler, latch);
-    }
-
-    AtomicReference<Thread> callerThread = new AtomicReference<>();
-    AtomicReference<Thread> taskRunThread = new AtomicReference<>();
-
-    Future<Boolean> submitted = customScheduler.submit(() -> {
-      callerThread.set(currentThread());
-
-      cpuLightScheduler.submit(() -> {
-        taskRunThread.set(currentThread());
-      });
-
-      return null;
-    });
-
-    try {
-      submitted.get(5, SECONDS);
-    } finally {
-      latch.countDown();
-    }
-
-    assertThat(taskRunThread.get(), sameInstance(callerThread.get()));
-  }
-
-  @Test
-  @Description("Tests that the behavior of combining runCpuLightWhenTargetBusy and waitAllowed depends on the target thread.")
-  public void customWaitToFullIoWaitsAndWaitToFullIoWaits() throws InterruptedException, ExecutionException, TimeoutException {
-    assumeDedicatedStrategy();
-
-    Scheduler customScheduler = service
-        .createCustomScheduler(config().withMaxConcurrentTasks(1).withWaitAllowed(true).withDirectRunCpuLightWhenTargetBusy(true),
-                               CORES, () -> 1000L);
-    Scheduler ioScheduler = service.createIoScheduler(config(), CORES, () -> 1000L);
-    Scheduler cpuLightScheduler = service.createCpuLightScheduler(config(), CORES, () -> 1000L);
-
-    Latch latch = new Latch();
-
-    // Fill up the IO pool
-    for (int i = 0; i < threadPoolsConfig.getIoMaxPoolSize().getAsInt(); ++i) {
-      consumeThread(ioScheduler, latch);
-    }
-    // Fill up the CPU-lite pool
-    for (int i = 0; i < threadPoolsConfig.getCpuLightPoolSize().getAsInt()
-        + threadPoolsConfig.getCpuLightQueueSize().getAsInt(); ++i) {
-      consumeThread(cpuLightScheduler, latch);
-    }
-
-    AtomicReference<Thread> callerThread = new AtomicReference<>();
-    AtomicReference<Thread> taskRunThread = new AtomicReference<>();
-
-    Future<Boolean> submittedCpuLight = customScheduler.submit(() -> {
-      callerThread.set(currentThread());
-
-      cpuLightScheduler.submit(() -> {
-        taskRunThread.set(currentThread());
-      });
-
-      return null;
-    });
-
-    Future<Boolean> submittedIo = customScheduler.submit(() -> {
-      ioScheduler.submit(() -> {
-      });
-
-      fail("Didn't wait");
-      return null;
-    });
-
-    try {
-      submittedCpuLight.get(5, SECONDS);
-      assertThat(taskRunThread.get(), sameInstance(callerThread.get()));
-
-      // Asssert that the task is waiting
-      expected.expect(TimeoutException.class);
-      submittedIo.get(5, SECONDS);
-    } finally {
-      latch.countDown();
-    }
-  }
-
-  @Test
   @Issue("MULE-20072")
   @Description("Tests that when a rejected task submitted from a custom pool is executed on the caller thread, the thread locals of the task are isolated from the caller's.")
   public void customCallerRunsHasThreadLocalsIsolation() throws ExecutionException, InterruptedException {
@@ -1028,18 +787,6 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     Scheduler scheduler = service.createCpuLightScheduler(config(), CORES, () -> 1000L);
     // Computes the maximum pool size regardless of the strategy.
     int maxPoolSize = threadPoolsConfig.getCpuLightPoolSize().orElseGet(() -> threadPoolsConfig.getUberMaxPoolSize().getAsInt());
-    assertCallerRunsThreadLocalsIsolation(scheduler, maxPoolSize);
-  }
-
-  @Test
-  @Issue("MULE-20072")
-  @Description("Tests that when a rejected task submitted from a CPU Intensive pool is executed on the caller thread, the thread locals of the task are isolated from the caller's.")
-  public void cpuIntensiveCallerRunsHasThreadLocalsIsolation() throws ExecutionException, InterruptedException {
-    // Assumes Uber strategy, because on Dedicated, tasks submitted from a CPU Intensive pool to a busy pool are rejected.
-    assumeUberStrategy();
-
-    Scheduler scheduler = service.createCpuIntensiveScheduler(config(), CORES, () -> 1000L);
-    int maxPoolSize = threadPoolsConfig.getUberMaxPoolSize().getAsInt();
     assertCallerRunsThreadLocalsIsolation(scheduler, maxPoolSize);
   }
 
@@ -1251,61 +998,12 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     probe(5000, 100, () -> innerThreadInterupted.get());
   }
 
-  @Test
-  @Description("Tests that ThrottledScheduler is not used for CPU light schedulers unless maxConcurrency is less than backing pool max size.")
-  public void maxCpuLightConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
-    assumeDedicatedStrategy();
-
-    assertThat(service
-        .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()), 1,
-                                 () -> 1l),
-               not(instanceOf(ThrottledScheduler.class)));
-    assertThat(service
-        .createCpuLightScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuLightPoolSize().getAsInt()
-            - 1), 1,
-                                 () -> 1l),
-               instanceOf(ThrottledScheduler.class));
-  }
-
-  @Test
-  @Description("Tests that ThrottledScheduler is not used for CPU intensive schedulers unless maxConcurrency is less than backing pool max size.")
-  public void maxCpuIntensiveConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
-    assumeDedicatedStrategy();
-    assertThat(service
-        .createCpuIntensiveScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
-            .getCpuIntensivePoolSize().getAsInt()), 1,
-                                     () -> 1l),
-               not(instanceOf(ThrottledScheduler.class)));
-    assertThat(service
-        .createCpuIntensiveScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getCpuIntensivePoolSize().getAsInt()
-            - 1), 1,
-                                     () -> 1l),
-               instanceOf(ThrottledScheduler.class));
-  }
-
-  @Test
-  @Description("Tests that ThrottledScheduler is not used for IO schedulers unless maxConcurrency is less than backing pool max size.")
-  public void maxIOConcurrencyMoreThanMaxPoolSizeDoesntUseThrottlingScheduler() {
-    assumeDedicatedStrategy();
-
-    assertThat(service
-        .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig
-            .getIoMaxPoolSize().getAsInt()), 1,
-                           () -> 1l),
-               not(instanceOf(ThrottledScheduler.class)));
-    assertThat(service
-        .createIoScheduler(config().withMaxConcurrentTasks(threadPoolsConfig.getIoMaxPoolSize().getAsInt()
-            - 1), 1,
-                           () -> 1l),
-               instanceOf(ThrottledScheduler.class));
-  }
-
-  private void assertCallerRunsThreadLocalsIsolation(Scheduler scheduler, int maxPoolSize)
+  protected void assertCallerRunsThreadLocalsIsolation(Scheduler scheduler, int maxPoolSize)
       throws ExecutionException, InterruptedException {
     assertCallerRunsThreadLocalsIsolation(scheduler, scheduler, maxPoolSize);
   }
 
-  private void assertCallerRunsThreadLocalsIsolation(Scheduler sourceScheduler, Scheduler targetScheduler, int maxPoolSize)
+  protected void assertCallerRunsThreadLocalsIsolation(Scheduler sourceScheduler, Scheduler targetScheduler, int maxPoolSize)
       throws InterruptedException, ExecutionException {
     Latch outerLatch = new Latch();
     Latch innerLatch = new Latch();
@@ -1352,7 +1050,7 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     assertThat(executingThread.get(), is(callerThread.get()));
   }
 
-  private Callable<Object> threadsConsumer(Scheduler targetScheduler, Latch latch) {
+  protected Callable<Object> threadsConsumer(Scheduler targetScheduler, Latch latch) {
     return () -> {
       while (latch.getCount() > 0) {
         consumeThread(targetScheduler, latch);
@@ -1361,13 +1059,13 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     };
   }
 
-  private void consumeThread(Scheduler scheduler, Latch latch) {
+  protected void consumeThread(Scheduler scheduler, Latch latch) {
     scheduler.submit(() -> {
       awaitLatch(latch);
     });
   }
 
-  private boolean awaitLatch(Latch latch) {
+  protected boolean awaitLatch(Latch latch) {
     try {
       return latch.await(getTestTimeoutSecs(), SECONDS);
     } catch (InterruptedException e) {
@@ -1376,11 +1074,4 @@ public class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase {
     }
   }
 
-  private void assumeDedicatedStrategy() {
-    assumeThat(strategy, is(DEDICATED));
-  }
-
-  private void assumeUberStrategy() {
-    assumeThat(strategy, is(UBER));
-  }
 }
