@@ -15,6 +15,7 @@
     <name>Mule Scheduler Service Implementation</name>
 
     <properties>
+        <javaModuleName>org.mule.service.scheduler</javaModuleName>
         <formatterConfigPath>formatter.xml</formatterConfigPath>
 
         <quartzVersion>2.3.2</quartzVersion>
