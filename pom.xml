@@ -15,6 +15,14 @@
     <name>Mule Scheduler Service Implementation</name>
 
     <properties>
+        <!-- Add visibility required by the tests exclusively -->
+        <surefire.args>
+            -XX:+IgnoreUnrecognizedVMOptions
+            --add-modules=net.bytebuddy.agent
+            --add-opens=java.base/java.lang=org.mule.service.scheduler
+            ${surefire.args.base}
+        </surefire.args>
+
         <javaModuleName>org.mule.service.scheduler</javaModuleName>
         <formatterConfigPath>formatter.xml</formatterConfigPath>
 
@@ -124,6 +132,12 @@
             <artifactId>mule-core</artifactId>
             <scope>provided</scope>
             <version>${mule.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>net.bytebuddy</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
 
         <dependency>
