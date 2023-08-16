@@ -17,6 +17,8 @@ import static org.mule.runtime.core.api.config.MuleProperties.MULE_HOME_DIRECTOR
 import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
 import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
 import static org.mule.service.scheduler.ThreadType.IO;
+import static org.apache.commons.lang3.JavaVersion.JAVA_11;
+import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtLeast;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.DefaultMuleException;
@@ -159,8 +161,14 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
       throw new DefaultMuleException(e);
     }
 
-    ScriptEngineManager manager = new ScriptEngineManager();
-    ScriptEngine engine = manager.getEngineByName("js");
+    ScriptEngineManager manager;
+    if (isJavaVersionAtLeast(JAVA_11)) {
+      manager = new ScriptEngineManager(GraalJSEngineFactory.class.getClassLoader());
+    } else {
+      manager = new ScriptEngineManager();
+    }
+    String engineName = "js";
+    ScriptEngine engine = manager.getEngineByName(engineName);
     if (engine == null) {
       throw new ConfigurationException(
                                        createStaticMessage("No 'js' script engine found. It is required to parse the config in 'conf/scheduler-pools.conf'"));

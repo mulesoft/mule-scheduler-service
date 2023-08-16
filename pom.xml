@@ -39,6 +39,16 @@
                 <artifactId>mule-service-maven-plugin</artifactId>
                 <version>${mule.app.plugins.maven.plugin.version}</version>
                 <extensions>true</extensions>
+                <configuration>
+                    <multiJavaReleases>
+                        <multiJavaRelease>
+                            <javaVersion>11</javaVersion>
+                            <includes>
+                                <include>org.graalvm.js:*</include>
+                            </includes>
+                        </multiJavaRelease>
+                    </multiJavaReleases>
+                </configuration>
             </plugin>
         </plugins>
     </build>
