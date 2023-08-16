@@ -3,13 +3,6 @@
  */
 package org.mule.service.scheduler.internal.config;
 
-import static java.io.File.separator;
-import static java.lang.Long.parseLong;
-import static java.lang.Math.max;
-import static java.lang.Runtime.getRuntime;
-import static java.lang.String.format;
-import static java.lang.System.getProperty;
-import static java.util.regex.Pattern.compile;
 import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
@@ -17,6 +10,15 @@ import static org.mule.runtime.core.api.config.MuleProperties.MULE_HOME_DIRECTOR
 import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
 import static org.mule.service.scheduler.ThreadType.CPU_LIGHT;
 import static org.mule.service.scheduler.ThreadType.IO;
+
+import static java.io.File.separator;
+import static java.lang.Long.parseLong;
+import static java.lang.Math.max;
+import static java.lang.Runtime.getRuntime;
+import static java.lang.String.format;
+import static java.lang.System.getProperty;
+import static java.util.regex.Pattern.compile;
+
 import static org.apache.commons.lang3.JavaVersion.JAVA_11;
 import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtLeast;
 import static org.slf4j.LoggerFactory.getLogger;
@@ -40,6 +42,8 @@ import java.util.regex.Pattern;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
+
+import com.oracle.truffle.js.scriptengine.GraalJSEngineFactory;
 
 import org.slf4j.Logger;
 
