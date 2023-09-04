@@ -22,8 +22,6 @@ import static java.lang.String.format;
 import static java.lang.System.getProperty;
 import static java.util.regex.Pattern.compile;
 
-import static org.apache.commons.lang3.JavaVersion.JAVA_11;
-import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtLeast;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.DefaultMuleException;
@@ -31,11 +29,13 @@ import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.SchedulerPoolStrategy;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 import org.mule.runtime.core.api.config.ConfigurationException;
+import org.mule.service.scheduler.internal.EngineClassLoader;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
@@ -45,8 +45,6 @@ import java.util.regex.Pattern;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
-
-import com.oracle.truffle.js.scriptengine.GraalJSEngineFactory;
 
 import org.slf4j.Logger;
 
@@ -160,7 +158,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
   }
 
   private static ContainerThreadPoolsConfig loadProperties(final ContainerThreadPoolsConfig config, InputStream configIs)
-      throws MuleException {
+      throws MuleException, MalformedURLException {
     final Properties properties = new Properties();
     try {
       properties.load(configIs);
@@ -169,16 +167,11 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     }
 
     ScriptEngineManager manager;
-    if (isJavaVersionAtLeast(JAVA_11)) {
-      manager = new ScriptEngineManager(GraalJSEngineFactory.class.getClassLoader());
-    } else {
-      manager = new ScriptEngineManager();
-    }
-    String engineName = "js";
+    manager = new ScriptEngineManager(new EngineClassLoader());
+    String engineName = "rhino";
     ScriptEngine engine = manager.getEngineByName(engineName);
     if (engine == null) {
-      throw new ConfigurationException(
-                                       createStaticMessage("No 'js' script engine found. It is required to parse the config in 'conf/scheduler-pools.conf'"));
+      throw new ConfigurationException(createStaticMessage("No 'js' script engine found. It is required to parse the config in 'conf/scheduler-pools.conf'"));
     }
     engine.put("cores", CORES);
     engine.put("mem", MEM);
