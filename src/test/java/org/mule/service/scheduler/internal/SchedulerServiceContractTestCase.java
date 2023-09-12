@@ -18,6 +18,7 @@ import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHED
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfigFactory;
+import org.mule.service.scheduler.internal.service.DefaultSchedulerService;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
 import org.mule.tck.probe.PollingProber;

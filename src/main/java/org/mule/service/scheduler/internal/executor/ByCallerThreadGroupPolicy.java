@@ -6,9 +6,10 @@
  */
 package org.mule.service.scheduler.internal.executor;
 
+import static org.mule.service.scheduler.internal.service.DefaultSchedulerService.USAGE_TRACE_INTERVAL_SECS;
+
 import static java.lang.Thread.currentThread;
 import static org.apache.commons.lang3.StringUtils.rightPad;
-import static org.mule.service.scheduler.internal.DefaultSchedulerService.USAGE_TRACE_INTERVAL_SECS;
 
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerBusyException;
