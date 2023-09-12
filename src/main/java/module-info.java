@@ -20,6 +20,8 @@ module org.mule.service.scheduler {
   // context injection
   requires org.mule.runtime.core;
 
+  requires java.inject;
+
   requires quartz;
 
   requires org.graalvm.js.scriptengine;
