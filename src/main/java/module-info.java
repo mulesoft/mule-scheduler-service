@@ -5,6 +5,7 @@
  * LICENSE.txt file.
  */
 import org.mule.api.annotation.jpms.ServiceModule;
+import org.mule.api.annotation.jpms.ServiceModule.RequiredOpens;
 
 /**
  * Mule Scheduler Service Implementation.
@@ -12,7 +13,15 @@ import org.mule.api.annotation.jpms.ServiceModule;
  * @moduleGraph
  * @since 1.5
  */
-@ServiceModule
+@ServiceModule(
+    requiredOpens = {
+        // required for cleaning up the thread localas after a task finishes execution
+        @RequiredOpens(
+            moduleName = "java.base",
+            packageNames = {
+                "java.lang"
+            })
+    })
 module org.mule.service.scheduler {
 
   requires org.mule.runtime.api;
