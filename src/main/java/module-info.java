@@ -4,8 +4,8 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
+import org.mule.api.annotation.jpms.RequiredOpens;
 import org.mule.api.annotation.jpms.ServiceModule;
-import org.mule.api.annotation.jpms.ServiceModule.RequiredOpens;
 
 /**
  * Mule Scheduler Service Implementation.
