@@ -4,6 +4,7 @@
  * license, a copy of which has been included with this distribution in the
  * LICENSE.txt file.
  */
+import org.mule.api.annotation.jpms.RequiredOpens;
 import org.mule.api.annotation.jpms.ServiceModule;
 
 /**
@@ -12,7 +13,15 @@ import org.mule.api.annotation.jpms.ServiceModule;
  * @moduleGraph
  * @since 1.5
  */
-@ServiceModule
+@ServiceModule(
+    requiredOpens = {
+        // required for cleaning up the thread localas after a task finishes execution
+        @RequiredOpens(
+            moduleName = "java.base",
+            packageNames = {
+                "java.lang"
+            })
+    })
 module org.mule.service.scheduler {
 
   requires org.mule.runtime.api;
