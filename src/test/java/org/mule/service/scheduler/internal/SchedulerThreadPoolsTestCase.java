@@ -18,6 +18,7 @@ import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHED
 
 import static java.lang.Runtime.getRuntime;
 import static java.lang.Thread.currentThread;
+import static java.lang.Thread.interrupted;
 import static java.lang.Thread.sleep;
 import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newFixedThreadPool;
@@ -813,10 +814,14 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
     Future<Object> submit = sourceScheduler.submit(threadsConsumer(targetScheduler, latch));
 
     try {
-      submit.get(5, SECONDS);
+      submit.get(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
       fail();
     } catch (ExecutionException e) {
       assertThat(e.getCause(), instanceOf(SchedulerBusyException.class));
+    } catch (TimeoutException e) {
+      sourceScheduler.shutdownNow();
+      sourceScheduler.awaitTermination(DEFAULT_TEST_TIMEOUT_SECS, SECONDS);
+      throw e;
     }
 
     CountDownLatch scheduledTaskLatch = new CountDownLatch(2);
@@ -1053,6 +1058,10 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
   protected Callable<Object> threadsConsumer(Scheduler targetScheduler, Latch latch) {
     return () -> {
       while (latch.getCount() > 0) {
+        if (interrupted()) {
+          throw new InterruptedException();
+        }
+
         consumeThread(targetScheduler, latch);
       }
       return null;
