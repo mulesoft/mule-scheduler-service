@@ -17,6 +17,7 @@ import static org.mule.tck.util.CollectableReference.collectedByGc;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 import static java.lang.Runtime.getRuntime;
+import static java.lang.Thread.MIN_PRIORITY;
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
 import static java.util.concurrent.Executors.newCachedThreadPool;
@@ -63,6 +64,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -74,6 +76,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 import org.junit.After;
 import org.junit.Before;
@@ -996,6 +999,51 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
     latch.countDown();
 
     probe(5000, 100, () -> innerThreadInterupted.get());
+  }
+
+  @Test
+  public void customWithPriority() throws ExecutionException, InterruptedException {
+    int actualPriority = executeWithPriorityAndCapture(MIN_PRIORITY, service::createCustomScheduler);
+
+    assertThat(actualPriority, is(MIN_PRIORITY));
+  }
+
+  @Test
+  public void cpuLightWithPriority() throws ExecutionException, InterruptedException {
+    expected.expect(instanceOf(IllegalArgumentException.class));
+    expected.expectMessage("Only custom schedulers may define 'priority' behaviour");
+    executeWithPriorityAndCapture(MIN_PRIORITY, service::createCpuLightScheduler);
+  }
+
+  @Test
+  public void cpuIntensiveWithPriority() throws ExecutionException, InterruptedException {
+    expected.expect(instanceOf(IllegalArgumentException.class));
+    expected.expectMessage("Only custom schedulers may define 'priority' behaviour");
+    executeWithPriorityAndCapture(MIN_PRIORITY, service::createCpuIntensiveScheduler);
+  }
+
+  @Test
+  public void ioWithPriority() throws ExecutionException, InterruptedException {
+    expected.expect(instanceOf(IllegalArgumentException.class));
+    expected.expectMessage("Only custom schedulers may define 'priority' behaviour");
+    executeWithPriorityAndCapture(MIN_PRIORITY, service::createIoScheduler);
+  }
+
+  private interface SchedulerFactory {
+
+    Scheduler create(SchedulerConfig config, int parallelTasksEstimate, Supplier<Long> stopTimeout);
+  }
+
+  private int executeWithPriorityAndCapture(int priority, SchedulerFactory schedulerFactory)
+      throws ExecutionException, InterruptedException {
+    SchedulerConfig configMaxPriority = config()
+        .withMaxConcurrentTasks(1)
+        .withPriority(priority);
+
+    Scheduler scheduler = schedulerFactory.create(configMaxPriority, CORES, () -> 1000L);
+    CompletableFuture<Integer> actualPriority = new CompletableFuture<>();
+    scheduler.execute(() -> actualPriority.complete(currentThread().getPriority()));
+    return actualPriority.get();
   }
 
   protected void assertCallerRunsThreadLocalsIsolation(Scheduler scheduler, int maxPoolSize)
