@@ -339,6 +339,9 @@ public abstract class SchedulerThreadPools {
     if (config.getDirectRunCpuLightWhenTargetBusy().isPresent()) {
       throw new IllegalArgumentException("Only custom schedulers may define 'directRunCpuLightWhenTargetBusy' behaviour");
     }
+    if (config.getPriority().isPresent()) {
+      throw new IllegalArgumentException("Only custom schedulers may define 'priority' behaviour");
+    }
   }
 
   protected boolean shouldThrottle(SchedulerConfig config, OptionalInt backingPoolMaxSize) {
@@ -377,7 +380,7 @@ public abstract class SchedulerThreadPools {
     final ThreadGroup customChildGroup = new ThreadGroup(resolveThreadGroupForCustomScheduler(config), threadsName);
     final ThreadPoolExecutor executor =
         new ThreadPoolExecutor(config.getMaxConcurrentTasks(), config.getMaxConcurrentTasks(), 0L, MILLISECONDS, workQueue,
-                               new SchedulerThreadFactory(customChildGroup, "%s.%02d"),
+                               new SchedulerThreadFactory(customChildGroup, "%s.%02d", config.getPriority()),
                                byCallerThreadGroupPolicy.apply(customChildGroup.getName()));
 
     prestartCoreThreads(executor, config.getMaxConcurrentTasks());
