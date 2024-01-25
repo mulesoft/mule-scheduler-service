@@ -7,9 +7,10 @@
 package org.mule.service.scheduler.internal;
 
 import static java.lang.Thread.currentThread;
+
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -46,7 +47,7 @@ public class RunnableRepeatableFutureDecoratorTestCase extends BaseDefaultSchedu
 
   @Test
   public void exceptionInWrapUpCallbackCompletesWrapUp() {
-    final ClassLoader taskClassloader = mock(ClassLoader.class);
+    final ClassLoader taskClassloader = new ClassLoader() {};
 
     Runnable command = () -> {
     };
