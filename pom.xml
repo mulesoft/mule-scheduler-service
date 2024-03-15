@@ -26,7 +26,7 @@
         <javaModuleName>org.mule.service.scheduler</javaModuleName>
         <formatterConfigPath>formatter.xml</formatterConfigPath>
 
-        <mockitoVersion>4.11.0</mockitoVersion>
+        <mockitoVersion>5.2.0</mockitoVersion>
     </properties>
 
     <scm>
