@@ -29,7 +29,7 @@
         <quartzVersion>2.3.2</quartzVersion>
         <caffeineVersion>2.9.0</caffeineVersion>
         <c3p0Version>0.9.5.5</c3p0Version>
-        <graaljsVersion>22.3.3</graaljsVersion>
+        <graaljsVersion>22.3.5</graaljsVersion>
         
         <mockitoVersion>4.11.0</mockitoVersion>
     </properties>
