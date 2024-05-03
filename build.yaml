@@ -1,5 +1,5 @@
 upstreamProjects:
-  Mule-runtime/mule/support/4.6.x
+  Mule-runtime/mule/rel/4.6.4
 mavenSettingsXmlId: mule-runtime-maven-settings-MuleSettings
 archiveArtifacts: "**/hs_*.log"
 projectType: runtime
