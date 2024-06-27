@@ -1,5 +1,5 @@
 upstreamProjects:
-  Mule-runtime/mule/support/4.7.x
+  Mule-runtime/mule/4.7.1-DRY-RUN
 mavenSettingsXmlId: mule-runtime-maven-settings-MuleSettings
 archiveArtifacts: "**/hs_*.log"
 projectType: runtime
