@@ -3,7 +3,7 @@
     <parent>
         <groupId>org.mule.services</groupId>
         <artifactId>mule-core-services-parent</artifactId>
-        <version>1.6.6-rc2</version>
+        <version>1.6.6</version>
         <relativePath></relativePath>
     </parent>
     <modelVersion>4.0.0</modelVersion>
