@@ -143,26 +143,6 @@
         </dependency>
     </dependencies>
     
-    <profiles>
-        <profile>
-            <!-- Prevents the Graal JS engine from being discovered by the ScriptEngineManager -->
-            <id>graal-js-excluded-from-tests</id>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-surefire-plugin</artifactId>
-                        <configuration>
-                            <classpathDependencyExcludes>
-                                <classpathDependencyExclude>org.graalvm.js:*</classpathDependencyExclude>
-                            </classpathDependencyExcludes>
-                        </configuration>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
-
     <distributionManagement>
         <downloadUrl>http://www.mulesoft.org/display/MULE/Download</downloadUrl>
         <repository>

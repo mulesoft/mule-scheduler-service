@@ -4,9 +4,3 @@ mavenSettingsXmlId: mule-runtime-maven-settings-MuleSettings
 archiveArtifacts: "**/hs_*.log"
 projectType: runtime
 jdkTool: OPEN-JDK17
-additionalTestConfigs:
-  jdk8:
-    testJdkTool: OPEN-JDK8
-    mavenAdditionalArgs: -Pgraal-js-excluded-from-tests
-  jdk11:
-    testJdkTool: OPEN-JDK11
