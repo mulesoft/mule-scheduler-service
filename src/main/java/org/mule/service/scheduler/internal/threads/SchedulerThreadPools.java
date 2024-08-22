@@ -6,6 +6,12 @@
  */
 package org.mule.service.scheduler.internal.threads;
 
+import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
+import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
+import static org.mule.runtime.api.util.MuleSystemProperties.SYSTEM_PROPERTY_PREFIX;
+import static org.mule.service.scheduler.ThreadType.CUSTOM;
+
 import static java.lang.Integer.MAX_VALUE;
 import static java.lang.Math.min;
 import static java.lang.System.currentTimeMillis;
@@ -14,17 +20,12 @@ import static java.lang.System.lineSeparator;
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
-import static java.lang.Thread.yield;
 import static java.util.concurrent.ForkJoinPool.commonPool;
 import static java.util.concurrent.ForkJoinPool.getCommonPoolParallelism;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
+
 import static org.apache.commons.lang3.SystemUtils.IS_JAVA_1_8;
-import static org.mule.runtime.api.i18n.I18nMessageFactory.createStaticMessage;
-import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
-import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
-import static org.mule.runtime.api.util.MuleSystemProperties.SYSTEM_PROPERTY_PREFIX;
-import static org.mule.service.scheduler.ThreadType.CUSTOM;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.MuleException;
@@ -67,6 +68,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.quartz.SchedulerException;
+
 import org.slf4j.Logger;
 
 /**
@@ -655,7 +657,7 @@ public abstract class SchedulerThreadPools {
           // If after the specified timeout still cannot be destroyed, the the exception is thrown.
           destroyException = e;
           try {
-            yield();
+            Thread.yield();
             sleep(min(50, durationMillis));
           } catch (InterruptedException e1) {
             currentThread().interrupt();
