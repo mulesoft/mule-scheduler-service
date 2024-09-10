@@ -4,3 +4,6 @@ mavenSettingsXmlId: mule-runtime-maven-settings-MuleSettings
 archiveArtifacts: "**/hs_*.log"
 projectType: runtime
 jdkTool: OPEN-JDK17
+additionalTestConfigs:
+  jdk21:
+    testJdkTool: TEMURIN-JDK21
