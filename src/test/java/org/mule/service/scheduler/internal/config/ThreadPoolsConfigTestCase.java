@@ -401,7 +401,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
   @Test
   @Description("Tests that the mule.schedulerPools.configFile pointing to an external url property is honored if present")
-  @Ignore("Uncomment when we actually have a url with the new parameters")
+  @Ignore("W-16788727: Uncomment when we actually have a url with the new parameters")
   public void overrideConfigFileWithUrl() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
     props.put(UBER_THREAD_POOL_SIZE_MAX, "1");
@@ -416,7 +416,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
   @Test
   @Description("Tests that system properties overriding the config from the file are honored if present")
-  @Ignore("Uncomment when we actually have a url with the new paramters")
+  @Ignore("W-16788727: Uncomment when we actually have a url with the new paramters")
   public void overrideConfigWithIndividualProperty() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
     props.put(UBER_THREAD_POOL_SIZE_MAX, "1");
