@@ -669,7 +669,7 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
       new PollingProber().check(new JUnitLambdaProbe(() -> {
         assertThat("Shutdown", scheduler.isShutdown(), is(true));
         assertThat("Terminated", scheduler.isTerminated(), is(true));
-        assertThat("Destroyed", customThreadGroup.get().isDestroyed(), is(true));
+        assertThat("ActiveCount", customThreadGroup.get().activeCount(), is(0));
         return true;
       }));
     }
@@ -703,7 +703,7 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
       new PollingProber().check(new JUnitLambdaProbe(() -> {
         assertThat("Shutdown", scheduler.isShutdown(), is(true));
         assertThat("Terminated", scheduler.isTerminated(), is(true));
-        assertThat("Destroyed", customThreadGroup.get().isDestroyed(), is(true));
+        assertThat("ActiveCount", customThreadGroup.get().activeCount(), is(0));
         return true;
       }));
     }
