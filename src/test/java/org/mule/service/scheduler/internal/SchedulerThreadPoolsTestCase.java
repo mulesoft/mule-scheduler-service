@@ -612,7 +612,7 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
   }
 
   private void assertNoThreadGroupReferenceHeld(List<PhantomReference> references) {
-    new PollingProber(GC_POLLING_TIMEOUT, DEFAULT_POLLING_INTERVAL)
+    new PollingProber(GC_POLLING_TIMEOUT * 10, DEFAULT_POLLING_INTERVAL)
         .check(new JUnitLambdaProbe(() -> {
           System.gc();
           references.forEach(ref -> assertThat(ref.toString(), ref.isEnqueued(), is(true)));

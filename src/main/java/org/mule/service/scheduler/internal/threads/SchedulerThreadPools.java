@@ -600,9 +600,20 @@ public abstract class SchedulerThreadPools {
 
       if (threadGroup.equals(currentThread().getThreadGroup())) {
         // Avoid thread suicide
-        groupDestroyerExecutor.execute(() -> interruptAndLogActiveThreadsInThreadGroup());
+        groupDestroyerExecutor.execute(() -> shutdownThreadGroup());
       } else {
+        shutdownThreadGroup();
+      }
+    }
+
+    private void shutdownThreadGroup() {
+      String version = System.getProperty("java.specification.version");
+      double versionNumber = Double.parseDouble(version);
+
+      if (versionNumber >= 21) {
         interruptAndLogActiveThreadsInThreadGroup();
+      } else {
+        destroyThreadGroup();
       }
     }
 
@@ -659,6 +670,76 @@ public abstract class SchedulerThreadPools {
           break;
         }
       }
+    }
+
+    /**
+     * For compatibility with Java < 21, we need to use the destroy method
+     */
+    private void destroyThreadGroup() {
+      IllegalThreadStateException destroyException = doDestroyThreadGroup();
+
+      if (destroyException != null) {
+        threadGroup.interrupt();
+        destroyException = doDestroyThreadGroup();
+      }
+
+      tryTerminate();
+
+      if (destroyException != null) {
+        // Create the array larger in case new threads are created after the enumeration
+        Thread[] threads = new Thread[(int) (threadGroup.activeCount() * THREADS_IN_GROUP_SIZE_MARGIN)];
+        threadGroup.enumerate(threads, true);
+        StringBuilder threadNamesBuilder = new StringBuilder();
+        for (Thread thread : threads) {
+          // Account for the extra slots added to the array
+          if (thread == null) {
+            continue;
+          }
+
+          threadNamesBuilder.append("\t* " + thread.getName() + lineSeparator());
+
+          if (LOGGER.isDebugEnabled()) {
+            final StackTraceElement[] stackTrace = thread.getStackTrace();
+            for (int i = 1; i < stackTrace.length; i++) {
+              threadNamesBuilder.append("\t\tat ").append(stackTrace[i]).append(lineSeparator());
+            }
+          }
+        }
+
+        LOGGER.error("Unable to destroy ThreadGroup '{}' of Scheduler '{}' ({}). Remaining threads in the group are:"
+            + lineSeparator() + "{}", threadGroup.getName(), this.getName(), destroyException.toString(),
+                     threadNamesBuilder);
+      }
+    }
+
+    /**
+     * For compatibility with Java < 21, we need to use the destroy method
+     */
+    private IllegalThreadStateException doDestroyThreadGroup() {
+      IllegalThreadStateException destroyException = null;
+
+      final long durationMillis = shutdownTimeoutMillis.get();
+      final long stopNanos = nanoTime() + MILLISECONDS.toNanos(durationMillis) + SECONDS.toNanos(1);
+      while (nanoTime() <= stopNanos && !threadGroup.isDestroyed()) {
+        try {
+          threadGroup.destroy();
+          destroyException = null;
+          break;
+        } catch (IllegalThreadStateException e) {
+          // The wrapup of the threads is done asynchronously by java, so we perform this repeatedly until it runs after the
+          // wrapup (ref: Thread#exit()).
+          // If after the specified timeout still cannot be destroyed, the the exception is thrown.
+          destroyException = e;
+          try {
+            Thread.yield();
+            sleep(min(50, durationMillis));
+          } catch (InterruptedException e1) {
+            currentThread().interrupt();
+            break;
+          }
+        }
+      }
+      return destroyException;
     }
 
     @Override
