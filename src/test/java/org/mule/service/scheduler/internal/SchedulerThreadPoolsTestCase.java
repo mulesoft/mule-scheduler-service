@@ -711,6 +711,9 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
         assertThat("Shutdown", scheduler.isShutdown(), is(true));
         assertThat("Terminated", scheduler.isTerminated(), is(true));
         assertThat("ActiveCount", customThreadGroup.get().activeCount(), is(0));
+        if (isJavaVersionAtMost(JAVA_17)) {
+          assertThat("isDestroyed", customThreadGroup.get().isDestroyed(), is(true));
+        }
         return true;
       }));
     }
