@@ -25,6 +25,7 @@ import static java.util.concurrent.ForkJoinPool.getCommonPoolParallelism;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import static org.apache.commons.lang3.JavaVersion.JAVA_21;
 import static org.apache.commons.lang3.SystemUtils.IS_JAVA_1_8;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -69,6 +70,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import org.apache.commons.lang3.JavaVersion;
+import org.apache.commons.lang3.SystemUtils;
 import org.quartz.SchedulerException;
 
 import org.slf4j.Logger;
@@ -607,10 +610,7 @@ public abstract class SchedulerThreadPools {
     }
 
     private void shutdownThreadGroup() {
-      String version = System.getProperty("java.specification.version");
-      double versionNumber = Double.parseDouble(version);
-
-      if (versionNumber >= 21) {
+      if (SystemUtils.isJavaVersionAtLeast(JAVA_21)) {
         interruptAndLogActiveThreadsInThreadGroup();
       } else {
         destroyThreadGroup();
@@ -686,29 +686,7 @@ public abstract class SchedulerThreadPools {
       tryTerminate();
 
       if (destroyException != null) {
-        // Create the array larger in case new threads are created after the enumeration
-        Thread[] threads = new Thread[(int) (threadGroup.activeCount() * THREADS_IN_GROUP_SIZE_MARGIN)];
-        threadGroup.enumerate(threads, true);
-        StringBuilder threadNamesBuilder = new StringBuilder();
-        for (Thread thread : threads) {
-          // Account for the extra slots added to the array
-          if (thread == null) {
-            continue;
-          }
-
-          threadNamesBuilder.append("\t* " + thread.getName() + lineSeparator());
-
-          if (LOGGER.isDebugEnabled()) {
-            final StackTraceElement[] stackTrace = thread.getStackTrace();
-            for (int i = 1; i < stackTrace.length; i++) {
-              threadNamesBuilder.append("\t\tat ").append(stackTrace[i]).append(lineSeparator());
-            }
-          }
-        }
-
-        LOGGER.error("Unable to destroy ThreadGroup '{}' of Scheduler '{}' ({}). Remaining threads in the group are:"
-            + lineSeparator() + "{}", threadGroup.getName(), this.getName(), destroyException.toString(),
-                     threadNamesBuilder);
+        logActiveThreadGroup();
       }
     }
 
