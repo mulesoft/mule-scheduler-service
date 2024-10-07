@@ -29,6 +29,7 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import static org.apache.commons.lang3.JavaVersion.JAVA_17;
+import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtMost;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.sameInstance;
 import static org.hamcrest.Matchers.allOf;
@@ -673,7 +674,7 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
         assertThat("Shutdown", scheduler.isShutdown(), is(true));
         assertThat("Terminated", scheduler.isTerminated(), is(true));
         assertThat("ActiveCount", customThreadGroup.get().activeCount(), is(0));
-        if (SystemUtils.isJavaVersionAtMost(JAVA_17)) {
+        if (isJavaVersionAtMost(JAVA_17)) {
           assertThat("isDestroyed", customThreadGroup.get().isDestroyed(), is(true));
         }
         return true;

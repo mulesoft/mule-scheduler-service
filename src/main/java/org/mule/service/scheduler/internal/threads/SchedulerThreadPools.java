@@ -27,6 +27,7 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 
 import static org.apache.commons.lang3.JavaVersion.JAVA_21;
 import static org.apache.commons.lang3.SystemUtils.IS_JAVA_1_8;
+import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtLeast;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.MuleException;
@@ -610,7 +611,7 @@ public abstract class SchedulerThreadPools {
     }
 
     private void shutdownThreadGroup() {
-      if (SystemUtils.isJavaVersionAtLeast(JAVA_21)) {
+      if (isJavaVersionAtLeast(JAVA_21)) {
         interruptAndLogActiveThreadsInThreadGroup();
       } else {
         destroyThreadGroup();
