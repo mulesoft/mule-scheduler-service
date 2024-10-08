@@ -28,6 +28,8 @@ import static java.util.concurrent.ForkJoinPool.commonPool;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
+import static org.apache.commons.lang3.JavaVersion.JAVA_17;
+import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtMost;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.sameInstance;
 import static org.hamcrest.Matchers.allOf;
@@ -79,6 +81,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
+import org.apache.commons.lang3.JavaVersion;
+import org.apache.commons.lang3.SystemUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -669,7 +673,10 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
       new PollingProber().check(new JUnitLambdaProbe(() -> {
         assertThat("Shutdown", scheduler.isShutdown(), is(true));
         assertThat("Terminated", scheduler.isTerminated(), is(true));
-        assertThat("Destroyed", customThreadGroup.get().isDestroyed(), is(true));
+        assertThat("ActiveCount", customThreadGroup.get().activeCount(), is(0));
+        if (isJavaVersionAtMost(JAVA_17)) {
+          assertThat("isDestroyed", customThreadGroup.get().isDestroyed(), is(true));
+        }
         return true;
       }));
     }
@@ -703,7 +710,10 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
       new PollingProber().check(new JUnitLambdaProbe(() -> {
         assertThat("Shutdown", scheduler.isShutdown(), is(true));
         assertThat("Terminated", scheduler.isTerminated(), is(true));
-        assertThat("Destroyed", customThreadGroup.get().isDestroyed(), is(true));
+        assertThat("ActiveCount", customThreadGroup.get().activeCount(), is(0));
+        if (isJavaVersionAtMost(JAVA_17)) {
+          assertThat("isDestroyed", customThreadGroup.get().isDestroyed(), is(true));
+        }
         return true;
       }));
     }
