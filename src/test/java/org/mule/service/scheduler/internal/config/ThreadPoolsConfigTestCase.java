@@ -6,14 +6,6 @@
  */
 package org.mule.service.scheduler.internal.config;
 
-import static java.lang.Runtime.getRuntime;
-import static java.lang.System.clearProperty;
-import static java.lang.System.setProperty;
-import static org.hamcrest.CoreMatchers.instanceOf;
-import static org.hamcrest.CoreMatchers.is;
-import static org.hamcrest.CoreMatchers.startsWith;
-import static org.hamcrest.CoreMatchers.containsString;
-import static org.junit.Assert.assertThat;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
 import static org.mule.runtime.core.api.config.MuleProperties.MULE_HOME_DIRECTORY_PROPERTY;
@@ -35,6 +27,16 @@ import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsCon
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.WORK_QUEUE_SIZE;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
 
+import static java.lang.Runtime.getRuntime;
+import static java.lang.System.clearProperty;
+import static java.lang.System.setProperty;
+
+import static org.hamcrest.CoreMatchers.containsString;
+import static org.hamcrest.CoreMatchers.instanceOf;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.startsWith;
+import static org.hamcrest.MatcherAssert.assertThat;
+
 import org.mule.runtime.api.exception.DefaultMuleException;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
@@ -46,14 +48,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.Properties;
 
-import io.qameta.allure.Description;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.rules.TemporaryFolder;
+
+import io.qameta.allure.Description;
 
 public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
@@ -126,7 +128,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
 
     assertThat(config.getUberQueueSize().isPresent(), is(true));
-    int queueSize = config.getUberQueueSize().getAsInt();
+    final int queueSize = config.getUberQueueSize().getAsInt();
     if (queueSize > 0) {
       assertThat(queueSize, is((int) MEM / (2 * 3 * 32)));
     } else {
@@ -390,7 +392,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
     final Properties props = buildDefaultConfigProps();
     props.put(UBER_THREAD_POOL_SIZE_MAX, "100");
 
-    File overrideConfigFile = new File(tempOtherDir.getRoot(), "overriding.conf");
+    final File overrideConfigFile = new File(tempOtherDir.getRoot(), "overriding.conf");
     props.store(new FileOutputStream(overrideConfigFile), "defaultConfig");
     System.setProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY, overrideConfigFile.getPath());
 
@@ -401,34 +403,41 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
   @Test
   @Description("Tests that the mule.schedulerPools.configFile pointing to an external url property is honored if present")
-  @Ignore("Uncomment when we actually have a url with the new parameters")
   public void overrideConfigFileWithUrl() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
     props.put(UBER_THREAD_POOL_SIZE_MAX, "1");
 
     System.setProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY,
-                       "https://raw.githubusercontent.com/mulesoft/mule-distributions/mule-4.2.0/standalone/src/main/resources/conf/scheduler-pools.conf");
+                       "https://raw.githubusercontent.com/mulesoft/mule-distributions/refs/heads/4.8.0/standalone/src/main/resources/conf/scheduler-pools.conf");
 
-    final SchedulerPoolsConfig config = loadThreadPoolsConfig();
+    try {
+      final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getIoCorePoolSize().getAsInt(), is(CORES));
+      assertThat(config.getUberCorePoolSize().getAsInt(), is(CORES));
+    } finally {
+      System.clearProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY);
+    }
   }
 
   @Test
   @Description("Tests that system properties overriding the config from the file are honored if present")
-  @Ignore("Uncomment when we actually have a url with the new paramters")
   public void overrideConfigWithIndividualProperty() throws IOException, MuleException {
     final Properties props = buildDefaultConfigProps();
     props.put(UBER_THREAD_POOL_SIZE_MAX, "1");
 
     System.setProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY,
-                       "https://raw.githubusercontent.com/mulesoft/mule-distributions/mule-4.2.0/standalone/src/main/resources/conf/scheduler-pools.conf");
-    System.setProperty("org.mule.runtime.scheduler.io.threadPool.maxSize",
+                       "https://raw.githubusercontent.com/mulesoft/mule-distributions/refs/heads/4.8.0/standalone/src/main/resources/conf/scheduler-pools.conf");
+    System.setProperty("org.mule.runtime.scheduler.uber.threadPool.maxSize",
                        "100");
 
-    final SchedulerPoolsConfig config = loadThreadPoolsConfig();
+    try {
+      final SchedulerPoolsConfig config = loadThreadPoolsConfig();
 
-    assertThat(config.getUberMaxPoolSize().getAsInt(), is(100));
+      assertThat(config.getUberMaxPoolSize().getAsInt(), is(100));
+    } finally {
+      System.clearProperty(SCHEDULER_POOLS_CONFIG_FILE_PROPERTY);
+      System.clearProperty("org.mule.runtime.scheduler.uber.threadPool.maxSize");
+    }
   }
 
 }

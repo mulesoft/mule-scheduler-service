@@ -3,6 +3,7 @@ upstreamProjects:
 mavenSettingsXmlId: mule-runtime-maven-settings-MuleSettings
 archiveArtifacts: "**/hs_*.log"
 projectType: runtime
+mavenTool: "3.9.9"
 jdkTool: OPEN-JDK17
 additionalTestConfigs:
   jdk21:
