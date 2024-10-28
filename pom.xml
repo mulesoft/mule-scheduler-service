@@ -23,6 +23,8 @@
             ${surefire.args.base}
         </surefire.args>
 
+        <oldMuleArtifactVersion>1.8.0</oldMuleArtifactVersion>
+
         <javaModuleName>org.mule.service.scheduler</javaModuleName>
         <formatterConfigPath>formatter.xml</formatterConfigPath>
     </properties>
