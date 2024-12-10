@@ -22,8 +22,6 @@ import static java.lang.String.format;
 import static java.lang.System.getProperty;
 import static java.util.regex.Pattern.compile;
 
-import static org.apache.commons.lang3.JavaVersion.JAVA_11;
-import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtLeast;
 import static org.slf4j.LoggerFactory.getLogger;
 
 import org.mule.runtime.api.exception.DefaultMuleException;
@@ -47,7 +45,6 @@ import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
 import com.oracle.truffle.js.scriptengine.GraalJSEngineFactory;
-
 import org.slf4j.Logger;
 
 /**
@@ -168,12 +165,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
       throw new DefaultMuleException(e);
     }
 
-    ScriptEngineManager manager;
-    if (isJavaVersionAtLeast(JAVA_11)) {
-      manager = new ScriptEngineManager(GraalJSEngineFactory.class.getClassLoader());
-    } else {
-      manager = new ScriptEngineManager();
-    }
+    ScriptEngineManager manager = new ScriptEngineManager(GraalJSEngineFactory.class.getClassLoader());
     String engineName = "js";
     ScriptEngine engine = manager.getEngineByName(engineName);
     if (engine == null) {
