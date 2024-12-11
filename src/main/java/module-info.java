@@ -31,7 +31,7 @@ module org.mule.service.scheduler {
 
   requires java.inject;
 
-  requires quartz;
+  requires org.quartz;
 
   requires org.graalvm.js.scriptengine;
   requires java.scripting;
@@ -46,5 +46,5 @@ module org.mule.service.scheduler {
       org.mule.runtime.service;
 
   exports org.mule.service.scheduler.internal to
-      quartz;
+      org.quartz;
 }
