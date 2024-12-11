@@ -20,13 +20,10 @@ import static java.lang.System.lineSeparator;
 import static java.lang.System.nanoTime;
 import static java.lang.Thread.currentThread;
 import static java.lang.Thread.sleep;
-import static java.util.concurrent.ForkJoinPool.commonPool;
-import static java.util.concurrent.ForkJoinPool.getCommonPoolParallelism;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 import static org.apache.commons.lang3.JavaVersion.JAVA_21;
-import static org.apache.commons.lang3.SystemUtils.IS_JAVA_1_8;
 import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtLeast;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -71,10 +68,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import org.apache.commons.lang3.JavaVersion;
-import org.apache.commons.lang3.SystemUtils;
 import org.quartz.SchedulerException;
-
 import org.slf4j.Logger;
 
 /**
@@ -212,11 +206,6 @@ public abstract class SchedulerThreadPools {
   protected abstract void createCustomThreadGroups();
 
   public final void start() throws MuleException {
-    // Workaround to avoid the leak caused by https://bugs.java.com/bugdatabase/view_bug.do?bug_id=JDK-8172726
-    if (IS_JAVA_1_8) {
-      prestartCoreThreads(commonPool(), getCommonPoolParallelism());
-    }
-
     doStart(preStartThreads);
 
     scheduledExecutor = new ScheduledThreadPoolExecutor(1, new SchedulerThreadFactory(timerGroup, "%s"));
