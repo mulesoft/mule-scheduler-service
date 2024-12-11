@@ -44,7 +44,7 @@ import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
 
-import com.oracle.truffle.js.scriptengine.GraalJSEngineFactory;
+import org.mozilla.javascript.engine.RhinoScriptEngine;
 import org.slf4j.Logger;
 
 /**
@@ -165,8 +165,8 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
       throw new DefaultMuleException(e);
     }
 
-    ScriptEngineManager manager = new ScriptEngineManager(GraalJSEngineFactory.class.getClassLoader());
-    String engineName = "js";
+    ScriptEngineManager manager = new ScriptEngineManager(RhinoScriptEngine.class.getClassLoader());
+    String engineName = "javascript";
     ScriptEngine engine = manager.getEngineByName(engineName);
     if (engine == null) {
       throw new ConfigurationException(

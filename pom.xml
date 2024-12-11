@@ -63,12 +63,14 @@
             <artifactId>c3p0</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.graalvm.js</groupId>
-            <artifactId>js</artifactId>
+            <groupId>org.mozilla</groupId>
+            <artifactId>rhino</artifactId>
+            <version>1.7.15</version>
         </dependency>
         <dependency>
-            <groupId>org.graalvm.js</groupId>
-            <artifactId>js-scriptengine</artifactId>
+            <groupId>org.mozilla</groupId>
+            <artifactId>rhino-engine</artifactId>
+            <version>1.7.15</version>
         </dependency>
 
         <dependency>
