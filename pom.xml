@@ -10,7 +10,7 @@
     
     <artifactId>mule-service-scheduler</artifactId>
     <packaging>mule-service</packaging>
-    <version>1.8.2-SNAPSHOT</version>
+    <version>1.8.2-rc2</version>
 
     <name>Mule Scheduler Service Implementation</name>
 
