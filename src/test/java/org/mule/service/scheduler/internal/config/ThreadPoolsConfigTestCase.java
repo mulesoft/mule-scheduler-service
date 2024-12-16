@@ -358,7 +358,7 @@ public class ThreadPoolsConfigTestCase extends AbstractMuleTestCase {
 
     expected.expect(DefaultMuleException.class);
     expected.expectMessage(startsWith(IO_PREFIX + "." + WORK_QUEUE_SIZE));
-    expected.expectMessage(containsString("<eval>:1:3 Expected ) but found eof"));
+    expected.expectMessage(containsString("missing ) in parenthetical in eval at line number 0 at column number 3"));
     loadThreadPoolsConfig();
   }
 

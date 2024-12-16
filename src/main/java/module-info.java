@@ -33,7 +33,7 @@ module org.mule.service.scheduler {
 
   requires org.quartz;
 
-  requires org.graalvm.js.scriptengine;
+  requires org.mozilla.rhino.engine;
   requires java.scripting;
 
   requires com.github.benmanes.caffeine;
