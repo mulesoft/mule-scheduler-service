@@ -512,6 +512,7 @@ public abstract class SchedulerThreadPools {
   private boolean skip(String className) {
     return className.startsWith("org.mule.service.scheduler.")
         || className.startsWith("org.mule.runtime.module.service.internal.manager.")
+        || className.startsWith("org.mule.runtime.config.internal.context.service.")
         || className.contains("$Proxy");
   }
 
