@@ -39,6 +39,7 @@ import org.mule.service.scheduler.ThreadType;
 import org.mule.service.scheduler.internal.DefaultScheduler;
 import org.mule.service.scheduler.internal.executor.ByCallerThreadGroupPolicy;
 
+import java.lang.StackWalker.StackFrame;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -498,26 +499,20 @@ public abstract class SchedulerThreadPools {
   }
 
   private String resolveSchedulerCreationLocation(String prefix) {
-    int i = 0;
-    final StackTraceElement[] stackTrace = new Throwable().getStackTrace();
+    return StackWalker.getInstance().walk(frames -> {
+      final StackFrame ste = frames
+          .filter(frame -> !skip(frame.getClassName()))
+          .findFirst()
+          .get();
 
-    StackTraceElement ste = stackTrace[i++];
-    // We have to go deep enough, right before the proxy calls
-    while (skip(ste) && i < stackTrace.length) {
-      ste = stackTrace[i++];
-    }
-
-    if (skip(ste)) {
-      ste = stackTrace[4];
-    } else {
-      ste = stackTrace[i];
-    }
-
-    return (prefix != null ? prefix : "") + "@" + ste.getClassName() + "." + ste.getMethodName() + ":" + ste.getLineNumber();
+      return (prefix != null ? prefix : "") + "@" + ste.getClassName() + "." + ste.getMethodName() + ":" + ste.getLineNumber();
+    });
   }
 
-  private boolean skip(StackTraceElement ste) {
-    return !ste.getClassName().contains("$Proxy");
+  private boolean skip(String className) {
+    return className.startsWith("org.mule.service.scheduler.")
+        || className.startsWith("org.mule.runtime.module.service.internal.manager.")
+        || className.contains("$Proxy");
   }
 
   protected abstract Set<ThreadGroup> getWaitGroups();
@@ -593,7 +588,7 @@ public abstract class SchedulerThreadPools {
 
       if (threadGroup.equals(currentThread().getThreadGroup())) {
         // Avoid thread suicide
-        groupDestroyerExecutor.execute(() -> shutdownThreadGroup());
+        groupDestroyerExecutor.execute(this::shutdownThreadGroup);
       } else {
         shutdownThreadGroup();
       }
