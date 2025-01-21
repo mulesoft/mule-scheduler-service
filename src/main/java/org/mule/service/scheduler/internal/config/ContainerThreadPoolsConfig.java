@@ -41,10 +41,10 @@ import java.util.Properties;
 import java.util.regex.Pattern;
 
 import javax.script.ScriptEngine;
-import javax.script.ScriptEngineManager;
+import javax.script.ScriptEngineFactory;
 import javax.script.ScriptException;
 
-import org.mozilla.javascript.engine.RhinoScriptEngine;
+import org.mozilla.javascript.engine.RhinoScriptEngineFactory;
 import org.slf4j.Logger;
 
 /**
@@ -165,9 +165,8 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
       throw new DefaultMuleException(e);
     }
 
-    ScriptEngineManager manager = new ScriptEngineManager(RhinoScriptEngine.class.getClassLoader());
-    String engineName = "javascript";
-    ScriptEngine engine = manager.getEngineByName(engineName);
+    ScriptEngineFactory factory = new RhinoScriptEngineFactory();
+    ScriptEngine engine = factory.getScriptEngine();
     if (engine == null) {
       throw new ConfigurationException(
                                        createStaticMessage("No 'js' script engine found. It is required to parse the config in 'conf/scheduler-pools.conf'"));
