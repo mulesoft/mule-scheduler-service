@@ -26,7 +26,6 @@ import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.ForkJoinPool.commonPool;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -1054,7 +1053,7 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
   }
 
   private boolean isScheduledTaskInWaitGroup(Scheduler scheduler) throws ExecutionException, InterruptedException {
-    return scheduler.schedule(() -> service.isCurrentThreadInWaitGroup(), 0, MILLISECONDS).get();
+    return scheduler.submit(() -> service.isCurrentThreadInWaitGroup()).get();
   }
 
   @Test
@@ -1069,7 +1068,7 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
   }
 
   private boolean isScheduledTaskInCpuWorkGroup(Scheduler scheduler) throws ExecutionException, InterruptedException {
-    return scheduler.schedule(() -> service.isCurrentThreadForCpuWork(), 0, MILLISECONDS).get();
+    return scheduler.submit(() -> service.isCurrentThreadForCpuWork()).get();
   }
 
   protected abstract boolean areCpuLightTasksInWaitGroup();

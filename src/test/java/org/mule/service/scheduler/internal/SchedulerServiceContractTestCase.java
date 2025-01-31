@@ -7,7 +7,6 @@
 package org.mule.service.scheduler.internal;
 
 import static java.util.Optional.of;
-import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toSet;
 
 import static org.hamcrest.CoreMatchers.hasItem;
@@ -19,7 +18,6 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
-import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 import org.mule.runtime.api.exception.MuleException;
@@ -148,7 +146,7 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
   }
 
   private boolean isScheduledTaskInWaitGroup(Scheduler scheduler) throws ExecutionException, InterruptedException {
-    return scheduler.schedule(() -> service.isCurrentThreadInWaitGroup(), 0, MILLISECONDS).get();
+    return scheduler.submit(() -> service.isCurrentThreadInWaitGroup()).get();
   }
 
   @Test
@@ -158,7 +156,7 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
   }
 
   private boolean isScheduledTaskInCpuWorkGroup(Scheduler scheduler) throws ExecutionException, InterruptedException {
-    return scheduler.schedule(() -> service.isCurrentThreadForCpuWork(), 0, MILLISECONDS).get();
+    return scheduler.submit(() -> service.isCurrentThreadForCpuWork()).get();
   }
 
   protected abstract String getCpuLightPrefix();
