@@ -37,8 +37,6 @@ import java.lang.ref.ReferenceQueue;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.qameta.allure.Feature;
 import org.junit.After;
@@ -48,8 +46,9 @@ import org.junit.Test;
 @Feature(SCHEDULER_SERVICE)
 public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestCase {
 
-  public static final String SCHEDULER_MAINTENANCE_THREAD_PREFIX = "CUSTOM - Scheduler Maintenance";
-  public static final String CPU_LIGHT_UBER_THRAD_PREFIX = "IO - uber";
+  private static final String SCHEDULER_MAINTENANCE_THREAD_PREFIX = "CUSTOM - Scheduler Maintenance";
+  private static final String CPU_LIGHT_UBER_THRAD_PREFIX = "IO - uber";
+
   protected DefaultSchedulerService service;
 
   @Before
@@ -79,16 +78,6 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
     assertThat(getSchedulersRepresentation(service),
                hasItems(startsWith(CPU_LIGHT_UBER_THRAD_PREFIX), startsWith(CPU_LIGHT_UBER_THRAD_PREFIX)));
     assertThat(areSchedulersActive(service), is(true));
-  }
-
-  @Test
-  public void testWaitGroups() throws ExecutionException, InterruptedException {
-    assertThat(schedulesTasksInWaitGroup(service.cpuLightScheduler()), is(true));
-    assertThat(schedulesTasksInWaitGroup(service.customScheduler(config().withMaxConcurrentTasks(10))), is(false));
-  }
-
-  private boolean schedulesTasksInWaitGroup(Scheduler scheduler) throws ExecutionException, InterruptedException {
-    return scheduler.schedule(() -> service.isCurrentThreadInWaitGroup(), 0, MILLISECONDS).get();
   }
 
   @Test
@@ -150,6 +139,26 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
     assertThat(getSchedulersRepresentation(service), hasItem(startsWith(CPU_LIGHT_UBER_THRAD_PREFIX)));
     scheduler.stop();
     assertThat(service.getSchedulers(), hasSize(1));
+  }
+
+  @Test
+  public void testWaitGroups() throws ExecutionException, InterruptedException {
+    assertThat(isScheduledTaskInWaitGroup(service.cpuLightScheduler()), is(true));
+    assertThat(isScheduledTaskInWaitGroup(service.customScheduler(config().withMaxConcurrentTasks(10))), is(false));
+  }
+
+  private boolean isScheduledTaskInWaitGroup(Scheduler scheduler) throws ExecutionException, InterruptedException {
+    return scheduler.schedule(() -> service.isCurrentThreadInWaitGroup(), 0, MILLISECONDS).get();
+  }
+
+  @Test
+  public void testCpuWorkGroups() throws ExecutionException, InterruptedException {
+    assertThat(isScheduledTaskInCpuWorkGroup(service.cpuLightScheduler()), is(true));
+    assertThat(isScheduledTaskInCpuWorkGroup(service.customScheduler(config().withMaxConcurrentTasks(10))), is(false));
+  }
+
+  private boolean isScheduledTaskInCpuWorkGroup(Scheduler scheduler) throws ExecutionException, InterruptedException {
+    return scheduler.schedule(() -> service.isCurrentThreadForCpuWork(), 0, MILLISECONDS).get();
   }
 
   protected abstract String getCpuLightPrefix();

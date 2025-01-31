@@ -34,5 +34,24 @@ public class UberSchedulerThreadPoolsTestCase extends SchedulerThreadPoolsTestCa
     assertCallerRunsThreadLocalsIsolation(scheduler, maxPoolSize);
   }
 
+  @Override
+  protected boolean areCpuLightTasksInWaitGroup() {
+    return true;
+  }
+
+  @Override
+  protected boolean areIoTasksInWaitGroup() {
+    return true;
+  }
+
+  @Override
+  protected boolean areCpuLightTasksInCpuWorkGroup() {
+    return true;
+  }
+
+  @Override
+  protected boolean areIoTasksInCpuWorkGroup() {
+    return true;
+  }
 
 }

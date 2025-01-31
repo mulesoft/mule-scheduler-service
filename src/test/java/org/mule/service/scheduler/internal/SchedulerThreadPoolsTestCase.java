@@ -26,6 +26,7 @@ import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newFixedThreadPool;
 import static java.util.concurrent.Executors.newSingleThreadExecutor;
 import static java.util.concurrent.ForkJoinPool.commonPool;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
@@ -33,6 +34,7 @@ import static org.apache.commons.lang3.JavaVersion.JAVA_17;
 import static org.apache.commons.lang3.SystemUtils.isJavaVersionAtMost;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.sameInstance;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.lessThanOrEqualTo;
@@ -40,7 +42,6 @@ import static org.hamcrest.core.Is.is;
 import static org.hamcrest.core.IsInstanceOf.instanceOf;
 import static org.hamcrest.core.IsIterableContaining.hasItem;
 import static org.hamcrest.core.StringStartsWith.startsWith;
-import static org.junit.Assert.assertThat;
 import static org.junit.Assert.fail;
 import static org.junit.rules.ExpectedException.none;
 import static org.mockito.Mockito.mock;
@@ -1042,6 +1043,42 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
     expected.expectMessage("Only custom schedulers may define 'priority' behaviour");
     executeWithPriorityAndCapture(MIN_PRIORITY, service::createIoScheduler);
   }
+
+  @Test
+  public void testWaitGroups() throws ExecutionException, InterruptedException {
+    assertThat(isScheduledTaskInWaitGroup(service.createCpuLightScheduler(config(), CORES, () -> 1000L)),
+               is(areCpuLightTasksInWaitGroup()));
+    assertThat(isScheduledTaskInWaitGroup(service.createIoScheduler(config(), CORES, () -> 1000L)), is(areIoTasksInWaitGroup()));
+    assertThat(isScheduledTaskInWaitGroup(service.createCustomScheduler(config().withMaxConcurrentTasks(10), CORES, () -> 1000L)),
+               is(false));
+  }
+
+  private boolean isScheduledTaskInWaitGroup(Scheduler scheduler) throws ExecutionException, InterruptedException {
+    return scheduler.schedule(() -> service.isCurrentThreadInWaitGroup(), 0, MILLISECONDS).get();
+  }
+
+  @Test
+  public void testCpuWorkGroups() throws ExecutionException, InterruptedException {
+    assertThat(isScheduledTaskInCpuWorkGroup(service.createCpuLightScheduler(config(), CORES, () -> 1000L)),
+               is(areCpuLightTasksInCpuWorkGroup()));
+    assertThat(isScheduledTaskInCpuWorkGroup(service.createIoScheduler(config(), CORES, () -> 1000L)),
+               is(areIoTasksInCpuWorkGroup()));
+    assertThat(isScheduledTaskInCpuWorkGroup(service.createCustomScheduler(config().withMaxConcurrentTasks(10), CORES,
+                                                                           () -> 1000L)),
+               is(false));
+  }
+
+  private boolean isScheduledTaskInCpuWorkGroup(Scheduler scheduler) throws ExecutionException, InterruptedException {
+    return scheduler.schedule(() -> service.isCurrentThreadForCpuWork(), 0, MILLISECONDS).get();
+  }
+
+  protected abstract boolean areCpuLightTasksInWaitGroup();
+
+  protected abstract boolean areIoTasksInWaitGroup();
+
+  protected abstract boolean areCpuLightTasksInCpuWorkGroup();
+
+  protected abstract boolean areIoTasksInCpuWorkGroup();
 
   private interface SchedulerFactory {
 

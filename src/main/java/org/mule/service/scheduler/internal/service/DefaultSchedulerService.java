@@ -241,7 +241,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   @Override
   public boolean isCurrentThreadForCpuWork() {
-    return cpuWorkCache.get(currentThread());
+    return TRUE.equals(cpuWorkCache.get(currentThread()));
   }
 
   @Override
