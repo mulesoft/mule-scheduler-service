@@ -7,6 +7,7 @@
 package org.mule.service.scheduler.internal;
 
 import static java.util.Optional.of;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.stream.Collectors.toSet;
 
 import static org.hamcrest.CoreMatchers.hasItem;
@@ -18,6 +19,7 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
+import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 import org.mule.runtime.api.exception.MuleException;
@@ -34,6 +36,9 @@ import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import io.qameta.allure.Feature;
 import org.junit.After;
@@ -74,6 +79,16 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
     assertThat(getSchedulersRepresentation(service),
                hasItems(startsWith(CPU_LIGHT_UBER_THRAD_PREFIX), startsWith(CPU_LIGHT_UBER_THRAD_PREFIX)));
     assertThat(areSchedulersActive(service), is(true));
+  }
+
+  @Test
+  public void testWaitGroups() throws ExecutionException, InterruptedException {
+    assertThat(schedulesTasksInWaitGroup(service.cpuLightScheduler()), is(true));
+    assertThat(schedulesTasksInWaitGroup(service.customScheduler(config().withMaxConcurrentTasks(10))), is(false));
+  }
+
+  private boolean schedulesTasksInWaitGroup(Scheduler scheduler) throws ExecutionException, InterruptedException {
+    return scheduler.schedule(() -> service.isCurrentThreadInWaitGroup(), 0, MILLISECONDS).get();
   }
 
   @Test
