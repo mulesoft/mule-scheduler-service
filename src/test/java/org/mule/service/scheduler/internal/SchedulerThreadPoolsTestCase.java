@@ -10,6 +10,7 @@ import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.runtime.core.api.util.ClassUtils.withContextClassLoader;
 import static org.mule.runtime.core.api.util.IOUtils.toByteArray;
 import static org.mule.service.scheduler.internal.config.ContainerThreadPoolsConfig.loadThreadPoolsConfig;
+import static org.mule.service.scheduler.internal.threads.SchedulerThreadPools.builder;
 import static org.mule.tck.junit4.matcher.Eventually.eventually;
 import static org.mule.tck.probe.PollingProber.DEFAULT_POLLING_INTERVAL;
 import static org.mule.tck.probe.PollingProber.probe;
@@ -81,8 +82,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-import org.apache.commons.lang3.JavaVersion;
-import org.apache.commons.lang3.SystemUtils;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Rule;
@@ -116,7 +115,7 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
     threadPoolsConfig = loadThreadPoolsConfig();
     threadPoolsConfig.setSchedulerPoolStrategy(strategy, true);
 
-    service = SchedulerThreadPools.builder(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig)
+    service = builder(SchedulerThreadPoolsTestCase.class.getName(), threadPoolsConfig)
         .setPreStartCallback(executor -> {
           try {
             sleep(prestarCallbackSleepTime);

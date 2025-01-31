@@ -7,17 +7,24 @@
 package org.mule.service.scheduler.internal;
 
 import static java.util.Optional.of;
+import static java.util.stream.Collectors.toSet;
+
+import static org.hamcrest.CoreMatchers.hasItem;
+import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.startsWith;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasSize;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 import org.mule.runtime.api.exception.MuleException;
+import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfigFactory;
+import org.mule.runtime.api.scheduler.SchedulerView;
 import org.mule.service.scheduler.internal.service.DefaultSchedulerService;
 import org.mule.tck.junit4.AbstractMuleTestCase;
 import org.mule.tck.probe.JUnitLambdaProbe;
@@ -26,6 +33,7 @@ import org.mule.tck.probe.PollingProber;
 import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
 import java.util.OptionalLong;
+import java.util.Set;
 
 import io.qameta.allure.Feature;
 import org.junit.After;
@@ -35,6 +43,8 @@ import org.junit.Test;
 @Feature(SCHEDULER_SERVICE)
 public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestCase {
 
+  public static final String SCHEDULER_MAINTENANCE_THREAD_PREFIX = "CUSTOM - Scheduler Maintenance";
+  public static final String CPU_LIGHT_UBER_THRAD_PREFIX = "IO - uber";
   protected DefaultSchedulerService service;
 
   @Before
@@ -51,21 +61,36 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
   @Test
   public void defaultNoConfig() {
     assertThat(service.getPools(), hasSize(1));
+    assertThat(service.getSchedulers(), hasSize(1));
+    assertThat(getSchedulersRepresentation(service), hasItem(startsWith(SCHEDULER_MAINTENANCE_THREAD_PREFIX)));
+
     service.cpuLightScheduler();
     assertThat(service.getPools(), hasSize(1));
+    assertThat(service.getSchedulers(), hasSize(2));
+    assertThat(getSchedulersRepresentation(service), hasItem(startsWith(CPU_LIGHT_UBER_THRAD_PREFIX)));
     service.cpuLightScheduler();
     assertThat(service.getPools(), hasSize(1));
+    assertThat(service.getSchedulers(), hasSize(3));
+    assertThat(getSchedulersRepresentation(service),
+               hasItems(startsWith(CPU_LIGHT_UBER_THRAD_PREFIX), startsWith(CPU_LIGHT_UBER_THRAD_PREFIX)));
+    assertThat(areSchedulersActive(service), is(true));
   }
 
   @Test
   public void artifactConfig() {
     assertThat(service.getPools(), hasSize(1));
+    assertThat(service.getSchedulers(), hasSize(1));
+    assertThat(getSchedulersRepresentation(service), hasItem(startsWith(SCHEDULER_MAINTENANCE_THREAD_PREFIX)));
 
     final SchedulerPoolsConfigFactory configFactory = getMockConfigFactory();
     service.cpuLightScheduler(config(), configFactory);
     assertThat(service.getPools(), hasSize(2));
+    assertThat(service.getSchedulers(), hasSize(2));
+    assertThat(getSchedulersRepresentation(service), hasItem(startsWith(getCpuLightPrefix())));
     service.cpuLightScheduler(config(), configFactory);
     assertThat(service.getPools(), hasSize(2));
+    assertThat(service.getSchedulers(), hasSize(3));
+    assertThat(getSchedulersRepresentation(service), hasItems(startsWith(getCpuLightPrefix()), startsWith(getCpuLightPrefix())));
   }
 
   @Test
@@ -73,8 +98,13 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
     assertThat(service.getPools(), hasSize(1));
     service.cpuLightScheduler();
     assertThat(service.getPools(), hasSize(1));
+    assertThat(service.getSchedulers(), hasSize(2));
+    assertThat(getSchedulersRepresentation(service), hasItem(startsWith(CPU_LIGHT_UBER_THRAD_PREFIX)));
     service.cpuLightScheduler(config(), getMockConfigFactory());
     assertThat(service.getPools(), hasSize(2));
+    assertThat(service.getSchedulers(), hasSize(3));
+    assertThat(getSchedulersRepresentation(service),
+               hasItems(startsWith(CPU_LIGHT_UBER_THRAD_PREFIX), startsWith(getCpuLightPrefix())));
   }
 
   @Test
@@ -96,6 +126,26 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
       assertThat(service.getPools(), hasSize(1));
       return true;
     }));
+  }
+
+  @Test
+  public void stoppedScheduler() {
+    Scheduler scheduler = service.cpuLightScheduler();
+    assertThat(service.getSchedulers(), hasSize(2));
+    assertThat(getSchedulersRepresentation(service), hasItem(startsWith(CPU_LIGHT_UBER_THRAD_PREFIX)));
+    scheduler.stop();
+    assertThat(service.getSchedulers(), hasSize(1));
+  }
+
+  protected abstract String getCpuLightPrefix();
+
+  private Set<String> getSchedulersRepresentation(DefaultSchedulerService service) {
+    return service.getSchedulers().stream().map(SchedulerView::toString).collect(toSet());
+  }
+
+  private boolean areSchedulersActive(DefaultSchedulerService service) {
+    return service.getSchedulers().stream().noneMatch(SchedulerView::isShutdown)
+        && service.getSchedulers().stream().noneMatch(SchedulerView::isTerminated);
   }
 
   private SchedulerPoolsConfigFactory getMockConfigFactory() {

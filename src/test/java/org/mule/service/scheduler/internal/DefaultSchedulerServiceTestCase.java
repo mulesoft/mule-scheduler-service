@@ -21,6 +21,11 @@ import io.qameta.allure.Feature;
 public class DefaultSchedulerServiceTestCase extends SchedulerServiceContractTestCase {
 
   @Override
+  protected String getCpuLightPrefix() {
+    return "CPU_LIGHT - cpuLight";
+  }
+
+  @Override
   protected void configure(SchedulerPoolsConfig config) {
     when(config.getSchedulerPoolStrategy()).thenReturn(DEDICATED);
     when(config.getCpuLightPoolSize()).thenReturn(OptionalInt.of(1));

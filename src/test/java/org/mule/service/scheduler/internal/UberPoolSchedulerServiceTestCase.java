@@ -12,10 +12,10 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.sameInstance;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.when;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
 import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
@@ -83,6 +83,11 @@ public class UberPoolSchedulerServiceTestCase extends SchedulerServiceContractTe
     });
 
     assertThat(uberCount.get(), is(greaterThanOrEqualTo(1)));
+  }
+
+  @Override
+  protected String getCpuLightPrefix() {
+    return "IO - uber";
   }
 
   @Override
