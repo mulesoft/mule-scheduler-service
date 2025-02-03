@@ -11,10 +11,12 @@ import static java.util.stream.Collectors.toSet;
 
 import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.CoreMatchers.hasItems;
+import static org.hamcrest.CoreMatchers.instanceOf;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.junit.Assert.fail;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
@@ -22,6 +24,7 @@ import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHED
 
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.Scheduler;
+import org.mule.runtime.api.scheduler.SchedulerBusyException;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfigFactory;
 import org.mule.runtime.api.scheduler.SchedulerView;
@@ -98,7 +101,7 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
   @Test
   public void addWithArtifactConfig() {
     assertThat(service.getPools(), hasSize(1));
-    service.cpuLightScheduler();
+    service.cpuLightScheduler(config());
     assertThat(service.getPools(), hasSize(1));
     assertThat(service.getSchedulers(), hasSize(2));
     assertThat(getSchedulersRepresentation(service), hasItem(startsWith(CPU_LIGHT_UBER_THRAD_PREFIX)));
@@ -153,6 +156,28 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
   public void testCpuWorkGroups() throws ExecutionException, InterruptedException {
     assertThat(isScheduledTaskInCpuWorkGroup(service.cpuLightScheduler()), is(true));
     assertThat(isScheduledTaskInCpuWorkGroup(service.customScheduler(config().withMaxConcurrentTasks(10))), is(false));
+  }
+
+  @Test
+  public void customSchedulerWithCustomQueueSize() throws ExecutionException, InterruptedException {
+    Scheduler sourceScheduler = service.customScheduler(config().withMaxConcurrentTasks(1), 1);
+
+    // The first task will be executed
+    sourceScheduler.submit(() -> {
+      try {
+        // The second task will get queued in the queue with size 1
+        sourceScheduler.submit(() -> {
+        });
+        // The third task will be rejected due to the queue not having room.
+        // The task is executed inside another task so the thread belongs to the scheduler's thread group, otherwise the
+        // `ByCallerThreadGroupPolicy` would wait instead of rejecting it
+        sourceScheduler.submit(() -> {
+        });
+        fail("Task should have been rejected");
+      } catch (Exception e) {
+        assertThat(e, instanceOf(SchedulerBusyException.class));
+      }
+    }).get();
   }
 
   private boolean isScheduledTaskInCpuWorkGroup(Scheduler scheduler) throws ExecutionException, InterruptedException {
