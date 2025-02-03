@@ -10,6 +10,8 @@ import static org.mockito.Mockito.when;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.DEDICATED;
 import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
+import static java.lang.System.lineSeparator;
+
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 
 import java.util.OptionalInt;
@@ -43,6 +45,22 @@ public class DefaultSchedulerServiceTestCase extends SchedulerServiceContractTes
   @Override
   protected boolean areIoTasksInCpuWorkGroup() {
     return false;
+  }
+
+  @Override
+  protected String getSplashMessage() {
+    return "cpuLight.threadPool.size:      " +
+        config.getCpuLightPoolSize().getAsInt() + lineSeparator() +
+        "cpuLight.workQueue.size:       " +
+        config.getCpuLightQueueSize().getAsInt() + lineSeparator() +
+        "io.threadPool.maxSize:         " +
+        config.getIoMaxPoolSize().getAsInt() + lineSeparator() +
+        "io.threadPool.threadKeepAlive: " +
+        config.getIoKeepAlive().getAsLong() + " ms" + lineSeparator() +
+        "cpuIntensive.threadPool.size:  " +
+        config.getCpuIntensivePoolSize().getAsInt() + lineSeparator() +
+        "cpuIntensive.workQueue.size:   " +
+        config.getCpuIntensiveQueueSize().getAsInt() + lineSeparator();
   }
 
   @Override

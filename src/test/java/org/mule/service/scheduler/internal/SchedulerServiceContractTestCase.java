@@ -6,6 +6,7 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static java.lang.System.lineSeparator;
 import static java.util.Optional.of;
 import static java.util.stream.Collectors.toSet;
 
@@ -53,6 +54,7 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
   private static final String SCHEDULER_MAINTENANCE_THREAD_PREFIX = "CUSTOM - Scheduler Maintenance";
 
   protected DefaultSchedulerService service;
+  protected ContainerThreadPoolsConfig config;
 
   @Before
   public void before() throws MuleException {
@@ -60,8 +62,8 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
 
     try (final MockedStatic<ContainerThreadPoolsConfig> containerThreadPoolsConfig =
         mockStatic(ContainerThreadPoolsConfig.class)) {
-      ContainerThreadPoolsConfig mockConfig = getMockConfig();
-      containerThreadPoolsConfig.when(ContainerThreadPoolsConfig::loadThreadPoolsConfig).thenReturn(mockConfig);
+      config = getMockConfig();
+      containerThreadPoolsConfig.when(ContainerThreadPoolsConfig::loadThreadPoolsConfig).thenReturn(config);
       service.start();
     }
   }
@@ -125,7 +127,7 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
     assertThat(service.getPools(), hasSize(1));
 
     // We cannot use Mockito to create this object, because Mockito keeps hard reference to the mocks it creates.
-    SchedulerPoolsConfigFactory config = () -> of(getMockConfig());
+    SchedulerPoolsConfigFactory config = () -> of(this.config);
     PhantomReference<SchedulerPoolsConfigFactory> configFactoryRef = new PhantomReference<>(config, new ReferenceQueue<>());
 
     service.cpuLightScheduler(config(), config);
@@ -202,6 +204,23 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
     }).get();
   }
 
+  @Test
+  public void splashMessage() {
+    String expectedSplashMessage = "Resolved configuration values:" + lineSeparator() +
+        lineSeparator() +
+        "Pooling strategy:       " +
+        config.getSchedulerPoolStrategy().name() + lineSeparator() +
+        "gracefulShutdownTimeout:       " +
+        config.getGracefulShutdownTimeout().getAsLong() + " ms" + lineSeparator() +
+        getSplashMessage() +
+        lineSeparator() +
+        "These can be modified by editing 'conf/scheduler-pools.conf'" + lineSeparator();
+
+    assertThat(service.getSplashMessage(), is(expectedSplashMessage));
+  }
+
+  protected abstract String getSplashMessage();
+
   protected abstract String getCpuLightPrefix();
 
   private Set<String> getSchedulersRepresentation(DefaultSchedulerService service) {
@@ -215,7 +234,6 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
 
   private SchedulerPoolsConfigFactory getMockConfigFactory() {
     final SchedulerPoolsConfigFactory configFactory = mock(SchedulerPoolsConfigFactory.class);
-    final SchedulerPoolsConfig config = getMockConfig();
     when(configFactory.getConfig()).thenReturn(of(config));
     return configFactory;
   }

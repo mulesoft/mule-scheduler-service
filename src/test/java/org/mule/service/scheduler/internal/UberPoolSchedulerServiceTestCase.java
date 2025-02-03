@@ -6,6 +6,7 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static java.lang.System.lineSeparator;
 import static java.lang.Thread.currentThread;
 import static java.util.Collections.newSetFromMap;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -108,6 +109,14 @@ public class UberPoolSchedulerServiceTestCase extends SchedulerServiceContractTe
   @Override
   protected boolean areIoTasksInCpuWorkGroup() {
     return true;
+  }
+
+  @Override
+  protected String getSplashMessage() {
+    return "uber.threadPool.maxSize:         " +
+        config.getUberMaxPoolSize().getAsInt() + lineSeparator() +
+        "uber.threadPool.threadKeepAlive: " +
+        config.getUberKeepAlive().getAsLong() + " ms" + lineSeparator();
   }
 
   @Override

@@ -392,7 +392,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
           .append(containerThreadPoolsConfig.getUberMaxPoolSize().getAsInt() + lineSeparator());
       splashMessage.append("uber.threadPool.threadKeepAlive: ")
           .append(containerThreadPoolsConfig.getUberKeepAlive().getAsLong() + " ms" + lineSeparator());
-
     } else {
       splashMessage.append("cpuLight.threadPool.size:      ")
           .append(containerThreadPoolsConfig.getCpuLightPoolSize().getAsInt() + lineSeparator());
