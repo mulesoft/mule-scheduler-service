@@ -1043,42 +1043,6 @@ public abstract class SchedulerThreadPoolsTestCase extends AbstractMuleTestCase 
     executeWithPriorityAndCapture(MIN_PRIORITY, service::createIoScheduler);
   }
 
-  @Test
-  public void testWaitGroups() throws ExecutionException, InterruptedException {
-    assertThat(isScheduledTaskInWaitGroup(service.createCpuLightScheduler(config(), CORES, () -> 1000L)),
-               is(areCpuLightTasksInWaitGroup()));
-    assertThat(isScheduledTaskInWaitGroup(service.createIoScheduler(config(), CORES, () -> 1000L)), is(areIoTasksInWaitGroup()));
-    assertThat(isScheduledTaskInWaitGroup(service.createCustomScheduler(config().withMaxConcurrentTasks(10), CORES, () -> 1000L)),
-               is(false));
-  }
-
-  private boolean isScheduledTaskInWaitGroup(Scheduler scheduler) throws ExecutionException, InterruptedException {
-    return scheduler.submit(() -> service.isCurrentThreadInWaitGroup()).get();
-  }
-
-  @Test
-  public void testCpuWorkGroups() throws ExecutionException, InterruptedException {
-    assertThat(isScheduledTaskInCpuWorkGroup(service.createCpuLightScheduler(config(), CORES, () -> 1000L)),
-               is(areCpuLightTasksInCpuWorkGroup()));
-    assertThat(isScheduledTaskInCpuWorkGroup(service.createIoScheduler(config(), CORES, () -> 1000L)),
-               is(areIoTasksInCpuWorkGroup()));
-    assertThat(isScheduledTaskInCpuWorkGroup(service.createCustomScheduler(config().withMaxConcurrentTasks(10), CORES,
-                                                                           () -> 1000L)),
-               is(false));
-  }
-
-  private boolean isScheduledTaskInCpuWorkGroup(Scheduler scheduler) throws ExecutionException, InterruptedException {
-    return scheduler.submit(() -> service.isCurrentThreadForCpuWork()).get();
-  }
-
-  protected abstract boolean areCpuLightTasksInWaitGroup();
-
-  protected abstract boolean areIoTasksInWaitGroup();
-
-  protected abstract boolean areCpuLightTasksInCpuWorkGroup();
-
-  protected abstract boolean areIoTasksInCpuWorkGroup();
-
   private interface SchedulerFactory {
 
     Scheduler create(SchedulerConfig config, int parallelTasksEstimate, Supplier<Long> stopTimeout);

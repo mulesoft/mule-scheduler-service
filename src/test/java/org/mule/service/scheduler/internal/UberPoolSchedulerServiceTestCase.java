@@ -57,7 +57,7 @@ public class UberPoolSchedulerServiceTestCase extends SchedulerServiceContractTe
     ThreadGroup group = groups.iterator().next();
 
     assertThat(group, is(not(sameInstance(currentThread().getThreadGroup()))));
-    assertThat(group.getName(), containsString(".uber"));
+    assertThat(group.getName(), containsString("testuber"));
   }
 
   @Test
@@ -77,7 +77,7 @@ public class UberPoolSchedulerServiceTestCase extends SchedulerServiceContractTe
       assertThat(thread.getName(), not(containsString(CPU_LIGHT.name())));
       assertThat(thread.getName(), not(containsString(CPU_INTENSIVE.name())));
 
-      if (thread.getName().contains(".uber")) {
+      if (thread.getName().contains("testuber")) {
         uberCount.addAndGet(1);
       }
     });
@@ -88,6 +88,26 @@ public class UberPoolSchedulerServiceTestCase extends SchedulerServiceContractTe
   @Override
   protected String getCpuLightPrefix() {
     return "IO - uber";
+  }
+
+  @Override
+  protected boolean areCpuLightTasksInWaitGroup() {
+    return true;
+  }
+
+  @Override
+  protected boolean areIoTasksInWaitGroup() {
+    return true;
+  }
+
+  @Override
+  protected boolean areCpuLightTasksInCpuWorkGroup() {
+    return true;
+  }
+
+  @Override
+  protected boolean areIoTasksInCpuWorkGroup() {
+    return true;
   }
 
   @Override

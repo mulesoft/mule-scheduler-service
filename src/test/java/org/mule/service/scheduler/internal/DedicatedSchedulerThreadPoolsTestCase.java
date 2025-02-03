@@ -302,24 +302,4 @@ public class DedicatedSchedulerThreadPoolsTestCase extends SchedulerThreadPoolsT
                instanceOf(ThrottledScheduler.class));
   }
 
-  @Override
-  protected boolean areCpuLightTasksInWaitGroup() {
-    return false;
-  }
-
-  @Override
-  protected boolean areIoTasksInWaitGroup() {
-    return true;
-  }
-
-  @Override
-  protected boolean areCpuLightTasksInCpuWorkGroup() {
-    return true;
-  }
-
-  @Override
-  protected boolean areIoTasksInCpuWorkGroup() {
-    return false;
-  }
-
 }

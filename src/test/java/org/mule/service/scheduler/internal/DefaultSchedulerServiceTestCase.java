@@ -26,6 +26,26 @@ public class DefaultSchedulerServiceTestCase extends SchedulerServiceContractTes
   }
 
   @Override
+  protected boolean areCpuLightTasksInWaitGroup() {
+    return false;
+  }
+
+  @Override
+  protected boolean areIoTasksInWaitGroup() {
+    return true;
+  }
+
+  @Override
+  protected boolean areCpuLightTasksInCpuWorkGroup() {
+    return true;
+  }
+
+  @Override
+  protected boolean areIoTasksInCpuWorkGroup() {
+    return false;
+  }
+
+  @Override
   protected void configure(SchedulerPoolsConfig config) {
     when(config.getSchedulerPoolStrategy()).thenReturn(DEDICATED);
     when(config.getCpuLightPoolSize()).thenReturn(OptionalInt.of(1));
