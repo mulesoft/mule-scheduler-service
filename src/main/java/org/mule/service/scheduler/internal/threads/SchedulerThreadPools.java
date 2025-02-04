@@ -83,6 +83,7 @@ public abstract class SchedulerThreadPools {
 
   private static final Logger LOGGER = getLogger(SchedulerThreadPools.class);
 
+  private static final String CORE_THREADS_PRESTART_ERROR_MSG = "Unable to prestart all core threads for executor:";
 
   public static class Builder {
 
@@ -168,7 +169,6 @@ public abstract class SchedulerThreadPools {
   protected final Logger traceLogger;
 
   protected ScheduledThreadPoolExecutor scheduledExecutor;
-  private CronSchedulerHandler cronSchedulerHandler;
   protected org.quartz.Scheduler quartzScheduler;
 
   protected SchedulerThreadPools(String name,
@@ -213,7 +213,7 @@ public abstract class SchedulerThreadPools {
     scheduledExecutor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
     scheduledExecutor.setRemoveOnCancelPolicy(true);
 
-    cronSchedulerHandler = new CronSchedulerHandler(parentGroup, threadPoolsConfig.getThreadNamePrefix());
+    CronSchedulerHandler cronSchedulerHandler = new CronSchedulerHandler(parentGroup, threadPoolsConfig.getThreadNamePrefix());
     try {
       quartzScheduler = cronSchedulerHandler.getScheduler();
       quartzScheduler.start();
@@ -433,8 +433,7 @@ public abstract class SchedulerThreadPools {
         }));
       } catch (RejectedExecutionException ree) {
         executor.shutdownNow();
-        throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
-            + executorAsString));
+        throw new MuleRuntimeException(createStaticMessage(CORE_THREADS_PRESTART_ERROR_MSG + executorAsString));
       }
     }
 
@@ -442,8 +441,7 @@ public abstract class SchedulerThreadPools {
     try {
       if (!prestartLatch.await(30, SECONDS)) {
         executor.shutdownNow();
-        throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
-            + executorAsString));
+        throw new MuleRuntimeException(createStaticMessage(CORE_THREADS_PRESTART_ERROR_MSG + executorAsString));
       }
 
       try {
@@ -451,10 +449,10 @@ public abstract class SchedulerThreadPools {
           future.get(30, SECONDS);
         }
       } catch (ExecutionException e) {
-        throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
+        throw new MuleRuntimeException(createStaticMessage(CORE_THREADS_PRESTART_ERROR_MSG
             + executorAsString), e.getCause());
       } catch (TimeoutException e) {
-        throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
+        throw new MuleRuntimeException(createStaticMessage(CORE_THREADS_PRESTART_ERROR_MSG
             + executorAsString), e);
       }
     } catch (InterruptedException e) {

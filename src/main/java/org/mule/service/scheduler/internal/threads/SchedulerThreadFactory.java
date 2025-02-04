@@ -50,12 +50,11 @@ public class SchedulerThreadFactory implements java.util.concurrent.ThreadFactor
 
   @Override
   public Thread newThread(Runnable runnable) {
-    return withContextClassLoader(this.getClass().getClassLoader(), () -> {
-      // Avoid the created thread to inherit the security context of the caller thread's stack.
-      // If the thread creation is triggered by a deployable artifact classloader, a reference to it would be kept by the created
-      // thread without this doPrivileged call.
-      return doPrivileged((PrivilegedAction<Thread>) () -> createPrivileged(runnable), ACCESS_CONTROL_CTX);
-    });
+    return withContextClassLoader(this.getClass().getClassLoader(), () ->
+    // Avoid the created thread to inherit the security context of the caller thread's stack.
+    // If the thread creation is triggered by a deployable artifact classloader, a reference to it would be kept by the created
+    // thread without this doPrivileged call.
+    doPrivileged((PrivilegedAction<Thread>) () -> createPrivileged(runnable), ACCESS_CONTROL_CTX));
   }
 
   private Thread createPrivileged(Runnable runnable) {
