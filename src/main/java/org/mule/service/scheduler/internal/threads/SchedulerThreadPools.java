@@ -187,7 +187,7 @@ public abstract class SchedulerThreadPools {
       @Override
       public void uncaughtException(Thread t, Throwable e) {
         // This case happens if some rogue code stops our threads.
-        LOGGER.error("Thread '" + t.getName() + "' stopped.", e);
+        LOGGER.error("Thread '{}' stopped.", t.getName(), e);
       }
     };
 
@@ -277,13 +277,13 @@ public abstract class SchedulerThreadPools {
         .awaitTermination(threadPoolsConfig.getGracefulShutdownTimeout().getAsLong() - (currentTimeMillis() - startMillis),
                           MILLISECONDS)) {
       final List<Runnable> cancelledJobs = executor.shutdownNow();
-      LOGGER.warn("'" + executorLabel + "' " + executor + " did not shutdown gracefully after "
-          + threadPoolsConfig.getGracefulShutdownTimeout() + " milliseconds.");
+      LOGGER.warn("'{}' {} did not shutdown gracefully after {} milliseconds.", executorLabel, executor,
+                  threadPoolsConfig.getGracefulShutdownTimeout());
 
       if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("The jobs " + cancelledJobs + " were cancelled.");
+        LOGGER.debug("The jobs {} were cancelled.", cancelledJobs);
       } else {
-        LOGGER.info(cancelledJobs.size() + " jobs were cancelled.");
+        LOGGER.info("{} jobs were cancelled.", cancelledJobs.size());
       }
     }
   }
@@ -560,7 +560,7 @@ public abstract class SchedulerThreadPools {
 
     @Override
     public void shutdown() {
-      LOGGER.debug("Shutting down " + this.toString());
+      LOGGER.debug("Shutting down {}", this);
       doShutdown();
       executor.shutdown();
       shutdownCallback.accept(this);
@@ -568,7 +568,7 @@ public abstract class SchedulerThreadPools {
 
     @Override
     public List<Runnable> shutdownNow() {
-      LOGGER.debug("Shutting down NOW " + this.toString());
+      LOGGER.debug("Shutting down NOW {}", this);
       try {
         List<Runnable> cancelledTasks = doShutdownNow();
         executor.shutdownNow();

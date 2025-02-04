@@ -114,7 +114,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
       if (overriddenConfigFile.exists()) {
         if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Loading thread pools configuration from " + overriddenConfigFile.getPath());
+          LOGGER.debug("Loading thread pools configuration from {}", overriddenConfigFile.getPath());
         }
 
         try (final FileInputStream configIs = new FileInputStream(overriddenConfigFile)) {
@@ -135,7 +135,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
         getProperty(MULE_HOME_DIRECTORY_PROPERTY) != null ? new File(getProperty(MULE_HOME_DIRECTORY_PROPERTY)) : null;
 
     if (muleHome == null) {
-      LOGGER.info("No " + MULE_HOME_DIRECTORY_PROPERTY + " defined. Using default values for thread pools.");
+      LOGGER.info("No {} defined. Using default values for thread pools.", MULE_HOME_DIRECTORY_PROPERTY);
       return config;
     }
 
@@ -146,7 +146,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     }
 
     if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Loading thread pools configuration from " + defaultConfigFile.getPath());
+      LOGGER.debug("Loading thread pools configuration from {}", defaultConfigFile.getPath());
     }
 
     try (final FileInputStream configIs = new FileInputStream(defaultConfigFile)) {

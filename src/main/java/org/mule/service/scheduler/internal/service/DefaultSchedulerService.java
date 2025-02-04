@@ -295,10 +295,10 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
             public void onRemoval(SchedulerPoolsConfigFactory key, SchedulerThreadPools value, RemovalCause cause) {
               try {
                 value.stop();
-                LOGGER.info("Stopped " + this.toString());
+                LOGGER.info("Stopped {}", this);
               } catch (InterruptedException e) {
                 currentThread().interrupt();
-                LOGGER.warn("Stop of " + this.toString() + " interrupted", e);
+                LOGGER.warn("Stop of {} interrupted", this, e);
               } catch (MuleException e) {
                 throw new MuleRuntimeException(e);
               }
