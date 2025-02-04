@@ -20,7 +20,6 @@ import static java.lang.Thread.currentThread;
 import static java.util.Collections.unmodifiableList;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.stream.Collectors.toList;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -323,7 +322,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
         usageReportingTask = poolsMaintenanceScheduler.scheduleAtFixedRate(() -> {
           traceLogger.warn("************************************************************************");
           traceLogger.warn("* Schedulers Usage Report                                              *");
-          getTraceLogger().warn("* Schedulers Usage Report                                              *");
           traceLogger.warn("************************************************************************");
           for (SchedulerThreadPools pool : getPools()) {
             traceLogger.warn(pool.buildReportString());
@@ -370,7 +368,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     List<SchedulerView> schedulers = new ArrayList<>();
 
     for (SchedulerThreadPools schedulerThreadPools : getPools()) {
-      schedulers.addAll(schedulerThreadPools.getSchedulers().stream().map(s -> new DefaultSchedulerView(s)).collect(toList()));
+      schedulers.addAll(schedulerThreadPools.getSchedulers().stream().map(DefaultSchedulerView::new).toList());
     }
 
     return unmodifiableList(schedulers);
