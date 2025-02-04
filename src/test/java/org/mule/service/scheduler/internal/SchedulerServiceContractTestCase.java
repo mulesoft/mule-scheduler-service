@@ -21,6 +21,7 @@ import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.startsWith;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasSize;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -31,6 +32,7 @@ import static org.mockito.Mockito.when;
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.runtime.api.scheduler.SchedulerBusyException;
+import org.mule.runtime.api.scheduler.SchedulerPoolStrategy;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfig;
 import org.mule.runtime.api.scheduler.SchedulerPoolsConfigFactory;
 import org.mule.runtime.api.scheduler.SchedulerView;
@@ -254,6 +256,21 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
         "These can be modified by editing 'conf/scheduler-pools.conf'" + lineSeparator();
 
     assertThat(service.getSplashMessage(), is(expectedSplashMessage));
+  }
+
+  @Test
+  public void unknownPoolStrategy() {
+    DefaultSchedulerService service = new DefaultSchedulerService();
+    try (final MockedStatic<ContainerThreadPoolsConfig> containerThreadPoolsConfig =
+        mockStatic(ContainerThreadPoolsConfig.class)) {
+      ContainerThreadPoolsConfig config = getMockConfig();
+      when(config.getSchedulerPoolStrategy()).thenReturn(mock(SchedulerPoolStrategy.class));
+      containerThreadPoolsConfig.when(ContainerThreadPoolsConfig::loadThreadPoolsConfig).thenReturn(config);
+      IllegalArgumentException thrown = assertThrows("service is still started", IllegalArgumentException.class,
+                                                     service::start);
+
+      assertThat(thrown.getMessage(), startsWith("Unsupported pool strategy type"));
+    }
   }
 
   protected abstract String getSplashMessage();
