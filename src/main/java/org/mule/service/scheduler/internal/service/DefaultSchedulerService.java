@@ -66,10 +66,10 @@ import org.slf4j.Logger;
 public class DefaultSchedulerService implements SchedulerService, Startable, Stoppable {
 
   private static final String USAGE_TRACE_INTERVAL_SECS_PROPERTY = "mule.scheduler.usageTraceIntervalSecs";
-  public static final Long USAGE_TRACE_INTERVAL_SECS = getLong(USAGE_TRACE_INTERVAL_SECS_PROPERTY);
+  private static final Long USAGE_TRACE_INTERVAL_SECS = getLong(USAGE_TRACE_INTERVAL_SECS_PROPERTY);
 
   private static final Logger LOGGER = getLogger(DefaultSchedulerService.class);
-  public static final Logger TRACE_LOGGER = getLogger("org.mule.service.scheduler.trace");
+  private static final Logger TRACE_LOGGER = getLogger("org.mule.service.scheduler.trace");
 
   private static final long DEFAULT_SHUTDOWN_TIMEOUT_MILLIS = 5000;
   private static final int CORES = getRuntime().availableProcessors();
@@ -88,6 +88,14 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
       .build(t -> isCurrentThreadForCpuWork(getInstance()));
   private final LoadingCache<Thread, Boolean> waitGroupCache = Caffeine.newBuilder().weakKeys()
       .build(t -> isCurrentThreadInWaitGroup(getInstance()));
+
+  public static Logger getTraceLogger() {
+    return TRACE_LOGGER;
+  }
+
+  public static Long getUsageTraceIntervalSecs() {
+    return USAGE_TRACE_INTERVAL_SECS;
+  }
 
   @Override
   public String getName() {
@@ -309,17 +317,19 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
       poolsMaintenanceScheduler = customScheduler(config().withName("Scheduler Maintenance").withMaxConcurrentTasks(1));
       poolsMaintenanceTask = poolsMaintenanceScheduler.scheduleAtFixedRate(() -> poolsByConfig.cleanUp(), 1, 1, MINUTES);
 
-      if (USAGE_TRACE_INTERVAL_SECS != null) {
-        TRACE_LOGGER.info("Usage Trace enabled");
+      if (getUsageTraceIntervalSecs() != null) {
+        Logger traceLogger = getTraceLogger();
+        traceLogger.info("Usage Trace enabled");
         usageReportingTask = poolsMaintenanceScheduler.scheduleAtFixedRate(() -> {
-          TRACE_LOGGER.warn("************************************************************************");
-          TRACE_LOGGER.warn("* Schedulers Usage Report                                              *");
-          TRACE_LOGGER.warn("************************************************************************");
+          traceLogger.warn("************************************************************************");
+          traceLogger.warn("* Schedulers Usage Report                                              *");
+          getTraceLogger().warn("* Schedulers Usage Report                                              *");
+          traceLogger.warn("************************************************************************");
           for (SchedulerThreadPools pool : getPools()) {
-            TRACE_LOGGER.warn(pool.buildReportString());
-            TRACE_LOGGER.warn("************************************************************************");
+            traceLogger.warn(pool.buildReportString());
+            traceLogger.warn("************************************************************************");
           }
-        }, USAGE_TRACE_INTERVAL_SECS, USAGE_TRACE_INTERVAL_SECS, SECONDS);
+        }, getUsageTraceIntervalSecs(), getUsageTraceIntervalSecs(), SECONDS);
       }
 
     } finally {
@@ -329,14 +339,14 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   private SchedulerThreadPools createSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig) {
     return SchedulerThreadPools.builder(name, threadPoolsConfig)
-        .setTraceLogger(TRACE_LOGGER)
+        .setTraceLogger(getTraceLogger())
         .preStartThreads(true)
         .build();
   }
 
   @Override
   public void stop() throws MuleException {
-    LOGGER.info("Stopping " + this.toString() + "...");
+    LOGGER.info("Stopping {}...", this);
     pollsWriteLock.lock();
     try {
       started = false;

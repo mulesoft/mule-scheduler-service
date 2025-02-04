@@ -6,10 +6,14 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
+import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
+
 import static java.lang.System.lineSeparator;
 import static java.util.Optional.of;
 import static java.util.stream.Collectors.toSet;
 
+import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.instanceOf;
@@ -18,11 +22,11 @@ import static org.hamcrest.CoreMatchers.startsWith;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.junit.Assert.fail;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
-import static org.mule.runtime.api.scheduler.SchedulerConfig.config;
-import static org.mule.test.allure.AllureConstants.SchedulerServiceFeature.SCHEDULER_SERVICE;
 
 import org.mule.runtime.api.exception.MuleException;
 import org.mule.runtime.api.scheduler.Scheduler;
@@ -38,6 +42,8 @@ import org.mule.tck.probe.PollingProber;
 
 import java.lang.ref.PhantomReference;
 import java.lang.ref.ReferenceQueue;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
@@ -47,6 +53,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.MockedStatic;
+import org.slf4j.Logger;
 
 @Feature(SCHEDULER_SERVICE)
 public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestCase {
@@ -60,6 +67,10 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
   public void before() throws MuleException {
     service = new DefaultSchedulerService();
 
+    startService(service);
+  }
+
+  private void startService(DefaultSchedulerService service) throws MuleException {
     try (final MockedStatic<ContainerThreadPoolsConfig> containerThreadPoolsConfig =
         mockStatic(ContainerThreadPoolsConfig.class)) {
       config = getMockConfig();
@@ -71,6 +82,32 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
   @After
   public void after() throws MuleException {
     service.stop();
+  }
+
+  @Test
+  public void usageTraceEnabled() throws Throwable {
+    List<String> maintenanceMessage = new ArrayList<>();
+    Logger testLogger = mock(Logger.class);
+    doAnswer(invocation -> {
+      maintenanceMessage.add(invocation.getArgument(0));
+      return null;
+    }).when(testLogger).warn(anyString());
+
+    try (final MockedStatic<DefaultSchedulerService> serviceClass = mockStatic(DefaultSchedulerService.class)) {
+      serviceClass.when(DefaultSchedulerService::getTraceLogger).thenReturn(testLogger);
+      serviceClass.when(DefaultSchedulerService::getUsageTraceIntervalSecs).thenReturn(1L);
+      DefaultSchedulerService service = new DefaultSchedulerService();
+      try {
+        startService(service);
+
+        new PollingProber(10000, 500).check(new JUnitLambdaProbe(() -> {
+          assertThat(maintenanceMessage, hasItem(containsString("Schedulers Usage Report")));
+          return true;
+        }));
+      } finally {
+        service.stop();
+      }
+    }
   }
 
   @Test
