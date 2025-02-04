@@ -277,7 +277,7 @@ public abstract class SchedulerThreadPools {
         .awaitTermination(threadPoolsConfig.getGracefulShutdownTimeout().getAsLong() - (currentTimeMillis() - startMillis),
                           MILLISECONDS)) {
       final List<Runnable> cancelledJobs = executor.shutdownNow();
-      LOGGER.warn("'" + executorLabel + "' " + executor.toString() + " did not shutdown gracefully after "
+      LOGGER.warn("'" + executorLabel + "' " + executor + " did not shutdown gracefully after "
           + threadPoolsConfig.getGracefulShutdownTimeout() + " milliseconds.");
 
       if (LOGGER.isDebugEnabled()) {
@@ -372,7 +372,7 @@ public abstract class SchedulerThreadPools {
     BlockingQueue<Runnable> workQueue = createQueue(workQueueSize);
     if (config.getMaxConcurrentTasks() == null) {
       throw new IllegalArgumentException(
-                                         "Custom schedulers must define a thread pool size bi calling `config.withMaxConcurrentTasks()`");
+                                         "Custom schedulers must define a thread pool size by calling `config.withMaxConcurrentTasks()`");
     }
 
     final ThreadGroup customChildGroup = new ThreadGroup(resolveThreadGroupForCustomScheduler(config), threadsName);

@@ -222,6 +222,15 @@ public abstract class SchedulerServiceContractTestCase extends AbstractMuleTestC
   protected abstract boolean areIoTasksInCpuWorkGroup();
 
   @Test
+  public void customSchedulerWithoutPoolSize() {
+    IllegalArgumentException thrown = assertThrows("Custom scheduler is still created", IllegalArgumentException.class,
+                                                   () -> service.customScheduler(config(), 1));
+
+    assertThat(thrown.getMessage(),
+               is("Custom schedulers must define a thread pool size by calling `config.withMaxConcurrentTasks()`"));
+  }
+
+  @Test
   public void customSchedulerWithCustomQueueSize() throws ExecutionException, InterruptedException {
     Scheduler sourceScheduler = service.customScheduler(config().withMaxConcurrentTasks(1), 1);
 
