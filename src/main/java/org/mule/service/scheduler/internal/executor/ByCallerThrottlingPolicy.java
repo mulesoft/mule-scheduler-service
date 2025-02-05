@@ -6,7 +6,7 @@
  */
 package org.mule.service.scheduler.internal.executor;
 
-import static org.mule.service.scheduler.internal.service.DefaultSchedulerService.USAGE_TRACE_INTERVAL_SECS;
+import static org.mule.service.scheduler.internal.service.DefaultSchedulerService.getTraceLogger;
 
 import static java.lang.Thread.currentThread;
 import static java.util.Collections.emptySet;
@@ -106,11 +106,11 @@ public final class ByCallerThrottlingPolicy extends AbstractByCallerPolicy {
   }
 
   private boolean isLogThrottleEnabled() {
-    return USAGE_TRACE_INTERVAL_SECS != null ? traceLogger.isWarnEnabled() : traceLogger.isDebugEnabled();
+    return getTraceLogger() != null ? traceLogger.isWarnEnabled() : traceLogger.isDebugEnabled();
   }
 
   private void logThrottle(String taskAsString, String strategy, String targetAsString) {
-    if (USAGE_TRACE_INTERVAL_SECS != null) {
+    if (getTraceLogger() != null) {
       traceLogger.warn("Task throttled back ({}) from '{}' scheduler: {}", rightPad(strategy, 16), targetAsString, taskAsString);
     } else {
       traceLogger.debug("Task throttled back ({}) from '{}' scheduler: {}", rightPad(strategy, 16), targetAsString, taskAsString);

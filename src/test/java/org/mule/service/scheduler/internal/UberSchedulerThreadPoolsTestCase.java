@@ -34,5 +34,4 @@ public class UberSchedulerThreadPoolsTestCase extends SchedulerThreadPoolsTestCa
     assertCallerRunsThreadLocalsIsolation(scheduler, maxPoolSize);
   }
 
-
 }

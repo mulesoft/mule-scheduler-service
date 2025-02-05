@@ -20,7 +20,6 @@ import static java.lang.Thread.currentThread;
 import static java.util.Collections.unmodifiableList;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static java.util.stream.Collectors.toList;
 
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -66,10 +65,10 @@ import org.slf4j.Logger;
 public class DefaultSchedulerService implements SchedulerService, Startable, Stoppable {
 
   private static final String USAGE_TRACE_INTERVAL_SECS_PROPERTY = "mule.scheduler.usageTraceIntervalSecs";
-  public static final Long USAGE_TRACE_INTERVAL_SECS = getLong(USAGE_TRACE_INTERVAL_SECS_PROPERTY);
+  private static final Long USAGE_TRACE_INTERVAL_SECS = getLong(USAGE_TRACE_INTERVAL_SECS_PROPERTY);
 
   private static final Logger LOGGER = getLogger(DefaultSchedulerService.class);
-  public static final Logger TRACE_LOGGER = getLogger("org.mule.service.scheduler.trace");
+  private static final Logger TRACE_LOGGER = getLogger("org.mule.service.scheduler.trace");
 
   private static final long DEFAULT_SHUTDOWN_TIMEOUT_MILLIS = 5000;
   private static final int CORES = getRuntime().availableProcessors();
@@ -88,6 +87,14 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
       .build(t -> isCurrentThreadForCpuWork(getInstance()));
   private final LoadingCache<Thread, Boolean> waitGroupCache = Caffeine.newBuilder().weakKeys()
       .build(t -> isCurrentThreadInWaitGroup(getInstance()));
+
+  public static Logger getTraceLogger() {
+    return TRACE_LOGGER;
+  }
+
+  public static Long getUsageTraceIntervalSecs() {
+    return USAGE_TRACE_INTERVAL_SECS;
+  }
 
   @Override
   public String getName() {
@@ -241,7 +248,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   @Override
   public boolean isCurrentThreadForCpuWork() {
-    return cpuWorkCache.get(currentThread());
+    return TRUE.equals(cpuWorkCache.get(currentThread()));
   }
 
   @Override
@@ -287,10 +294,10 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
             public void onRemoval(SchedulerPoolsConfigFactory key, SchedulerThreadPools value, RemovalCause cause) {
               try {
                 value.stop();
-                LOGGER.info("Stopped " + this.toString());
+                LOGGER.info("Stopped {}", this);
               } catch (InterruptedException e) {
                 currentThread().interrupt();
-                LOGGER.warn("Stop of " + this.toString() + " interrupted", e);
+                LOGGER.warn("Stop of {} interrupted", this, e);
               } catch (MuleException e) {
                 throw new MuleRuntimeException(e);
               }
@@ -309,17 +316,18 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
       poolsMaintenanceScheduler = customScheduler(config().withName("Scheduler Maintenance").withMaxConcurrentTasks(1));
       poolsMaintenanceTask = poolsMaintenanceScheduler.scheduleAtFixedRate(() -> poolsByConfig.cleanUp(), 1, 1, MINUTES);
 
-      if (USAGE_TRACE_INTERVAL_SECS != null) {
-        TRACE_LOGGER.info("Usage Trace enabled");
+      if (getUsageTraceIntervalSecs() != null) {
+        Logger traceLogger = getTraceLogger();
+        traceLogger.info("Usage Trace enabled");
         usageReportingTask = poolsMaintenanceScheduler.scheduleAtFixedRate(() -> {
-          TRACE_LOGGER.warn("************************************************************************");
-          TRACE_LOGGER.warn("* Schedulers Usage Report                                              *");
-          TRACE_LOGGER.warn("************************************************************************");
+          traceLogger.warn("************************************************************************");
+          traceLogger.warn("* Schedulers Usage Report                                              *");
+          traceLogger.warn("************************************************************************");
           for (SchedulerThreadPools pool : getPools()) {
-            TRACE_LOGGER.warn(pool.buildReportString());
-            TRACE_LOGGER.warn("************************************************************************");
+            traceLogger.warn(pool.buildReportString());
+            traceLogger.warn("************************************************************************");
           }
-        }, USAGE_TRACE_INTERVAL_SECS, USAGE_TRACE_INTERVAL_SECS, SECONDS);
+        }, getUsageTraceIntervalSecs(), getUsageTraceIntervalSecs(), SECONDS);
       }
 
     } finally {
@@ -329,14 +337,14 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
 
   private SchedulerThreadPools createSchedulerThreadPools(String name, SchedulerPoolsConfig threadPoolsConfig) {
     return SchedulerThreadPools.builder(name, threadPoolsConfig)
-        .setTraceLogger(TRACE_LOGGER)
+        .setTraceLogger(getTraceLogger())
         .preStartThreads(true)
         .build();
   }
 
   @Override
   public void stop() throws MuleException {
-    LOGGER.info("Stopping " + this.toString() + "...");
+    LOGGER.info("Stopping {}...", this);
     pollsWriteLock.lock();
     try {
       started = false;
@@ -360,7 +368,7 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
     List<SchedulerView> schedulers = new ArrayList<>();
 
     for (SchedulerThreadPools schedulerThreadPools : getPools()) {
-      schedulers.addAll(schedulerThreadPools.getSchedulers().stream().map(s -> new DefaultSchedulerView(s)).collect(toList()));
+      schedulers.addAll(schedulerThreadPools.getSchedulers().stream().map(DefaultSchedulerView::new).toList());
     }
 
     return unmodifiableList(schedulers);
@@ -392,7 +400,6 @@ public class DefaultSchedulerService implements SchedulerService, Startable, Sto
           .append(containerThreadPoolsConfig.getUberMaxPoolSize().getAsInt() + lineSeparator());
       splashMessage.append("uber.threadPool.threadKeepAlive: ")
           .append(containerThreadPoolsConfig.getUberKeepAlive().getAsLong() + " ms" + lineSeparator());
-
     } else {
       splashMessage.append("cpuLight.threadPool.size:      ")
           .append(containerThreadPoolsConfig.getCpuLightPoolSize().getAsInt() + lineSeparator());
