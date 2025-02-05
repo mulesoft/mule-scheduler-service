@@ -83,6 +83,7 @@ public abstract class SchedulerThreadPools {
 
   private static final Logger LOGGER = getLogger(SchedulerThreadPools.class);
 
+  private static final String CORE_THREADS_PRESTART_ERROR_MSG = "Unable to prestart all core threads for executor:";
 
   public static class Builder {
 
@@ -168,7 +169,6 @@ public abstract class SchedulerThreadPools {
   protected final Logger traceLogger;
 
   protected ScheduledThreadPoolExecutor scheduledExecutor;
-  private CronSchedulerHandler cronSchedulerHandler;
   protected org.quartz.Scheduler quartzScheduler;
 
   protected SchedulerThreadPools(String name,
@@ -187,7 +187,7 @@ public abstract class SchedulerThreadPools {
       @Override
       public void uncaughtException(Thread t, Throwable e) {
         // This case happens if some rogue code stops our threads.
-        LOGGER.error("Thread '" + t.getName() + "' stopped.", e);
+        LOGGER.error("Thread '{}' stopped.", t.getName(), e);
       }
     };
 
@@ -213,7 +213,7 @@ public abstract class SchedulerThreadPools {
     scheduledExecutor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
     scheduledExecutor.setRemoveOnCancelPolicy(true);
 
-    cronSchedulerHandler = new CronSchedulerHandler(parentGroup, threadPoolsConfig.getThreadNamePrefix());
+    CronSchedulerHandler cronSchedulerHandler = new CronSchedulerHandler(parentGroup, threadPoolsConfig.getThreadNamePrefix());
     try {
       quartzScheduler = cronSchedulerHandler.getScheduler();
       quartzScheduler.start();
@@ -277,13 +277,13 @@ public abstract class SchedulerThreadPools {
         .awaitTermination(threadPoolsConfig.getGracefulShutdownTimeout().getAsLong() - (currentTimeMillis() - startMillis),
                           MILLISECONDS)) {
       final List<Runnable> cancelledJobs = executor.shutdownNow();
-      LOGGER.warn("'" + executorLabel + "' " + executor.toString() + " did not shutdown gracefully after "
-          + threadPoolsConfig.getGracefulShutdownTimeout() + " milliseconds.");
+      LOGGER.warn("'{}' {} did not shutdown gracefully after {} milliseconds.", executorLabel, executor,
+                  threadPoolsConfig.getGracefulShutdownTimeout());
 
       if (LOGGER.isDebugEnabled()) {
-        LOGGER.debug("The jobs " + cancelledJobs + " were cancelled.");
+        LOGGER.debug("The jobs {} were cancelled.", cancelledJobs);
       } else {
-        LOGGER.info(cancelledJobs.size() + " jobs were cancelled.");
+        LOGGER.info("{} jobs were cancelled.", cancelledJobs.size());
       }
     }
   }
@@ -372,7 +372,7 @@ public abstract class SchedulerThreadPools {
     BlockingQueue<Runnable> workQueue = createQueue(workQueueSize);
     if (config.getMaxConcurrentTasks() == null) {
       throw new IllegalArgumentException(
-                                         "Custom schedulers must define a thread pool size bi calling `config.withMaxConcurrentTasks()`");
+                                         "Custom schedulers must define a thread pool size by calling `config.withMaxConcurrentTasks()`");
     }
 
     final ThreadGroup customChildGroup = new ThreadGroup(resolveThreadGroupForCustomScheduler(config), threadsName);
@@ -433,8 +433,7 @@ public abstract class SchedulerThreadPools {
         }));
       } catch (RejectedExecutionException ree) {
         executor.shutdownNow();
-        throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
-            + executorAsString));
+        throw new MuleRuntimeException(createStaticMessage(CORE_THREADS_PRESTART_ERROR_MSG + executorAsString));
       }
     }
 
@@ -442,8 +441,7 @@ public abstract class SchedulerThreadPools {
     try {
       if (!prestartLatch.await(30, SECONDS)) {
         executor.shutdownNow();
-        throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
-            + executorAsString));
+        throw new MuleRuntimeException(createStaticMessage(CORE_THREADS_PRESTART_ERROR_MSG + executorAsString));
       }
 
       try {
@@ -451,10 +449,10 @@ public abstract class SchedulerThreadPools {
           future.get(30, SECONDS);
         }
       } catch (ExecutionException e) {
-        throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
+        throw new MuleRuntimeException(createStaticMessage(CORE_THREADS_PRESTART_ERROR_MSG
             + executorAsString), e.getCause());
       } catch (TimeoutException e) {
-        throw new MuleRuntimeException(createStaticMessage("Unable to prestart all core threads for executor:"
+        throw new MuleRuntimeException(createStaticMessage(CORE_THREADS_PRESTART_ERROR_MSG
             + executorAsString), e);
       }
     } catch (InterruptedException e) {
@@ -560,7 +558,7 @@ public abstract class SchedulerThreadPools {
 
     @Override
     public void shutdown() {
-      LOGGER.debug("Shutting down " + this.toString());
+      LOGGER.debug("Shutting down {}", this);
       doShutdown();
       executor.shutdown();
       shutdownCallback.accept(this);
@@ -568,7 +566,7 @@ public abstract class SchedulerThreadPools {
 
     @Override
     public List<Runnable> shutdownNow() {
-      LOGGER.debug("Shutting down NOW " + this.toString());
+      LOGGER.debug("Shutting down NOW {}", this);
       try {
         List<Runnable> cancelledTasks = doShutdownNow();
         executor.shutdownNow();

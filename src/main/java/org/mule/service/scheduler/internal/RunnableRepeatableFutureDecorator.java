@@ -69,13 +69,13 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
   public void run() {
     if (running) {
       if (logger.isTraceEnabled()) {
-        logger.trace(this.toString() + " still running, returning.");
+        logger.trace("{} still running, returning.", this);
       }
       return;
     }
     if (cancelled) {
       if (logger.isDebugEnabled()) {
-        logger.debug("Task " + this.toString() + " has been cancelled. Retunrning immendiately.");
+        logger.debug("Task {} has been cancelled. Retunrning immendiately.", this);
       }
       return;
     }
@@ -108,7 +108,7 @@ class RunnableRepeatableFutureDecorator<V> extends AbstractRunnableFutureDecorat
     boolean success = true;
     if (task != null) {
       if (logger.isDebugEnabled()) {
-        logger.debug("Cancelling task " + this.toString() + " (mayInterruptIfRunning=" + mayInterruptIfRunning + ")...");
+        logger.debug("Cancelling task {} (mayInterruptIfRunning={})...", this, mayInterruptIfRunning);
       }
       success = task.cancel(mayInterruptIfRunning);
     }

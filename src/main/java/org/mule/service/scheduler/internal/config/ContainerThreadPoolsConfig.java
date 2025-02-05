@@ -114,7 +114,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
 
       if (overriddenConfigFile.exists()) {
         if (LOGGER.isDebugEnabled()) {
-          LOGGER.debug("Loading thread pools configuration from " + overriddenConfigFile.getPath());
+          LOGGER.debug("Loading thread pools configuration from {}", overriddenConfigFile.getPath());
         }
 
         try (final FileInputStream configIs = new FileInputStream(overriddenConfigFile)) {
@@ -135,7 +135,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
         getProperty(MULE_HOME_DIRECTORY_PROPERTY) != null ? new File(getProperty(MULE_HOME_DIRECTORY_PROPERTY)) : null;
 
     if (muleHome == null) {
-      LOGGER.info("No " + MULE_HOME_DIRECTORY_PROPERTY + " defined. Using default values for thread pools.");
+      LOGGER.info("No {} defined. Using default values for thread pools.", MULE_HOME_DIRECTORY_PROPERTY);
       return config;
     }
 
@@ -146,7 +146,7 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     }
 
     if (LOGGER.isDebugEnabled()) {
-      LOGGER.debug("Loading thread pools configuration from " + defaultConfigFile.getPath());
+      LOGGER.debug("Loading thread pools configuration from {}", defaultConfigFile.getPath());
     }
 
     try (final FileInputStream configIs = new FileInputStream(defaultConfigFile)) {
@@ -177,36 +177,36 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
     SchedulerPoolStrategy schedulerPoolStrategy = resolveSchedulerPoolStrategy(properties);
     config.setSchedulerPoolStrategy(schedulerPoolStrategy, true);
     resolveNumber(properties, PROP_PREFIX + "gracefulShutdownTimeout", true)
-        .ifPresent(v -> config.setGracefulShutdownTimeout(v));
+        .ifPresent(config::setGracefulShutdownTimeout);
 
     if (schedulerPoolStrategy == UBER) {
       resolveExpression(properties, UBER_THREAD_POOL_SIZE_CORE, engine, false)
-          .ifPresent(v -> config.setUberCorePoolSize(v));
+          .ifPresent(config::setUberCorePoolSize);
       resolveExpression(properties, UBER_THREAD_POOL_SIZE_MAX, engine, false)
-          .ifPresent(v -> config.setUberMaxPoolSize(v));
+          .ifPresent(config::setUberMaxPoolSize);
       resolveExpression(properties, UBER_QUEUE_SIZE, engine, true)
-          .ifPresent(v -> config.setUberQueueSize(v));
+          .ifPresent(config::setUberQueueSize);
       resolveNumber(properties, UBER_THREAD_POOL_KEEP_ALIVE, true)
-          .ifPresent(v -> config.setUberKeepAlive(v));
+          .ifPresent(config::setUberKeepAlive);
     } else if (schedulerPoolStrategy == DEDICATED) {
       resolveExpression(properties, CPU_LIGHT_THREAD_POOL_SIZE, engine, false)
-          .ifPresent(v -> config.setCpuLightPoolSize(v));
+          .ifPresent(config::setCpuLightPoolSize);
       resolveExpression(properties, CPU_LIGHT_WORK_QUEUE_SIZE, engine, true)
-          .ifPresent(v -> config.setCpuLightQueueSize(v));
+          .ifPresent(config::setCpuLightQueueSize);
 
       resolveExpression(properties, IO_THREAD_POOL_SIZE, engine, false)
-          .ifPresent(v -> config.setIoCorePoolSize(v));
+          .ifPresent(config::setIoCorePoolSize);
       resolveExpression(properties, IO_THREAD_POOL_SIZE_MAX, engine, false)
-          .ifPresent(v -> config.setIoMaxPoolSize(v));
+          .ifPresent(config::setIoMaxPoolSize);
       resolveExpression(properties, IO_WORK_QUEUE_SIZE, engine, true)
-          .ifPresent(v -> config.setIoQueueSize(v));
+          .ifPresent(config::setIoQueueSize);
       resolveNumber(properties, IO_THERAD_POOL_KEEP_ALIVE, true)
-          .ifPresent(v -> config.setIoKeepAlive(v));
+          .ifPresent(config::setIoKeepAlive);
 
       resolveExpression(properties, CPU_INTENSIVE_THREAD_POOL_SIZE, engine, false)
-          .ifPresent(v -> config.setCpuIntensivePoolSize(v));
+          .ifPresent(config::setCpuIntensivePoolSize);
       resolveExpression(properties, CPU_INTENSIVE_WORK_QUEUE_SIZE, engine, true)
-          .ifPresent(v -> config.setCpuIntensiveQueueSize(v));
+          .ifPresent(config::setCpuIntensiveQueueSize);
     } else {
       throw new IllegalArgumentException("Unknown pool strategy " + schedulerPoolStrategy);
     }
@@ -501,9 +501,9 @@ public class ContainerThreadPoolsConfig implements SchedulerPoolsConfig {
   private OptionalInt nullableMax(Integer a, Integer b) {
     if (a == null && b == null) {
       return OptionalInt.empty();
-    } else if (a == null && b != null) {
+    } else if (a == null) {
       return OptionalInt.of(b);
-    } else if (a != null && b == null) {
+    } else if (b == null) {
       return OptionalInt.of(a);
     } else {
       return OptionalInt.of(max(a, b));

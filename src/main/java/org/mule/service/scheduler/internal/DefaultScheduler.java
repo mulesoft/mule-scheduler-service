@@ -305,10 +305,10 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   }
 
   private <T> boolean recurrentTaskAlreadyRunning(RunnableFuture<T> task) {
-    return task instanceof RepeatableTaskWrapper && scheduledTasks.keySet()
+    return task instanceof RepeatableTaskWrapper taskRepeatableTaskWrapper && scheduledTasks.keySet()
         .stream()
-        .anyMatch(st -> st instanceof RepeatableTaskWrapper && ((RepeatableTaskWrapper) st)
-            .getCommand() == ((RepeatableTaskWrapper) task).getCommand());
+        .anyMatch(st -> st instanceof RepeatableTaskWrapper stRepeatableTaskWrapper && stRepeatableTaskWrapper
+            .getCommand() == (taskRepeatableTaskWrapper).getCommand());
   }
 
   public void setJobClass(Class<? extends QuartzCronJob> jobClass) {
@@ -336,8 +336,8 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
         final ScheduledFuture<?> scheduledFuture = scheduledTasks.get(task);
 
         if (scheduledFuture != null
-            && (!(scheduledFuture instanceof ScheduledFutureDecorator)
-                || ((ScheduledFutureDecorator) scheduledFuture).isPeriodic())) {
+            && (!(scheduledFuture instanceof ScheduledFutureDecorator<?>sf)
+                || sf.isPeriodic())) {
           scheduledFuture.cancel(false);
         }
       }
@@ -366,8 +366,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     for (Entry<RunnableFuture<?>, ScheduledFuture<?>> taskEntry : scheduledTasks.entrySet()) {
       taskEntry.getValue().cancel(true);
       taskEntry.getKey().cancel(true);
-      if (taskEntry.getKey() instanceof RunnableFutureDecorator
-          && !((RunnableFutureDecorator<?>) taskEntry.getKey()).isStarted()) {
+      if (taskEntry.getKey() instanceof RunnableFutureDecorator<?>decorator && !decorator.isStarted()) {
         tasks.add(taskEntry.getKey());
       }
     }
@@ -391,8 +390,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
       // If the only remaining task is running in this thread currently stopping, return right away to avoid waiting on itself.
       return scheduledTasks.keySet().stream()
           .noneMatch(t -> !currentThread
-              .equals((t instanceof AbstractRunnableFutureDecorator) ? ((AbstractRunnableFutureDecorator) t).getRunningThread()
-                  : null));
+              .equals((t instanceof AbstractRunnableFutureDecorator<?>decorator) ? decorator.getRunningThread() : null));
     }
 
     return false;

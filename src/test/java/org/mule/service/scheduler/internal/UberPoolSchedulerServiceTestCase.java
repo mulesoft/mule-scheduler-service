@@ -6,16 +6,17 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static java.lang.System.lineSeparator;
 import static java.lang.Thread.currentThread;
 import static java.util.Collections.newSetFromMap;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.sameInstance;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasSize;
-import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.when;
 import static org.mule.runtime.api.scheduler.SchedulerPoolStrategy.UBER;
 import static org.mule.service.scheduler.ThreadType.CPU_INTENSIVE;
@@ -57,7 +58,7 @@ public class UberPoolSchedulerServiceTestCase extends SchedulerServiceContractTe
     ThreadGroup group = groups.iterator().next();
 
     assertThat(group, is(not(sameInstance(currentThread().getThreadGroup()))));
-    assertThat(group.getName(), containsString(".uber"));
+    assertThat(group.getName(), containsString("testuber"));
   }
 
   @Test
@@ -77,12 +78,45 @@ public class UberPoolSchedulerServiceTestCase extends SchedulerServiceContractTe
       assertThat(thread.getName(), not(containsString(CPU_LIGHT.name())));
       assertThat(thread.getName(), not(containsString(CPU_INTENSIVE.name())));
 
-      if (thread.getName().contains(".uber")) {
+      if (thread.getName().contains("testuber")) {
         uberCount.addAndGet(1);
       }
     });
 
     assertThat(uberCount.get(), is(greaterThanOrEqualTo(1)));
+  }
+
+  @Override
+  protected String getCpuLightPrefix() {
+    return "IO - uber";
+  }
+
+  @Override
+  protected boolean areCpuLightTasksInWaitGroup() {
+    return true;
+  }
+
+  @Override
+  protected boolean areIoTasksInWaitGroup() {
+    return true;
+  }
+
+  @Override
+  protected boolean areCpuLightTasksInCpuWorkGroup() {
+    return true;
+  }
+
+  @Override
+  protected boolean areIoTasksInCpuWorkGroup() {
+    return true;
+  }
+
+  @Override
+  protected String getSplashMessage() {
+    return "uber.threadPool.maxSize:         " +
+        config.getUberMaxPoolSize().getAsInt() + lineSeparator() +
+        "uber.threadPool.threadKeepAlive: " +
+        config.getUberKeepAlive().getAsLong() + " ms" + lineSeparator();
   }
 
   @Override

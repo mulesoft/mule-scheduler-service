@@ -123,7 +123,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
     long startTime = 0;
     if (logger.isTraceEnabled()) {
       startTime = nanoTime();
-      logger.trace("Starting task " + this + "...");
+      logger.trace("Starting task {}...", this);
     }
     ranAtLeastOnce = true;
     started = true;
@@ -145,7 +145,7 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
 
     if (cl == null) {
       if (logger.isDebugEnabled()) {
-        logger.debug("Task " + this + " has been cancelled. Returning immediately.");
+        logger.debug("Task {} has been cancelled. Returning immediately.", this);
       }
       return;
     }
@@ -181,23 +181,23 @@ abstract class AbstractRunnableFutureDecorator<V> implements RunnableFuture<V> {
       if (task.isCancelled()) {
         if (logger.isTraceEnabled()) {
           // Log instead of rethrow to avoid flooding the logger with stack traces of cancellation, which may be very common.
-          logger.trace("Task " + this + " cancelled");
+          logger.trace("Task {} cancelled", this);
         }
       } else {
         task.get();
       }
     } catch (ExecutionException e) {
-      logger.error("Uncaught throwable in task " + this, e);
+      logger.error("Uncaught throwable in task {}", this, e);
     } catch (InterruptedException e) {
       currentThread.interrupt();
     } finally {
       try {
         wrapUp();
       } catch (Exception e) {
-        logger.error("Exception wrapping up execution of " + this, e);
+        logger.error("Exception wrapping up execution of {}", this, e);
       } finally {
         if (logger.isTraceEnabled()) {
-          logger.trace("Task " + this + " finished after " + (nanoTime() - startTime) + " nanoseconds");
+          logger.trace("Task {} finished after {} nanoseconds", this, nanoTime() - startTime);
         }
 
         currentThread.setContextClassLoader(currentClassLoader);

@@ -6,7 +6,7 @@
  */
 package org.mule.service.scheduler.internal.executor;
 
-import static org.mule.service.scheduler.internal.service.DefaultSchedulerService.USAGE_TRACE_INTERVAL_SECS;
+import static org.mule.service.scheduler.internal.service.DefaultSchedulerService.getTraceLogger;
 
 import static java.lang.Thread.currentThread;
 import static org.apache.commons.lang3.StringUtils.rightPad;
@@ -128,11 +128,11 @@ public final class ByCallerThreadGroupPolicy extends AbstractByCallerPolicy impl
   }
 
   private boolean isLogRejectionEnabled() {
-    return USAGE_TRACE_INTERVAL_SECS != null ? traceLogger.isWarnEnabled() : traceLogger.isDebugEnabled();
+    return getTraceLogger() != null ? traceLogger.isWarnEnabled() : traceLogger.isDebugEnabled();
   }
 
   private void logRejection(String taskAsString, String strategy, String targetAsString) {
-    if (USAGE_TRACE_INTERVAL_SECS != null) {
+    if (getTraceLogger() != null) {
       traceLogger.warn("Task rejected ({}) from '{}' scheduler: {}", rightPad(strategy, 16), targetAsString, taskAsString);
     } else {
       traceLogger.debug("Task rejected ({}) from '{}' scheduler: {}", rightPad(strategy, 16), targetAsString, taskAsString);
