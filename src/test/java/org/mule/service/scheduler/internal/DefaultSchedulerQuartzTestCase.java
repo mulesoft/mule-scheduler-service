@@ -164,17 +164,19 @@ public class DefaultSchedulerQuartzTestCase extends BaseDefaultSchedulerTestCase
     List<Long> startTimes = new ArrayList<>();
     List<Long> endTimes = new ArrayList<>();
 
-    final CountDownLatch latch = new CountDownLatch(2);
+    final CountDownLatch latch = new CountDownLatch(3);
 
     final String everySecond = "0/1 * * ? * *";
     final ScheduledFuture<?> scheduled = executor.scheduleWithCronExpression(() -> {
       startTimes.add(System.nanoTime());
+      latch.countDown();
+
       try {
         sleep(1200);
       } catch (InterruptedException e) {
         currentThread().interrupt();
       }
-      latch.countDown();
+
       endTimes.add(System.nanoTime());
     }, everySecond);
 
@@ -184,7 +186,10 @@ public class DefaultSchedulerQuartzTestCase extends BaseDefaultSchedulerTestCase
     verify(sharedQuartzScheduler).scheduleJob(any(JobDetail.class), argThat(new CronTriggerMatcher(everySecond)));
 
     new PollingProber().check(new JUnitLambdaProbe(() -> {
+      assertThat(startTimes.size(), is(3));
+      assertThat(endTimes.size(), is(3));
       assertThat((double) NANOSECONDS.toMillis(startTimes.get(2) - endTimes.get(1)), closeTo(0, DELTA_MILLIS));
+      assertThat((double) NANOSECONDS.toMillis(startTimes.get(1) - endTimes.get(0)), closeTo(0, DELTA_MILLIS));
       return true;
     }));
   }
