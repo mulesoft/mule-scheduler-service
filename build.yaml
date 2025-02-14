@@ -1,5 +1,5 @@
 upstreamProjects:
-  Mule-runtime/mule/4.8.4
+  Mule-runtime/mule/4.8.5
 # TODO W-17404141: Uncomment once mule-sdk-api and mule-sdk-compatibility-api are deployed to public repos
 # mavenSettingsXmlId: mule-runtime-maven-settings-MuleSettings
 archiveArtifacts: "**/hs_*.log"
