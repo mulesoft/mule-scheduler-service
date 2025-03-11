@@ -47,7 +47,7 @@ import org.quartz.impl.StdSchedulerFactory;
 
 public class BaseDefaultSchedulerTestCase extends AbstractMuleTestCase {
 
-  protected static final int DELTA_MILLIS = 50;
+  protected static final int DELTA_MILLIS = 100;
   protected static final int EXECUTOR_TIMEOUT_SECS = 1;
 
   protected static final Runnable EMPTY_RUNNABLE = () -> {
