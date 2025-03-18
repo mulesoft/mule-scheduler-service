@@ -29,8 +29,6 @@ module org.mule.service.scheduler {
   // context injection
   requires org.mule.runtime.core;
 
-  requires java.inject;
-
   requires org.quartz;
 
   requires org.mozilla.rhino.engine;
