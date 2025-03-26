@@ -47,15 +47,15 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
 
-import javax.inject.Inject;
-import javax.inject.Named;
-
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
 import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.RemovalListener;
 
 import org.slf4j.Logger;
+
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
 /**
  * Default implementation of {@link SchedulerService}.
