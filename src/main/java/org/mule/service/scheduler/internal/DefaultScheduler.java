@@ -14,6 +14,7 @@ import static java.lang.Thread.currentThread;
 import static java.util.Objects.requireNonNull;
 import static java.util.TimeZone.getDefault;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mule.service.scheduler.internal.QuartzCronJob.JOB_TASK_KEY;
 import static org.quartz.CronScheduleBuilder.cronSchedule;
@@ -148,10 +149,24 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   }
 
   private <V> ScheduledFuture<V> doSchedule(final RunnableFuture<V> task, long delay, TimeUnit unit) {
+    if (delay == Long.MAX_VALUE && unit == NANOSECONDS) {
+      task.cancel(false);
+      return new CancelledScheduledFuture<>(task);
+    }
+
     shutdownLock.readLock().lock();
     try {
       // This synchronization is to avoid race conditions against #doShutdown or #fixedDelayWrapUp when processing the same task
       synchronized (task) {
+        if (delay == 0) {
+          try {
+            execute(task);
+          } catch (Exception e) {
+            throw new MuleRuntimeException(e);
+          }
+          return new ImmediateScheduledFuture<>(task);
+        }
+
         final ScheduledFuture<V> scheduled = new ScheduledFutureDecorator(scheduledExecutor.schedule(schedulableTask(task, () -> {
           removeTask(task);
           // Retry after some time, the max theoretical duration of cpu-light tasks
