@@ -151,7 +151,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   private <V> ScheduledFuture<V> doSchedule(final RunnableFuture<V> task, long delay, TimeUnit unit) {
     if (delay == Long.MAX_VALUE && unit == NANOSECONDS) {
       task.cancel(false);
-      return new CancelledScheduledFuture<>(task);
+      return new ZeroDelayScheduledFuture<>(task);
     }
 
     shutdownLock.readLock().lock();
@@ -164,7 +164,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
           } catch (Exception e) {
             throw new MuleRuntimeException(e);
           }
-          return new ImmediateScheduledFuture<>(task);
+          return new ZeroDelayScheduledFuture<>(task);
         }
 
         final ScheduledFuture<V> scheduled = new ScheduledFutureDecorator(scheduledExecutor.schedule(schedulableTask(task, () -> {

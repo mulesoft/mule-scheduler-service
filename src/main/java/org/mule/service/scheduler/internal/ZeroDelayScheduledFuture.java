@@ -14,12 +14,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * Implementation of {@link ScheduledFuture} for immediately executed tasks. This future delegates all operations to the
- * underlying task.
+ * Implementation of {@link ScheduledFuture} for tasks that have no pending delay.
+ * This can represent tasks that are intended for immediate execution or tasks
+ * that have already been cancelled prior to scheduling.
+ * All operations are delegated to the underlying {@link RunnableFuture}.
  *
  * @since 1.10
  */
-final class ImmediateScheduledFuture<V> implements ScheduledFuture<V> {
+final class ZeroDelayScheduledFuture<V> implements ScheduledFuture<V> {
 
   private final RunnableFuture<V> task;
 
@@ -28,7 +30,7 @@ final class ImmediateScheduledFuture<V> implements ScheduledFuture<V> {
    *
    * @param task the task to delegate to
    */
-  ImmediateScheduledFuture(RunnableFuture<V> task) {
+  ZeroDelayScheduledFuture(RunnableFuture<V> task) {
     this.task = task;
   }
 
