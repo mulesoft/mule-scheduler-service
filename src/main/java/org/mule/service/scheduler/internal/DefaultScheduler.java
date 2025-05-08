@@ -6,6 +6,8 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static org.mule.service.scheduler.internal.QuartzCronJob.JOB_TASK_KEY;
+
 import static java.lang.Integer.toHexString;
 import static java.lang.Runtime.getRuntime;
 import static java.lang.System.lineSeparator;
@@ -15,7 +17,7 @@ import static java.util.Objects.requireNonNull;
 import static java.util.TimeZone.getDefault;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.mule.service.scheduler.internal.QuartzCronJob.JOB_TASK_KEY;
+
 import static org.quartz.CronScheduleBuilder.cronSchedule;
 import static org.quartz.JobBuilder.newJob;
 import static org.quartz.TriggerBuilder.newTrigger;
@@ -26,6 +28,7 @@ import org.mule.runtime.api.profiling.ProfilingService;
 import org.mule.runtime.api.scheduler.Scheduler;
 import org.mule.service.scheduler.ThreadType;
 import org.mule.service.scheduler.internal.logging.SuppressingLogger;
+import org.mule.service.scheduler.internal.reporting.ReportableScheduler;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +39,7 @@ import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.RunnableFuture;
@@ -59,7 +63,7 @@ import org.slf4j.Logger;
  *
  * @since 1.0
  */
-public class DefaultScheduler extends AbstractExecutorService implements Scheduler {
+public class DefaultScheduler extends AbstractExecutorService implements ReportableScheduler {
 
   private static final Runnable EMPTY_RUNNABLE = () -> {
   };
@@ -547,6 +551,10 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     } else {
       return getThreadType() + " - " + getName() + "{shutdown: " + shutdown + "}";
     }
+  }
 
+  @Override
+  public Executor getActualExecutor() {
+    return executor;
   }
 }

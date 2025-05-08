@@ -6,7 +6,8 @@
  */
 package org.mule.service.scheduler.internal.reporting;
 
-import org.mule.runtime.api.scheduler.Scheduler;
+import static java.lang.Integer.toHexString;
+
 import org.mule.runtime.api.scheduler.SchedulerView;
 
 /**
@@ -16,14 +17,14 @@ import org.mule.runtime.api.scheduler.SchedulerView;
  */
 public class DefaultSchedulerView implements SchedulerView {
 
-  private Scheduler scheduler;
+  private ReportableScheduler scheduler;
 
   /**
-   * Creates a reporting view for a {@link Scheduler}.
+   * Creates a reporting view for a {@link ReportableScheduler}.
    *
    * @param scheduler the scheduler to provide a view for.
    */
-  public DefaultSchedulerView(Scheduler scheduler) {
+  public DefaultSchedulerView(ReportableScheduler scheduler) {
     this.scheduler = scheduler;
   }
 
@@ -40,6 +41,21 @@ public class DefaultSchedulerView implements SchedulerView {
   @Override
   public boolean isTerminated() {
     return scheduler.isTerminated();
+  }
+
+  @Override
+  public String getActualExecutorId() {
+    return toHexString(scheduler.getActualExecutor().hashCode());
+  }
+
+  @Override
+  public String getActualExecutorToString() {
+    return scheduler.getActualExecutor().toString();
+  }
+
+  @Override
+  public String getThreadType() {
+    return scheduler.getThreadType().name();
   }
 
   @Override
