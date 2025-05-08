@@ -14,10 +14,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * Implementation of {@link ScheduledFuture} for tasks that have no pending delay.
- * This can represent tasks that are intended for immediate execution or tasks
- * that have already been cancelled prior to scheduling.
- * All operations are delegated to the underlying {@link RunnableFuture}.
+ * Implementation of {@link ScheduledFuture} for tasks that have no pending delay. This can represent tasks that are intended for
+ * immediate execution or tasks that have already been cancelled prior to scheduling. All operations are delegated to the
+ * underlying {@link RunnableFuture}.
  *
  * @since 1.10
  */
