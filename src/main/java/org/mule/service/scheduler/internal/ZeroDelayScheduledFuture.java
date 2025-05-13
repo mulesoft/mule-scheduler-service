@@ -6,6 +6,8 @@
  */
 package org.mule.service.scheduler.internal;
 
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
+
 import java.util.concurrent.Delayed;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RunnableFuture;

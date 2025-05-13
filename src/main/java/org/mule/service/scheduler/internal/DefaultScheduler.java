@@ -14,7 +14,6 @@ import static java.lang.Thread.currentThread;
 import static java.util.Objects.requireNonNull;
 import static java.util.TimeZone.getDefault;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
-import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.mule.service.scheduler.internal.QuartzCronJob.JOB_TASK_KEY;
 import static org.quartz.CronScheduleBuilder.cronSchedule;
@@ -69,6 +68,11 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
    * Forced shutdown delay. The time to wait while threads are being interrupted.
    */
   private static final long FORCEFUL_SHUTDOWN_TIMEOUT_SECS = 5;
+
+  /**
+   * Maximum delay in nanoseconds (approximately 146 years)
+   */
+  private static final long MAX_DELAY = (Long.MAX_VALUE >>> 1) - 1;
 
   private static final Logger LOGGER = getLogger(DefaultScheduler.class);
 
@@ -149,8 +153,14 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   }
 
   private <V> ScheduledFuture<V> doSchedule(final RunnableFuture<V> task, long delay, TimeUnit unit) {
-    if (delay == Long.MAX_VALUE && unit == NANOSECONDS) {
+    // 1) If the delay is excessively long, the task will be cancelled.
+    if (delay >= MAX_DELAY) {
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Task scheduling cancelled due to excessive delay ({} {})", delay, unit);
+      }
       task.cancel(false);
+      // Returns ZeroDelayScheduledFuture instead of NullScheduledFuture to better reflect the task's status,
+      // as NullScheduledFuture always returns false for both isCancelled() and isDone().
       return new ZeroDelayScheduledFuture<>(task);
     }
 
@@ -158,12 +168,15 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     try {
       // This synchronization is to avoid race conditions against #doShutdown or #fixedDelayWrapUp when processing the same task
       synchronized (task) {
+        // 2) If the delay is zero, the task is executed immediately.
         if (delay == 0) {
           try {
             execute(task);
           } catch (Exception e) {
             throw new MuleRuntimeException(e);
           }
+          // Returns ZeroDelayScheduledFuture instead of NullScheduledFuture to better reflect the task's status,
+          // as NullScheduledFuture always returns false for both isCancelled() and isDone().
           return new ZeroDelayScheduledFuture<>(task);
         }
 
