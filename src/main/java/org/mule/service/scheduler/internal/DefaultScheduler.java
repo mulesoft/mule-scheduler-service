@@ -68,6 +68,11 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
    */
   private static final long FORCEFUL_SHUTDOWN_TIMEOUT_SECS = 5;
 
+  /**
+   * Maximum delay in nanoseconds (approximately 146 years)
+   */
+  private static final long MAX_DELAY = (Long.MAX_VALUE >>> 1) - 1;
+
   private static final Logger LOGGER = getLogger(DefaultScheduler.class);
 
   private final AtomicInteger idGenerator = new AtomicInteger(0);
@@ -144,10 +149,33 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   }
 
   private <V> ScheduledFuture<V> doSchedule(final RunnableFuture<V> task, long delay, TimeUnit unit) {
+    // 1) If the delay is excessively long, the task will be cancelled.
+    if (delay >= MAX_DELAY) {
+      if (LOGGER.isDebugEnabled()) {
+        LOGGER.debug("Task scheduling cancelled due to excessive delay ({} {})", delay, unit);
+      }
+      task.cancel(false);
+      // Returns ZeroDelayScheduledFuture instead of NullScheduledFuture to better reflect the task's status,
+      // as NullScheduledFuture always returns false for both isCancelled() and isDone().
+      return new ZeroDelayScheduledFuture<>(task);
+    }
+
     shutdownLock.readLock().lock();
     try {
       // This synchronization is to avoid race conditions against #doShutdown or #fixedDelayWrapUp when processing the same task
       synchronized (task) {
+        // 2) If the delay is zero, the task is executed immediately.
+        if (delay == 0) {
+          try {
+            execute(task);
+          } catch (Exception e) {
+            throw new MuleRuntimeException(e);
+          }
+          // Returns ZeroDelayScheduledFuture instead of NullScheduledFuture to better reflect the task's status,
+          // as NullScheduledFuture always returns false for both isCancelled() and isDone().
+          return new ZeroDelayScheduledFuture<>(task);
+        }
+
         final ScheduledFuture<V> scheduled = new ScheduledFutureDecorator(scheduledExecutor.schedule(schedulableTask(task, () -> {
           removeTask(task);
           // Retry after some time, the max theoretical duration of cpu-light tasks
