@@ -12,30 +12,26 @@ import static java.util.concurrent.TimeUnit.NANOSECONDS;
 import org.mule.runtime.api.exception.MuleRuntimeException;
 
 import java.util.concurrent.Delayed;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.RunnableFuture;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import org.quartz.Scheduler;
 import org.quartz.SchedulerException;
 import org.quartz.Trigger;
 
-public class QuartzScheduledFuture<V> implements ScheduledFuture<V> {
+public class QuartzScheduledFuture<V> extends AbstractDelegatedScheduledFuture<V> {
 
   private final Scheduler quartzScheduler;
   private final Trigger trigger;
-  private final RunnableFuture<?> task;
 
   /**
    *
    * @param task the actual task that was scheduled.
    */
   QuartzScheduledFuture(org.quartz.Scheduler quartzScheduler, Trigger trigger, RunnableFuture<?> task) {
+    super((RunnableFuture<V>) task);
     this.quartzScheduler = quartzScheduler;
     this.trigger = trigger;
-    this.task = task;
   }
 
   @Override
@@ -69,23 +65,8 @@ public class QuartzScheduledFuture<V> implements ScheduledFuture<V> {
   }
 
   @Override
-  public boolean isCancelled() {
-    return task.isCancelled();
-  }
-
-  @Override
   public boolean isDone() {
     return task.isCancelled() || task.isDone();
-  }
-
-  @Override
-  public V get() throws InterruptedException, ExecutionException {
-    return (V) task.get();
-  }
-
-  @Override
-  public V get(long timeout, TimeUnit unit) throws InterruptedException, ExecutionException, TimeoutException {
-    return (V) task.get(timeout, unit);
   }
 
 }
