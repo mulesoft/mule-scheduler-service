@@ -24,7 +24,6 @@
         </surefire.args>
 
         <javaModuleName>org.mule.service.scheduler</javaModuleName>
-        <formatterConfigPath>formatter.xml</formatterConfigPath>
     </properties>
 
     <scm>
