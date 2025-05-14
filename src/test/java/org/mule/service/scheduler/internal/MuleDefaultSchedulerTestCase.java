@@ -56,8 +56,10 @@ public class MuleDefaultSchedulerTestCase extends AbstractMuleExecutorTestCase {
     assertThat(latch.await(EXECUTOR_TIMEOUT_SECS, SECONDS), is(true));
     assertThat(nanoTime() - startTime, lessThan(SECONDS.toNanos(1)));
     taskLatch.countDown();
+    assertThat(scheduled.get(), nullValue());
     assertThat(scheduled.get(EXECUTOR_TIMEOUT_SECS, SECONDS), nullValue());
     assertThat(scheduled.isDone(), is(true));
+    assertThat(scheduled.getDelay(NANOSECONDS), is(0L));
   }
 
   @Test
@@ -73,5 +75,19 @@ public class MuleDefaultSchedulerTestCase extends AbstractMuleExecutorTestCase {
     assertThat(scheduled.isCancelled(), is(true));
     assertThat(scheduled.isDone(), is(true));
     assertThat(latch.getCount(), is(1L)); // task should not execute
+  }
+
+  @Test
+  @Description("Tests that the compareTo method orders tasks by their delay correctly")
+  public void compareToOrdersTasksByDelay() {
+    // Create futures with different delays
+    final ScheduledFuture<?> shortDelay = executor.schedule(() -> {
+    }, 10, NANOSECONDS);
+    final ScheduledFuture<?> longDelay = executor.schedule(() -> {
+    }, 100, NANOSECONDS);
+
+    // Zero delay should come before positive delay in ordering
+    assertThat(shortDelay.compareTo(longDelay) < 0, is(true));
+    assertThat(longDelay.compareTo(shortDelay) > 0, is(true));
   }
 }

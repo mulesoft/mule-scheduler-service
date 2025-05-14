@@ -87,6 +87,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
   private final ThreadType threadType;
 
   private Class<? extends QuartzCronJob> jobClass = QuartzCronJob.class;
+  private final Object lock = new Object();
 
   /**
    * Wait condition to support awaitTermination
@@ -167,7 +168,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     shutdownLock.readLock().lock();
     try {
       // This synchronization is to avoid race conditions against #doShutdown or #fixedDelayWrapUp when processing the same task
-      synchronized (task) {
+      synchronized (lock) {
         // 2) If the delay is zero, the task is executed immediately.
         if (delay == 0) {
           try {
