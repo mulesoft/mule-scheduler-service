@@ -364,7 +364,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
         final ScheduledFuture<?> scheduledFuture = scheduledTasks.get(task);
 
         if (scheduledFuture != null
-            && (!(scheduledFuture instanceof ScheduledFutureDecorator<?>sf)
+            && (!(scheduledFuture instanceof ScheduledFutureDecorator<?> sf)
                 || sf.isPeriodic())) {
           scheduledFuture.cancel(false);
         }
@@ -394,7 +394,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
     for (Entry<RunnableFuture<?>, ScheduledFuture<?>> taskEntry : scheduledTasks.entrySet()) {
       taskEntry.getValue().cancel(true);
       taskEntry.getKey().cancel(true);
-      if (taskEntry.getKey() instanceof RunnableFutureDecorator<?>decorator && !decorator.isStarted()) {
+      if (taskEntry.getKey() instanceof RunnableFutureDecorator<?> decorator && !decorator.isStarted()) {
         tasks.add(taskEntry.getKey());
       }
     }
@@ -418,7 +418,7 @@ public class DefaultScheduler extends AbstractExecutorService implements Schedul
       // If the only remaining task is running in this thread currently stopping, return right away to avoid waiting on itself.
       return scheduledTasks.keySet().stream()
           .noneMatch(t -> !currentThread
-              .equals((t instanceof AbstractRunnableFutureDecorator<?>decorator) ? decorator.getRunningThread() : null));
+              .equals((t instanceof AbstractRunnableFutureDecorator<?> decorator) ? decorator.getRunningThread() : null));
     }
 
     return false;
