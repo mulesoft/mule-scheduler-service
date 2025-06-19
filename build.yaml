@@ -1,5 +1,5 @@
 upstreamProjects:
-  Mule-runtime/mule/master
+  Mule-runtime/mule/master-TESTCYCLE-2020-DRY-RUN
 mavenSettingsXmlId: mule-runtime-maven-settings-MuleSettings
 archiveArtifacts: "**/hs_*.log"
 projectType: runtime
